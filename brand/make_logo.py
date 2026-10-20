@@ -11,9 +11,8 @@ OUT = Path(__file__).parent
 BLUE = "#3D7BFF"
 BLACK = "#05070D"
 
-# Drawing coordinates. FRAME is the square that maps onto the 512 canvas; the outer arc is
-# allowed to run off its left edge, which keeps the ring large.
-FRAME = (-60, 20, 860)  # x, y, size
+# Drawing coordinates; the whole mark is centred in the 512 canvas with this margin on each side.
+MARGIN = 0.08
 CENTER = (205, 525)
 RING = {"r": 111, "width": 44}
 # (radius at start, radius at tip, start deg, end deg, width). Angles are math-style
@@ -24,7 +23,7 @@ ARCS = [
     (198, 180, 226, 356, 32),
     (275, 248, 271, 403, 40),
     (345, 312, 316, 448, 38),
-    (410, 384, 0, 150, 42),
+    (410, 384, 0, 135, 42),
 ]
 STEPS = 240
 
@@ -49,18 +48,27 @@ def arc_polygon(r0: float, r1: float, start: float, end: float, width: float) ->
     return outer + inner[::-1]
 
 
+def frame(shapes: list[list[tuple[float, float]]]) -> tuple[float, float, float]:
+    """Square (x, y, size) centred on the mark's bounding box, padded by MARGIN."""
+    xs = [px for s in shapes for px, _ in s]
+    ys = [py for s in shapes for _, py in s]
+    size = max(max(xs) - min(xs), max(ys) - min(ys)) / (1 - 2 * MARGIN)
+    return (max(xs) + min(xs) - size) / 2, (max(ys) + min(ys) - size) / 2, size
+
+
 def mark(color: str) -> str:
-    x, y, size = FRAME
-    scale = 512 / size
     cx, cy = CENTER
+    rr = RING["r"] + RING["width"] / 2
+    shapes = [arc_polygon(*arc) for arc in ARCS]
+    x, y, size = frame(shapes + [[(cx - rr, cy - rr), (cx + rr, cy + rr)]])
+    scale = 512 / size
     paths = [
         f'<circle cx="{cx}" cy="{cy}" r="{RING["r"]}" fill="none" stroke="{color}" stroke-width="{RING["width"]}"/>'
     ]
-    for arc in ARCS:
-        pts = arc_polygon(*arc)
+    for pts in shapes:
         paths.append('<path d="M ' + " L ".join(f"{px:.1f} {py:.1f}" for px, py in pts) + f' Z" fill="{color}"/>')
     body = "\n    ".join(paths)
-    return f'<g transform="scale({scale:.5f}) translate({-x} {-y})">\n    {body}\n  </g>'
+    return f'<g transform="scale({scale:.5f}) translate({-x:.1f} {-y:.1f})">\n    {body}\n  </g>'
 
 
 def svg(body: str, clip: str) -> str:
