@@ -15,16 +15,16 @@ BLACK = "#05070D"
 # allowed to run off its left edge, which keeps the ring large.
 FRAME = (-60, 20, 860)  # x, y, size
 CENTER = (205, 525)
-RING = {"r": 111, "width": 38}
+RING = {"r": 111, "width": 44}
 # (radius at start, radius at tip, start deg, end deg, width). Angles are math-style
 # (0 = right, counter-clockwise). Each arc starts 45 degrees further round than the one inside
 # it and is longer than it. Each is cut flat at the start, thins into a long tail, and curls
 # slightly inward as it goes.
 ARCS = [
-    (198, 180, 226, 356, 26),
-    (275, 248, 271, 403, 32),
-    (345, 312, 316, 448, 30),
-    (410, 384, 0, 150, 34),
+    (198, 180, 226, 356, 32),
+    (275, 248, 271, 403, 40),
+    (345, 312, 316, 448, 38),
+    (410, 384, 0, 150, 42),
 ]
 STEPS = 240
 
