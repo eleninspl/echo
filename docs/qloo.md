@@ -13,9 +13,9 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 | Find candidates | `/v2/insights`, `filter.type=urn:entity:person`, show as signal |
 | Fit | Candidate's `query.affinity` from the call above, or `filter.results.entities=<guest>` to score one guest directly |
 | Love back | `/v2/insights`, `filter.type=urn:entity:podcast`, guest as signal, `filter.results.entities=<show>` |
-| Reach | `/v2/analysis/compare` with the show as `a` and the guest as `b` |
+| Reach | Overlap of the show's and the guest's audience maps (same insights calls, guest as signal): less overlap, more new listeners |
 | Who the new listeners are | `/v2/insights`, `filter.type=urn:demographics`, guest as signal |
-| Episode theme | `/v2/insights`, `filter.type=urn:tag` (taste analysis) for show and guest, then the tags they share |
+| Episode theme | Shared tags from `/v2/analysis/compare` and `filter.type=urn:tag` |
 
 ## Basics
 
@@ -23,6 +23,7 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 - Auth: `X-Api-Key` header. **Verified.**
 - Every call is GET with params in the query string. POST to `/v2/insights` fails with "No path matching request parameters".
 - Recommended flow: get IDs from `/search` (entities) or `/v2/tags` (tags), then pass them to `/v2/insights`.
+- `engine/echo_engine/params.py` rejects any Insights param not documented for its `filter.type`, plus all demographic and person-attribute params.
 
 ## Endpoints
 
@@ -32,7 +33,7 @@ Params: `query`, `types`, `take`, `page`, `sort_by` (`match`, `distance`, `popul
 
 Response: `{ results: [...] }`. Each result has `entity_id`, `name`, `types`, `popularity` (0 to 1), `tags`, `disambiguation`, `properties` (`short_description`, `short_descriptions`, `image`, `external`).
 
-### `GET /v2/insights`: recommendations and analysis (**verified** for people)
+### `GET /v2/insights`: recommendations and analysis (**verified** for person, podcast, artist, book, movie, brand and tv_show)
 
 `filter.type` is required. Values from the hackathon guide: `urn:entity:artist`, `urn:entity:book`, `urn:entity:brand`, `urn:entity:destination`, `urn:entity:movie`, `urn:entity:person`, `urn:entity:place`, `urn:entity:podcast`, `urn:entity:tv_show`, `urn:entity:video_game`. Also `urn:demographics` (audience makeup) and `urn:tag` (taste analysis). Music is `artist`, never `music`.
 
@@ -51,7 +52,9 @@ Response (**verified**): `{ success, results: { entities: [...] }, query }`. Eac
 
 ### `GET /v2/analysis/compare`: what two sets of tastes share and where they differ
 
-Params: `a.signal.interests.entities`, `b.signal.interests.entities` (both required), `filter.type`, `filter.subtype` (`urn:tag:occupation`, `urn:tag:genre`), `model` (`descriptive`, `predictive`), `take` (1 to 50), `page`, `offset`. Response shape not documented. Not yet called.
+Params: `a.signal.interests.entities`, `b.signal.interests.entities` (both required), `filter.type`, `filter.subtype` (`urn:tag:occupation`, `urn:tag:genre`), `model` (`descriptive`, `predictive`), `take` (1 to 50), `page`, `offset`.
+
+**Verified** (show as `a`, person as `b`; `/v2/insights/compare` also works). Response `results`: `tags` (shared, with `query.score`; few and broad), `a` and `b` (one-sided tags with `query.count`; `b` can include a gender tag, which Echo drops), `matchEntities` (empty). Tag level only, so it explains a match but doesn't measure audience overlap.
 
 ### `GET /v2/insights?filter.type=urn:demographics`: audience makeup
 
@@ -59,7 +62,9 @@ Pass an entity or tag as signal. Response: `results.demographics[]`, each with `
 
 ### `GET /v2/insights?filter.type=urn:tag`: taste analysis
 
-Returns tags tied to an entity. Combine with `signal.interests.entities`, `filter.tag.types` and `filter.parents.types`. Response: `results.tags[]` with `tag_id`, `name`, `types`, `subtype`, `tag_value`. The documented example has no score field. Not yet called.
+Returns tags tied to an entity. Combine with `signal.interests.entities`, `filter.tag.types` and `filter.parents.types`. Response: `results.tags[]` with `tag_id`, `name`, `types`, `subtype`, `tag_value`.
+
+**Verified** for a podcast: every tag had `query.affinity` 1, and subtypes mix useful (motif, lifestyle), noise and sensitive (ethnicity). Allow-list subtypes before use.
 
 ### `GET /v2/tags`: find tag IDs by keyword
 
@@ -78,6 +83,16 @@ Results themselves are not written down here, because Qloo response data must no
   - The top pick had died. Insights returns people who have died, so Echo must drop them. `properties` may carry a date of death; check.
   - Affinity scores were bunched tightly near the top of the 0 to 1 range, so raw affinity alone won't separate candidates much.
   - With a single input entity, explainability gives every result a score of 1, so it says nothing. Reasons for a match have to come from shared tags or compare.
+- **20 Oct, engine spike (`engine/scripts/spike.py`), 7 shows incl. comedy, music and sports:**
+  - Almost all top-20 people are plausible guests, in every genre.
+  - Hosts come back for their own show, plus near-duplicate entities. Exclude hosts, dedupe names.
+  - The deceased carry `properties.date_of_death`; drop them after the call.
+  - `filter.popularity.max=0.8` gives less famous but still relevant people.
+  - Love back works, but saturates when all candidates come from one world; also use the show's rank among the guest audience's podcasts.
+  - Audience-map overlap spreads well between guests, so the sweet spot is measurable.
+  - Multi-signal explainability names a top driver, but scores are nearly equal: secondary reason only.
+  - The guest audience's podcasts that the show's audience lacks are the clearest "new audience" signal.
+  - About 90 calls and 25 s per show uncached; instant cached.
 
 ## Errors
 
@@ -110,8 +125,8 @@ Echo doesn't depend on either.
 
 1. ~~Does a well-known podcast exist as a podcast entity?~~ Yes.
 2. ~~Do people come back from a show as input?~~ Yes, with affinity scores.
-3. Are the top people distinctive or just the most famous? Try `filter.popularity.max` and more shows (comedy, music, sports).
-4. Does love back work: guest as input, `filter.type=urn:entity:podcast`, `filter.results.entities=<show>`?
-5. What does `/v2/analysis/compare` return for a show and a guest?
-6. Do `urn:demographics` and `urn:tag` return useful data for a podcast and a person?
-7. How do we detect people who have died?
+3. ~~Distinctive or just famous?~~ Famous by default; `filter.popularity.max` fixes it.
+4. ~~Does love back work?~~ Yes.
+5. ~~What does compare return?~~ Shared and one-sided tags.
+6. `urn:tag`: yes, after filtering. `urn:demographics`: not called; whether to use it is undecided.
+7. ~~How do we detect people who have died?~~ `properties.date_of_death`.
