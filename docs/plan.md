@@ -21,3 +21,8 @@ A starting point to discuss, not agreed yet. Ten days from 20 October to the dea
 5. **Who counts as a guest.** Only Qloo person entities, or also the hosts of other podcasts (through their podcast entities)?
 6. **Demo shows.** Which 3 or so shows to feature, picked after the coverage checks. Comedy, music and sports first.
 7. **Who does what.** Split between the two of us.
+8. **Qloo quota.** 10,000 calls a month, about 9,500 left on 20 October, and judges' demo use counts against it. That means precomputing the featured demo shows, keeping a cache that survives Vercel deploys (for example Vercel Blob or a Redis store from the Vercel Marketplace, not local files), capping live analyses per visitor, and asking for a higher limit in Qloo's Discord `#api-help`.
+
+## Progress
+
+- **20 Oct:** coverage probe run on 6 shows. Go. Reach needs a v2 before the scoring is locked. See [qloo.md](qloo.md).
