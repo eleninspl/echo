@@ -14,13 +14,13 @@ BLACK = "#05070D"
 RING = {"c": (100, 262), "r": 53, "width": 23}
 # (centre x, centre y, radius, start deg, end deg, width, taper). Angles are math-style
 # (0 = right, counter-clockwise). Centres are slightly offset so the arcs swirl around the ring.
+# radius may be a (start, end) pair, which makes the arc a spiral that widens as it goes.
 # taper "end": cut flat at the start and fades to a point at the end, like a comet trail;
 # taper "both": a thin crescent that fades at both ends.
 ARCS = [
     (100, 262, 87, 222, 345, 18, "end"),  # hugs under the ring
-    (110, 262, 132, 262, 400, 19, "end"),
-    (105, 258, 170, 312, 385, 20, "end"),
-    (115, 270, 160, 45, 100, 10, "both"),  # thin accent near the top
+    (112, 265, (122, 152), 262, 460, 18, "end"),  # spiral: up the right side and over the top
+    (105, 258, 177, 312, 385, 18, "end"),
     (115, 270, 204, 0, 145, 21, "end"),  # big outer sweep over the top
 ]
 STEPS = 180
@@ -36,18 +36,19 @@ def profile(u: float, taper: str) -> float:
 
 
 def crescent(
-    cx: float, cy: float, r: float, start: float, end: float, width: float, taper: str
+    cx: float, cy: float, r: float | tuple[float, float], start: float, end: float, width: float, taper: str
 ) -> list[tuple[float, float]]:
     """Polygon for an arc of the given width, shaped along its length by `profile`.
 
     The outer edge stays a perfect circle and only the inner edge moves in, so the arc reads
     as one continuous curve (a crescent) rather than bending where it starts to taper.
     """
+    r0, r1 = r if isinstance(r, tuple) else (r, r)
     outer, inner = [], []
     for i in range(STEPS + 1):
         u = i / STEPS
         a = radians(start + (end - start) * u)
-        ro = r + width / 2
+        ro = r0 + (r1 - r0) * u + width / 2
         ri = ro - max(0.4, width * profile(u, taper))
         outer.append((cx + ro * cos(a), cy - ro * sin(a)))
         inner.append((cx + ri * cos(a), cy - ri * sin(a)))
