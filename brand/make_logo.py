@@ -14,16 +14,16 @@ BLACK = "#05070D"
 # Drawing coordinates; the whole mark is centred in the 512 canvas with this margin on each side.
 MARGIN = 0.08
 CENTER = (205, 525)
-RING = {"r": 111, "width": 44}
+RING = {"r": 111, "width": 54}
 # (radius at start, radius at tip, start deg, end deg, width). Angles are math-style
 # (0 = right, counter-clockwise). Each arc starts 45 degrees further round than the one inside
 # it and is longer than it. Each is cut flat at the start, thins into a long tail, and curls
 # slightly inward as it goes.
 ARCS = [
-    (198, 180, 226, 356, 32),
-    (275, 248, 271, 403, 40),
-    (345, 312, 316, 448, 38),
-    (410, 384, 0, 135, 42),
+    (198, 180, 226, 356, 42),
+    (277, 250, 271, 403, 52),
+    (352, 318, 316, 448, 50),
+    (425, 398, 0, 135, 54),
 ]
 STEPS = 240
 
