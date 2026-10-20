@@ -1,0 +1,24 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+
+# Private Qloo response cache: never commit (repo goes public)
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
