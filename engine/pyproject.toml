@@ -1,0 +1,24 @@
+[project]
+name = "echo-engine"
+version = "0.1.0"
+description = "Echo engine: finds podcast guests in the audience sweet spot using the Qloo Taste AI API."
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "pydantic>=2.7",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["echo_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
