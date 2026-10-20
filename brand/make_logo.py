@@ -11,19 +11,19 @@ OUT = Path(__file__).parent
 BLUE = "#3D7BFF"
 BLACK = "#05070D"
 
-RING = {"c": (100, 262), "r": 53, "width": 17}
+RING = {"c": (100, 262), "r": 53, "width": 23}
 # (centre x, centre y, radius, start deg, end deg, width, taper). Angles are math-style
 # (0 = right, counter-clockwise). Centres are slightly offset so the arcs swirl around the ring.
 # taper "end": cut flat at the start and fades to a point at the end, like a comet trail;
 # taper "both": a thin crescent that fades at both ends.
 ARCS = [
-    (100, 262, 85, 222, 345, 13, "end"),  # hugs under the ring
-    (110, 262, 132, 262, 400, 14, "end"),
-    (105, 258, 170, 312, 385, 15, "end"),
-    (115, 270, 160, 45, 100, 7, "both"),  # thin accent near the top
-    (115, 270, 204, 0, 145, 16, "end"),  # big outer sweep over the top
+    (100, 262, 87, 222, 345, 18, "end"),  # hugs under the ring
+    (110, 262, 132, 262, 400, 19, "end"),
+    (105, 258, 170, 312, 385, 20, "end"),
+    (115, 270, 160, 45, 100, 10, "both"),  # thin accent near the top
+    (115, 270, 204, 0, 145, 21, "end"),  # big outer sweep over the top
 ]
-STEPS = 64
+STEPS = 180
 MARGIN = 40
 
 
@@ -38,14 +38,19 @@ def profile(u: float, taper: str) -> float:
 def crescent(
     cx: float, cy: float, r: float, start: float, end: float, width: float, taper: str
 ) -> list[tuple[float, float]]:
-    """Polygon for an arc of the given width, shaped along its length by `profile`."""
+    """Polygon for an arc of the given width, shaped along its length by `profile`.
+
+    The outer edge stays a perfect circle and only the inner edge moves in, so the arc reads
+    as one continuous curve (a crescent) rather than bending where it starts to taper.
+    """
     outer, inner = [], []
     for i in range(STEPS + 1):
         u = i / STEPS
         a = radians(start + (end - start) * u)
-        half = max(0.4, width * profile(u, taper)) / 2
-        outer.append((cx + (r + half) * cos(a), cy - (r + half) * sin(a)))
-        inner.append((cx + (r - half) * cos(a), cy - (r - half) * sin(a)))
+        ro = r + width / 2
+        ri = ro - max(0.4, width * profile(u, taper))
+        outer.append((cx + ro * cos(a), cy - ro * sin(a)))
+        inner.append((cx + ri * cos(a), cy - ri * sin(a)))
     return outer + inner[::-1]
 
 
