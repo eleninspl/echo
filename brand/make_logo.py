@@ -11,28 +11,39 @@ OUT = Path(__file__).parent
 BLUE = "#3D7BFF"
 BLACK = "#05070D"
 
-RING = {"c": (200, 280), "r": 56, "width": 28}
-# (centre x, centre y, radius, start deg, end deg, max width). Angles are math-style
-# (0 = right, counter-clockwise). Centres are slightly offset so the arcs swirl instead of
-# nesting like a Wi-Fi icon, and each arc tapers to points at both ends.
+RING = {"c": (100, 262), "r": 53, "width": 17}
+# (centre x, centre y, radius, start deg, end deg, width, taper). Angles are math-style
+# (0 = right, counter-clockwise). Centres are slightly offset so the arcs swirl around the ring.
+# taper "end": cut flat at the start and fades to a point at the end, like a comet trail;
+# taper "both": a thin crescent that fades at both ends.
 ARCS = [
-    (215, 270, 104, 195, 335, 16),  # hugs under the ring
-    (200, 272, 152, -65, 50, 20),
-    (205, 268, 184, 28, 92, 8),  # thin accent near the top
-    (196, 272, 218, -55, 62, 24),
-    (186, 266, 262, -38, 132, 30),  # big outer sweep over the top
+    (100, 262, 85, 222, 345, 13, "end"),  # hugs under the ring
+    (110, 262, 132, 262, 400, 14, "end"),
+    (105, 258, 170, 312, 385, 15, "end"),
+    (115, 270, 160, 45, 100, 7, "both"),  # thin accent near the top
+    (115, 270, 204, 0, 145, 16, "end"),  # big outer sweep over the top
 ]
 STEPS = 64
 MARGIN = 40
 
 
-def crescent(cx: float, cy: float, r: float, start: float, end: float, width: float) -> list[tuple[float, float]]:
-    """Polygon for an arc whose width swells to `width` in the middle and tapers to ~0 at the ends."""
+def profile(u: float, taper: str) -> float:
+    """Width factor (0..1) along the arc at position u (0 = start, 1 = end)."""
+    if taper == "both":
+        return sin(pi * u)
+    t = 1 - u if taper == "end" else u
+    return sin(pi / 2 * min(1.0, t / 0.55))
+
+
+def crescent(
+    cx: float, cy: float, r: float, start: float, end: float, width: float, taper: str
+) -> list[tuple[float, float]]:
+    """Polygon for an arc of the given width, shaped along its length by `profile`."""
     outer, inner = [], []
     for i in range(STEPS + 1):
         u = i / STEPS
         a = radians(start + (end - start) * u)
-        half = (0.6 + (width - 0.6) * sin(pi * u)) / 2
+        half = max(0.4, width * profile(u, taper)) / 2
         outer.append((cx + (r + half) * cos(a), cy - (r + half) * sin(a)))
         inner.append((cx + (r - half) * cos(a), cy - (r - half) * sin(a)))
     return outer + inner[::-1]
