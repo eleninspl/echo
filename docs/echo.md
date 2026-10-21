@@ -67,6 +67,6 @@ The sweet spot is high fit, high love back and high reach. A guest with high fit
 - **Podcast coverage.** Smaller shows may be missing from Qloo. The demo should use shows we have confirmed are there.
 - **Outreach in a demo.** Echo must not email real guests from a hackathon demo. Invitations should go to the host's own inbox or a test address.
 - **Audience, not topic.** Qloo follows who listens, not what the show is about. A music interview show can point to journalists its listeners also follow. That is the point of Echo, but the app has to explain it, or a host will read it as a wrong answer.
-- **Quota.** 10,000 Qloo calls a month for build and judging together, and a full analysis costs roughly 25 to 45 calls. The demo needs a few precomputed featured shows and a persistent cache.
+- **Quota.** 50,000 Qloo calls a month for build and judging together (raised from 10,000 on 21 Oct). A full analysis costs roughly 25 to 130 calls, depending on how many guests are scored. The demo still needs a few precomputed featured shows and a persistent cache.
 
 The first probe results (20 Oct) are in [qloo.md](qloo.md), under "Findings from real calls".

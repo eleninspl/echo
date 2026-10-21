@@ -4,6 +4,8 @@ Qloo holds a taste graph of more than 250 million things people like, across mus
 
 Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-llm-hackathon-developer-guide) and the reference pages it links to. Facts marked **verified** were confirmed with a real call to the hackathon server.
 
+Every API feature and whether it works on the hackathon server: [qloo-map.md](qloo-map.md).
+
 ## What Echo uses it for
 
 | Echo step | Call |
@@ -34,7 +36,7 @@ Response: `{ results: [...] }`. Each result has `entity_id`, `name`, `types`, `p
 
 ### `GET /v2/insights`: recommendations and analysis (**verified** for people)
 
-`filter.type` is required. Values from the hackathon guide: `urn:entity:artist`, `urn:entity:book`, `urn:entity:brand`, `urn:entity:destination`, `urn:entity:movie`, `urn:entity:person`, `urn:entity:place`, `urn:entity:podcast`, `urn:entity:tv_show`, `urn:entity:video_game`. Also `urn:demographics` (audience makeup) and `urn:tag` (taste analysis). Music is `artist`, never `music`.
+`filter.type` is required. Values from the hackathon guide: `urn:entity:artist`, `urn:entity:book`, `urn:entity:brand`, `urn:entity:destination`, `urn:entity:movie`, `urn:entity:person`, `urn:entity:place`, `urn:entity:podcast`, `urn:entity:tv_show`, `urn:entity:videogame`. The guide writes `video_game`, which returns 400 (**verified**). Also `urn:demographics` (audience makeup) and `urn:tag` (taste analysis). Music is `artist`, never `music`.
 
 Params valid for person, podcast, artist, tv_show, movie, book and brand:
 
@@ -59,19 +61,19 @@ Comparing a podcast with a person is not useful: the two use different tag vocab
 
 ### `GET /v2/insights?filter.type=urn:demographics`: audience makeup
 
-Pass an entity or tag as signal. Response: `results.demographics[]`, each with `entity_id`, `query.age` (score per age bucket) and `query.gender` (`male`, `female`). Positive means the group over-indexes, negative means it under-indexes. Not yet called.
+Pass an entity or tag as signal. Response: `results.demographics[]`, each with `entity_id`, `query.age` (score per age bucket) and `query.gender` (`male`, `female`). Positive means the group over-indexes, negative means it under-indexes. **Verified** 21 Oct: it returns one block per input entity, so a show and several guests fit in one call.
 
 ### `GET /v2/insights?filter.type=urn:tag`: taste analysis
 
-Returns tags tied to an entity. Combine with `signal.interests.entities`, `filter.tag.types` and `filter.parents.types`. Response: `results.tags[]` with `tag_id`, `name`, `types`, `subtype`, `tag_value`. The documented example has no score field. Not yet called.
+Returns tags tied to an entity. Combine with `signal.interests.entities`, `filter.tag.types` and `filter.parents.types`. Response: `results.tags[]` with `tag_id`, `name`, `types`, `subtype`, `tag_value`. **Verified** 21 Oct: tags carry `query.affinity`, `filter.tag.types` narrows to one type, and `diversify.by=subtype` spreads the types. A person's tags include religion and ethnicity subtypes, so allow-list subtypes.
 
 ### `GET /v2/tags`: find tag IDs by keyword
 
-Tags must be IDs from here, never free text. There is no static tag list. Not yet called.
+Tags must be IDs from here, never free text. There is no static tag list. **Verified** 21 Oct: `filter.query` searches by keyword, `filter.tag.types` narrows by type, and `/v2/tags/types` lists the types.
 
 ### `GET /entities?entity_ids=...`: look up entities by ID
 
-Also accepts external IDs such as `external.spotify.ids`, `external.imdb.ids`, `external.wikidata.ids`. Not yet called.
+Also accepts external IDs such as `external.spotify.ids`, `external.imdb.ids`, `external.wikidata.ids`. **Verified** 21 Oct: several IDs per call, and lookup by Wikidata and IMDb ID. A returned entity's external IDs are in `properties.external`.
 
 ## Findings from real calls
 
@@ -109,12 +111,14 @@ Results themselves are not written down here, because Qloo response data must no
 | "at least one valid signal or filter is required" | Invalid tag or audience IDs. |
 | 200 with empty `entities` | A param isn't valid for that `filter.type` (silently ignored), or no data. |
 | 400 "All of the provided signal.interests.entities were invalid" | The entity has too little data to be used as an input. **Verified** for some people. |
-| 429 `{"error_msg":"Rate limit exceeded"}` | More than 5 requests in a second. **Verified.** |
+| 429 `{"error_msg":"Rate limit exceeded"}` | Over the per-second limit (5 on 20 Oct, 10 since 21 Oct). **Verified.** |
+| 400 "The value urn:entity:video_game is not supported for filter.type" | Use `urn:entity:videogame`. **Verified.** |
+| 400 "signal.interests.entities.weight must be a positive number or one of very_low, low, mid, medium, high, very_high" | The weight is one value for all entities, not a list. **Verified.** |
 
 ## Limits and rules
 
-- **5 requests per second and 10,000 per month** per key (**verified** from the `x-second-ratelimit-*` and `x-month-ratelimit-*` response headers, 20 Oct). The month resets around 19 November, so this budget covers the build and judging. Judges using the live demo draw on it too. To raise it, post project details in Discord `#api-help`.
-- The client in `src/lib/qloo/client.ts` spaces requests to 4 per second, waits out 429s, caches every response and tracks the remaining monthly quota.
+- **10 requests per second and 50,000 per month** per key (**verified** from the `x-second-ratelimit-*` and `x-month-ratelimit-*` response headers, 21 Oct). On 20 Oct it was 5 and 10,000. The counter restarted around 21 Oct and resets around 20 November, so this budget covers the build and judging. Judges using the live demo draw on it too. To raise it further, post project details in Discord `#api-help`.
+- The client in `src/lib/qloo/client.ts` spaces requests to 4 per second (it could go to 8 now), waits out 429s, caches every response and tracks the remaining monthly quota.
 - Keys stay active through judging and are turned off after the hackathon.
 - You can't trim response fields through the API. Verbose fields such as `akas` always come back.
 - Private server-side caching is allowed with no time limit. **Never store Qloo response data in the public repo.** Cache in `.cache/` only.
@@ -134,7 +138,7 @@ Echo doesn't depend on either.
 3. ~~Are the top people distinctive or just the most famous?~~ Famous by default; the popularity cap fixes it.
 4. ~~Does love back work?~~ Yes.
 5. ~~What does compare return for a show and a guest?~~ Tag contrast, not useful between a podcast and a person.
-6. Do `urn:demographics` and `urn:tag` return useful data for a podcast and a person?
+6. ~~Do `urn:demographics` and `urn:tag` return useful data for a podcast and a person?~~ Yes. Demographics handles many entities in one call. Tags need an allow-list.
 7. ~~How do we detect people who have died?~~ `properties.date_of_death`.
-8. Reach v2: something that doesn't saturate. Candidates: how differently the show and guest audiences skew by age and gender (`urn:demographics`); the show audience's affinity for the guest's top podcasts (`filter.results.entities` with up to 50 IDs, one call); overlap across artists or TV as well as podcasts.
+8. Reach v2: something that doesn't saturate. Candidates: how differently the show and guest audiences skew by age and gender (`urn:demographics`); the show audience's affinity for the guest's top podcasts (`filter.results.entities` with up to 50 IDs, one call); overlap across artists or TV as well as podcasts. The teammate's spike found that audience-map overlap across categories spreads well. Demographics now costs one call for all guests ([qloo-map.md](qloo-map.md)).
 9. How to spot a show's own hosts in its candidate list.

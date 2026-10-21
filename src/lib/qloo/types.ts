@@ -8,7 +8,7 @@ export type EntityType =
   | "urn:entity:place"
   | "urn:entity:podcast"
   | "urn:entity:tv_show"
-  | "urn:entity:video_game";
+  | "urn:entity:videogame";
 
 export type ParamValue = string | number | boolean | string[];
 
