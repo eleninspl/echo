@@ -12,6 +12,8 @@ This repo is only about the Qloo hackathon and Echo.
 - `docs/hackathon.md`: submission requirements, judging, Qloo's rules.
 - `docs/qloo.md`: API reference for Echo, with what has been verified on the hackathon server.
 - `docs/qloo-map.md`: every Qloo API feature, whether it works on the hackathon server, and what Echo could use it for. Check here before assuming a feature exists or doesn't.
+- `docs/features.md`: proposed inputs, features, scoring, call budget and the checks behind them. Section 6 lists open decisions.
+- `docs/api.md`: proposed HTTP contract for the engine, the web app and the bot.
 - `docs/plan.md`: timeline and open decisions.
 
 ## Stack
@@ -42,6 +44,9 @@ Full detail in `docs/qloo.md`. The rules that break things if ignored:
 - Insights returns people who have died (`properties.date_of_death`) and a show's own hosts. Filter both out before showing guests.
 - Some people return 400 when used as an input. Skip them.
 - Video games are `urn:entity:videogame`. The guide's `video_game` returns 400.
+- `/entities` can't look up iTunes IDs. Search Qloo by Apple's title and compare `properties.external.itunes.id`.
+- A lens (`filter.results.entities`) returns 200 even for a signal Qloo can't use, with no `query.affinity`. Check for the affinity, not the status. Some shows are never returned as a result at all, so love back can't be scored for them.
+- Entity weight `high` behaves like no weight. Use `very_high`, `medium` or `mid`.
 - Audience IDs go in as the `urn:audience:...` value from `id`. The UUID in `entity_id` is silently ignored.
 - `signal.interests.entities.weight` is one value for all entities (`very_low` to `very_high`), not one per entity.
 - Person tags include Wikipedia categories about religion, sexuality and similar, and `urn:tag` returns religion and ethnicity subtypes. Use an allow-list of tag subtypes for themes and reasons, never a block-list. Never use the political, beliefs or communities audience types.
@@ -59,7 +64,8 @@ Update this section whenever something changes.
 - **20 Oct:** docs and `scripts/set-env.sh` on branch `docs/echo-plan`, PR #1. Qloo client and coverage probe (TypeScript) on branch `probe/qloo-coverage`, no PR. It overlaps the Python engine on `day1/spike` (PR #2); which one to keep is undecided. No app yet.
 - **Probe result: go.** Coverage is good for comedy, music and sports shows. Fit and love back work. The fit against reach trade-off shows up clearly for comedy shows. Reach v1 (top 50 podcast overlap) saturates and needs a v2. Details in `docs/qloo.md` under "Findings from real calls".
 - **21 Oct:** every Qloo API feature checked on the hackathon server and mapped in `docs/qloo-map.md`. Quota raised to 10 a second and 50,000 a month.
-- **Next:** reach v2 experiment (first checks 8 and 9 in `docs/qloo.md`), then the open decisions in `docs/plan.md`.
+- **21 Oct:** proposed inputs, features and contract in `docs/features.md` and `docs/api.md` on branch `docs/echo-contract`, not yet agreed with the teammate. Reach v2 is chosen there ("unfamiliar podcasts", F10).
+- **Next:** agree the contract and split with the teammate, starting with features.md section 6, then build against api.md.
 
 ## Keeping this file current
 

@@ -39,6 +39,8 @@ This is the core idea and the part to prove first with real Qloo data. Working d
 
 The sweet spot is high fit, high love back and high reach. A guest with high fit and low reach is safe but adds nobody new. A guest with high reach and low love back brings people who won't stay. Plotted as fit against reach, this is the chart the web app is built around.
 
+The proposed formulas are in [features.md](features.md) section 2. Reach there is "unfamiliar podcasts": how little the show's audience likes the guest's top podcasts. Fit is adjusted for fame in the score. Reach and love back pull against each other on real data, so the sweet spot is rare, and the app should say so.
+
 ## Where people use it
 
 - **OpenClaw agent** in Telegram, Slack or email: the working tool for hosts. Asks for the show, returns matches, drafts invitations, sends only after approval, prepares briefings.

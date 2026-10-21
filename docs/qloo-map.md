@@ -80,6 +80,20 @@ Checked on 21 Oct with `npm run map-api`, about 55 calls. The input was one cele
 | `/v2/insights/compare` | Works (teammate, 20 Oct) | Same as analysis compare. |
 | `/v2/trending` | Podcasts only, and only up to September 2025. Empty for people, and empty for 2026. | Not usable for "rising guests". |
 
+## Found while writing the feature spec (21 Oct)
+
+About 800 more live calls while drafting and reviewing [features.md](features.md). Each line points to its check in features.md section 7.
+
+- **iTunes IDs don't resolve.** Podcasts carry `properties.external.itunes.id`, but `/entities?external.itunes.ids=` returns 200 with nothing (C2). Match an Apple show by searching Qloo with Apple's title and comparing the iTunes ID. 7 of 198 cached podcasts have no iTunes ID (C25). No Spotify IDs on podcasts (C1).
+- **Some shows are never returned as a result.** They work as a signal but never come back in a podcast list or lens, so love back can't be scored for any guest. Mostly shows below popularity 0.6 (C81). Echo probes for this when it resolves a show.
+- **Lenses hide bad signals.** A signal that returns 400 as a plain list returns 200 on a lens (`filter.results.entities`), with every entity back and no `query.affinity` (C75). Check for the affinity, not the status.
+- **Rejection is per `filter.type`.** A person can work as a signal for a person list and return 400 on podcast and artist lists (C74).
+- **Entity weight ladder.** Against an age signal, kept of 50 on 3 shows: `very_high` 18 to 34, `high` identical to no weight, `medium` 11 to 23, `mid` 5 to 11, `low` 2 to 3, `very_low` 0 (C29). So `high` is not a usable step.
+- **Occupation tags need a prefix rewrite.** `/v2/tags` returns `urn:tag:occupation:wikidata:<slug>`, which matches 0 people. People carry `urn:tag:occupation:person:<slug>` (C34).
+- **Unknown tags and locations.** A tag ID that doesn't exist returns 200 with results (C85). A location Qloo can't resolve returns 400, not a silent ignore (C59).
+- **Thin data.** Shows below popularity 0.6 mostly have no `urn:demographics` block (C82). People with null popularity can't be scored (C83).
+- **Small things.** IDs are accepted lower case and always returned upper case. A person never appears in their own list (C46). Love back read through `filter.results.entities` equals the value from the guest's top 50.
+
 ## Keep out
 
 - **Tags:** a person's `urn:tag` results included `urn:tag:religion:qloo` and `urn:tag:ethnicity:qloo`. Compare can include a gender tag. Use an allow-list of subtypes for themes (such as `keyword:media`, `genre:media`, `genre:music`, `theme`, `plot`, `style`), never a block-list.
