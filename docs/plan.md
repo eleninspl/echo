@@ -21,3 +21,10 @@ A starting point to discuss, not agreed yet. Ten days from 20 October to the dea
 5. **Who counts as a guest.** Only Qloo person entities, or also the hosts of other podcasts (through their podcast entities)?
 6. **Demo shows.** Which 3 or so shows to feature, picked after the coverage checks. Comedy, music and sports first.
 7. **Who does what.** Split between the two of us.
+8. **Qloo quota.** 50,000 calls a month and 10 a second since 21 October (it was 10,000 and 5), resetting around 20 November. Judges' demo use counts against it. That's roughly 400 new shows at about 130 calls each, so it's no longer the tightest limit. Still precompute the featured demo shows, keep a cache that survives deploys (for example Vercel Blob or a Redis store from the Vercel Marketplace, not local files), and cap live analyses per visitor.
+
+## Progress
+
+- **20 Oct:** coverage probe run on 6 shows. Go. Reach needs a v2 before the scoring is locked. See [qloo.md](qloo.md).
+- **21 Oct:** every Qloo API feature checked and mapped in [qloo-map.md](qloo-map.md). New options for Echo: who the new listeners are (demographics, one call), growing toward an age or interest group, and topic-led search.
+- **21 Oct:** proposed inputs, features and engine contract in [features.md](features.md) and [api.md](api.md), not yet agreed with the teammate. Drafted, then reviewed and fixed over 4 rounds from 8 angles, with about 800 live Qloo calls behind the claims. Main changes to the plan: find the show through Apple first and match by iTunes ID; a proxy show for the many small shows Qloo lacks (11 of 12 tested); reach v2 is "unfamiliar podcasts"; fit is fame-adjusted in the score. Section 6 of features.md has 32 decisions with recommendations, including answers to Q1, Q5 and the web stack.

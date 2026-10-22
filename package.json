@@ -1,0 +1,15 @@
+{
+  "name": "echo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "probe": "node --env-file=.env --import tsx scripts/probe.ts",
+    "typecheck": "tsc --noEmit",
+    "map-api": "node --env-file=.env --import tsx scripts/map-api.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
