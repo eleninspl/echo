@@ -12,7 +12,7 @@ ENTITY_TYPES = {
     "place",
     "podcast",
     "tv_show",
-    "video_game",
+    "videogame",
 }
 
 # Listed for every entity type we use.

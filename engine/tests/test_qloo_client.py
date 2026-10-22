@@ -80,11 +80,13 @@ def test_expired_cache_entry_is_refetched(tmp_path):
 
 
 def test_retries_429_then_succeeds_honouring_retry_after():
-    responses = iter([
-        httpx.Response(429, headers={"Retry-After": "2"}),
-        httpx.Response(503),
-        httpx.Response(200, json={"results": []}),
-    ])
+    responses = iter(
+        [
+            httpx.Response(429, headers={"Retry-After": "2"}),
+            httpx.Response(503),
+            httpx.Response(200, json={"results": []}),
+        ]
+    )
     client = make_client(lambda request: next(responses))
     assert run(client.search("lex")) == []
     assert client.sleeps[0] == 2.0
@@ -132,13 +134,15 @@ def test_param_guard_rejects_demographics_even_though_qloo_accepts_them():
 
 
 def test_param_guard_accepts_documented_params():
-    check_insights_params({
-        "filter.type": "urn:entity:podcast",
-        "signal.interests.entities": "a",
-        "filter.results.entities": "b",
-        "feature.explainability": True,
-        "take": 10,
-    })
+    check_insights_params(
+        {
+            "filter.type": "urn:entity:podcast",
+            "signal.interests.entities": "a",
+            "filter.results.entities": "b",
+            "feature.explainability": True,
+            "take": 10,
+        }
+    )
 
 
 def test_param_guard_rejects_unknown_type():
@@ -153,3 +157,13 @@ def test_invalid_params_never_reach_the_network():
     client = make_client(handler)
     with pytest.raises(InvalidParamError):
         run(client.insights({"filter.type": "urn:entity:person", "filter.bogus": 1}))
+
+
+def test_normalize_params_sorts_sets_for_a_stable_cache_key():
+    assert normalize_params({"ids": {"c", "a", "b"}}) == {"ids": "a,b,c"}
+
+
+def test_videogame_is_the_working_type_name():
+    check_insights_params({"filter.type": "urn:entity:videogame", "signal.interests.entities": "abc"})
+    with pytest.raises(InvalidParamError):
+        check_insights_params({"filter.type": "urn:entity:video_game", "signal.interests.entities": "abc"})

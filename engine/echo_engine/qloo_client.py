@@ -10,7 +10,7 @@ import random
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +40,7 @@ class CallRecord:
     status: int
     duration_ms: int
     cached: bool
-    at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    at: str = field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -54,7 +54,10 @@ def normalize_params(params: Params) -> dict[str, str]:
             continue
         if isinstance(value, bool):
             out[key] = "true" if value else "false"
-        elif isinstance(value, (list, tuple, set)):
+        elif isinstance(value, (set, frozenset)):
+            # Set order changes per process, which would change the cache key and the results.
+            out[key] = ",".join(sorted(str(v) for v in value))
+        elif isinstance(value, (list, tuple)):
             out[key] = ",".join(str(v) for v in value)
         else:
             out[key] = str(value)

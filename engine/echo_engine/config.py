@@ -1,8 +1,8 @@
 """Settings loaded from the repo-root .env file (never committed)."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
-import os
 
 from dotenv import load_dotenv
 
