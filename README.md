@@ -14,9 +14,9 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 |---|---|---|
 | **Fit** | Will the show's audience love the guest? | `/v2/insights`, `filter.type=urn:entity:person`, signal = show |
 | **Love back** | Will the guest's audience love the show? | `/v2/insights`, `filter.type=urn:entity:podcast`, signal = guest, `filter.results.entities` = show |
-| **Reach** | How much new audience does the guest bring? | Overlap of the two audience maps (artists, books, movies, brands, podcasts, TV) |
+| **Reach** | How much new audience does the guest bring? | `/v2/insights`, `filter.type=urn:entity:podcast`, signal = show, `filter.results.entities` = the guest audience's top podcasts: the less the show's audience likes them, the more reach |
 
-Echo doesn't look for the most similar audience: an identical one brings no one new. It looks for the sweet spot, and requires love back so both sides win. More in [docs/echo.md](docs/echo.md#fit-and-reach).
+Echo doesn't look for the most similar audience: an identical one brings no one new. It looks for the sweet spot, and requires love back so both sides win. More in [docs/echo.md](docs/echo.md#fit-and-reach); the proposed formulas are in [docs/features.md](docs/features.md#2-scoring).
 
 ## Setup
 
@@ -27,22 +27,23 @@ scripts/set-env.sh QLOO_API_KEY   # type the key, it stays hidden
 cd engine
 uv sync
 uv run pytest
-uv run python scripts/spike.py "This Week in Startups"
+uv run python scripts/spike.py "<show name>"
 ```
 
 ## Privacy
 
 - Only public figures and audience-level taste are scored, never private individuals.
-- No personal data goes to Qloo. Demographic signals and person-attribute filters are blocked in code.
+- No personal data goes to Qloo: only shows, public figures and other public entities are sent as signals. Person-attribute filters are blocked in code.
 - Qloo responses are cached privately in `.cache/` and never committed.
 
 ## Layout
 
 ```
 brand/    logo
-docs/     pitch, rules, Qloo notes, plan
+docs/     pitch, rules, Qloo notes, features, API contract, plan
 engine/   Python engine
-scripts/  repo helpers
+scripts/  repo helpers and TypeScript probes of the Qloo API
+src/      TypeScript Qloo client used by the probes
 ```
 
 ## License
