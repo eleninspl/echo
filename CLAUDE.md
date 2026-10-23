@@ -62,7 +62,7 @@ Update this section whenever something changes.
 - **22 Oct:** the top 3 present live on air on 5 Nov. The investor judge's shows are in Qloo and scorable; their hosts come back as candidates.
 - **22 Oct (call):** v1 is the engine and the web app only. The proposal was cut to three short docs: no path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side and an LLM side, one person each. The chat in the web app is the agent.
 - **23 Oct:** PR #3 (`v1/setup`) holds everything: the three docs, the engine with a FastAPI skeleton of the 9 routes and a mock mode, and the Next.js app in `web/`. It contains #1 and #2. `ANTHROPIC_API_KEY` isn't set in `.env` yet.
-- **23 Oct:** #3 merged. Eleni: everything as in `docs/plan.md`, except the engine is hosted on Vercel instead of Railway.
+- **23 Oct:** #3 merged. Eleni: everything as in `docs/plan.md`, except the engine is hosted on Vercel instead of Railway (PR #4).
 - **Next:** agree the three open points in `docs/plan.md`, build Q and L in parallel, and add Neon and Upstash to the Vercel project from the Marketplace.
 
 ## Keeping this file current
