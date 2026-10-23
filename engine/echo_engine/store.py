@@ -1,5 +1,6 @@
-"""Where the engine keeps analyses and cached responses: files in .cache/ locally, or Postgres when DATABASE_URL
-is set (on Vercel, where an instance keeps nothing between requests and a poll can land on another instance)."""
+"""Where the engine keeps analyses, cached responses and the Qloo counters: files in .cache/ and memory locally, or
+Postgres when DATABASE_URL is set and Redis when the Upstash variables are set (on Vercel, where an instance keeps
+nothing between requests, a poll can land on another instance and several instances share one Qloo limit)."""
 
 from __future__ import annotations
 
@@ -9,9 +10,13 @@ import json
 import logging
 import random
 import time
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
+
+import httpx
 
 from .config import get_settings
 from .models import Analysis, ErrorBody, Filters
@@ -26,6 +31,14 @@ log = logging.getLogger("echo.store")
 STALE_SECONDS = 180
 # About 1 MB of gzipped cache per fresh analysis: expired rows are deleted on about one write in 100.
 CLEANUP_CHANCE = 0.01
+# Qloo allows 10 a second; one less leaves room for clocks that don't quite agree.
+REQUESTS_PER_SECOND = 9
+
+Sleep = Callable[[float], Awaitable[None]]
+
+
+def today() -> str:
+    return datetime.now(UTC).date().isoformat()
 
 
 def request_key(show_id: str, filters: Filters) -> str:
@@ -60,6 +73,32 @@ class AnalysisStore(Protocol):
 
     async def find(self, key: str) -> Analysis | None:
         """The newest running or finished analysis for this request key."""
+        ...
+
+    async def close(self) -> None: ...
+
+
+class Limiter(Protocol):
+    async def wait(self, sleep: Sleep) -> None:
+        """Returns when the next Qloo call may go."""
+        ...
+
+
+class Counters(Protocol):
+    """Today's fresh Qloo calls, for the daily cap, and the monthly quota Qloo last reported."""
+
+    async def take_call(self, cap: int) -> bool:
+        """Counts one fresh call, or returns False without counting it when today's count has reached `cap`."""
+        ...
+
+    async def calls_today(self) -> int: ...
+
+    async def set_month_left(self, remaining: int) -> None: ...
+
+    async def month_left(self) -> int | None: ...
+
+    async def save(self) -> None:
+        """Called when a Qloo client closes."""
         ...
 
     async def close(self) -> None: ...
@@ -131,6 +170,60 @@ class LocalStore:
             if reusable(current := checked(analysis, saved_at)):
                 return current
         return None
+
+    async def close(self) -> None:
+        pass
+
+
+class RateLimiter:
+    """Spaces this process's calls evenly, `per_second` at most."""
+
+    def __init__(self, per_second: float) -> None:
+        self.interval = 1 / per_second
+        self._next_slot = 0.0
+
+    async def wait(self, sleep: Sleep) -> None:
+        now = time.monotonic()
+        slot = max(now, self._next_slot)
+        self._next_slot = slot + self.interval
+        if slot > now:
+            await sleep(slot - now)
+
+
+class LocalCounters:
+    """Counts in memory. Today's count is written to `path`, when there is one, as each Qloo client closes, so it
+    survives a restart."""
+
+    def __init__(self, path: Path | None) -> None:
+        self.path = path
+        self.day, self.calls = today(), 0
+        self.remaining: int | None = None
+        if path and path.exists():
+            saved = json.loads(path.read_text())
+            if saved.get("day") == self.day:
+                self.calls = int(saved.get("calls", 0))
+
+    async def take_call(self, cap: int) -> bool:
+        if self.day != today():
+            self.day, self.calls = today(), 0
+        if self.calls >= cap:
+            return False
+        self.calls += 1
+        return True
+
+    async def calls_today(self) -> int:
+        return self.calls if self.day == today() else 0
+
+    async def set_month_left(self, remaining: int) -> None:
+        self.remaining = remaining
+
+    async def month_left(self) -> int | None:
+        return self.remaining
+
+    async def save(self) -> None:
+        if self.path:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({"day": self.day, "calls": self.calls}))
 
     async def close(self) -> None:
         pass
@@ -255,12 +348,126 @@ class PostgresStore:
         await self.db.close()
 
 
+# Redis --------------------------------------------------------------------------------------------------------
+
+
+# Every key expires: the tests can share the production database under their own prefix.
+REDIS_PREFIX = "echo:qloo:"
+
+
+class RedisError(RuntimeError):
+    pass
+
+
+class Upstash:
+    """Upstash Redis over its REST API: each pipeline of commands is one HTTPS request, so there is no Redis
+    connection to lose when Vercel freezes an instance. The HTTP client opens on first use."""
+
+    def __init__(self, url: str, token: str, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self.url = url.rstrip("/")
+        self.token = token
+        self.transport = transport
+        self._http: httpx.AsyncClient | None = None
+
+    async def pipeline(self, *commands: list[str | int]) -> list[Any]:
+        if self._http is None:
+            self._http = httpx.AsyncClient(
+                base_url=self.url,
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=5,
+                transport=self.transport,
+            )
+        body = [[str(part) for part in command] for command in commands]
+        response = await self._http.post("/pipeline", json=body)
+        if response.status_code != 200:
+            raise RedisError(f"Upstash returned {response.status_code}: {response.text[:200]}")
+        results = response.json()
+        for result in results:
+            if "error" in result:
+                raise RedisError(f"Upstash: {result['error']}")
+        return [result["result"] for result in results]
+
+    async def command(self, *parts: str | int) -> Any:
+        return (await self.pipeline(list(parts)))[0]
+
+    async def close(self) -> None:
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
+
+
+class RedisLimiter:
+    """At most `per_second` calls in each clock second, counted in Redis so every instance shares the one limit.
+    A call that finds its second full waits for the next one."""
+
+    def __init__(
+        self, redis: Upstash, per_second: int, clock: Callable[[], float] = time.time, prefix: str = REDIS_PREFIX
+    ) -> None:
+        self.redis = redis
+        self.per_second = per_second
+        self.clock = clock
+        self.prefix = prefix
+
+    async def wait(self, sleep: Sleep) -> None:
+        while True:
+            second = int(self.clock())
+            key = f"{self.prefix}second:{second}"
+            calls, _ = await self.redis.pipeline(["INCR", key], ["EXPIRE", key, 10])
+            if calls <= self.per_second:
+                return
+            await sleep(max(0.0, second + 1 - self.clock()))
+
+
+class RedisCounters:
+    """One counter per UTC day and the last monthly quota, both expiring once they no longer matter. Every call is
+    counted as it's made, so instances never need to save."""
+
+    def __init__(self, redis: Upstash, prefix: str = REDIS_PREFIX) -> None:
+        self.redis = redis
+        self.prefix = prefix
+
+    def _day_key(self) -> str:
+        return f"{self.prefix}calls:{today()}"
+
+    async def take_call(self, cap: int) -> bool:
+        key = self._day_key()
+        calls, _ = await self.redis.pipeline(["INCR", key], ["EXPIRE", key, 2 * 86400])
+        if calls <= cap:
+            return True
+        await self.redis.command("DECR", key)
+        return False
+
+    async def calls_today(self) -> int:
+        return int(await self.redis.command("GET", self._day_key()) or 0)
+
+    async def set_month_left(self, remaining: int) -> None:
+        await self.redis.command("SET", f"{self.prefix}month_left", remaining, "EX", 40 * 86400)
+
+    async def month_left(self) -> int | None:
+        value = await self.redis.command("GET", f"{self.prefix}month_left")
+        return None if value is None else int(value)
+
+    async def save(self) -> None:
+        pass
+
+    async def close(self) -> None:
+        await self.redis.close()
+
+
 # Choosing ---------------------------------------------------------------------------------------------------
+
+
+LOCAL_LIMITER = RateLimiter(REQUESTS_PER_SECOND)
 
 
 @lru_cache
 def postgres(url: str) -> Postgres:
     return Postgres(url)
+
+
+@lru_cache
+def upstash(url: str, token: str) -> Upstash:
+    return Upstash(url, token)
 
 
 def analysis_store(directory: Path | None) -> AnalysisStore:
@@ -273,3 +480,18 @@ def response_cache(namespace: str, ttl_seconds: float) -> Cache:
     if settings.database_url:
         return PostgresCache(postgres(settings.database_url), namespace, ttl_seconds)
     return DiskCache(settings.cache_dir / namespace, ttl_seconds)
+
+
+def qloo_limiter() -> Limiter:
+    settings = get_settings()
+    if settings.upstash_url:
+        return RedisLimiter(upstash(settings.upstash_url, settings.upstash_token), REQUESTS_PER_SECOND)
+    return LOCAL_LIMITER
+
+
+@lru_cache
+def qloo_counters() -> Counters:
+    settings = get_settings()
+    if settings.upstash_url:
+        return RedisCounters(upstash(settings.upstash_url, settings.upstash_token))
+    return LocalCounters(settings.cache_dir / "usage.json")

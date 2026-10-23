@@ -7,7 +7,8 @@ from statistics import fmean
 from echo_engine import pipeline
 from echo_engine.config import get_settings
 from echo_engine.models import Analysis, EpisodeAbout, ErrorBody, Filters, QlooCall, Step
-from echo_engine.qloo_client import QUOTA, QlooClient
+from echo_engine.qloo_client import QlooClient
+from echo_engine.store import qloo_counters
 
 
 def parse() -> argparse.Namespace:
@@ -29,11 +30,11 @@ def filters_of(args: argparse.Namespace) -> Filters:
     return Filters(fame=args.fame, age=args.age, country=args.country, episode_about=about)
 
 
-def report(analysis: Analysis, seconds: float) -> None:
+def report(analysis: Analysis, seconds: float, month_left: int | None) -> None:
     calls = analysis.qloo_calls
     fresh = [c for c in calls if not c.cached]
     print(f"\n{analysis.show.title}  [{analysis.status}]  {analysis.filters.model_dump(exclude_none=True)}")
-    print(f"{len(calls)} Qloo calls, {len(fresh)} fresh, {seconds:.1f}s, month left {QUOTA.month_remaining}")
+    print(f"{len(calls)} Qloo calls, {len(fresh)} fresh, {seconds:.1f}s, month left {month_left}")
     if analysis.error:
         print("ERROR", analysis.error.error, analysis.error.message)
         return
@@ -78,7 +79,7 @@ async def main() -> None:
             analysis.status = "failed"
             analysis.error = ErrorBody(error=error.code, message=error.message)
         analysis.qloo_calls = [QlooCall.model_validate(c.to_dict()) for c in client.log]
-    report(analysis, time.monotonic() - started)
+    report(analysis, time.monotonic() - started, await qloo_counters().month_left())
     out = get_settings().cache_dir / "runs"
     out.mkdir(parents=True, exist_ok=True)
     slug = "".join(ch if ch.isalnum() else "_" for ch in show.title.lower())[:40]

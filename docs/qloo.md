@@ -9,7 +9,7 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 - Host `https://hackathon.api.qloo.com` only. Hackathon keys get 401 on `api.qloo.com` and `staging.api.qloo.com`.
 - Auth is the `X-Api-Key` header. Every call is GET with query-string params. POST fails with "No path matching request parameters".
 - **10 requests a second, 50,000 a month**, covering build and judging. Resets around 20 Nov. Read from the `x-second-ratelimit-*` and `x-month-ratelimit-*` headers.
-- Go through `QlooClient` in `engine/`: throttled, cached in `.cache/`, checks params per `filter.type`. Private caching is allowed with no time limit. Qloo data never goes in the repo.
+- Go through `QlooClient` in `engine/`: throttled to 9 a second (shared by every instance through Redis on Vercel), cached in `.cache/` or Postgres, checks params per `filter.type`. Private caching is allowed with no time limit. Qloo data never goes in the repo.
 - `take` is at most 50; `offset=50` gives the next 50. On a lens, send `take=50` or only 20 come back.
 
 ## Gotchas

@@ -3,7 +3,6 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -41,8 +40,8 @@ from .models import (
     ShowList,
     Step,
 )
-from .qloo_client import QUOTA, CallRecord, QlooClient, QlooError
-from .store import AnalysisStore, LocalStore, analysis_store, request_key
+from .qloo_client import QlooClient, QlooError
+from .store import AnalysisStore, Counters, LocalCounters, LocalStore, analysis_store, qloo_counters, request_key
 
 log = logging.getLogger("echo.app")
 ClientFactory = Callable[..., QlooClient]
@@ -60,33 +59,8 @@ def load_example() -> dict[str, Any]:
     return json.loads(resources.files("echo_engine").joinpath("fixtures/example.json").read_text())
 
 
-def today() -> str:
-    return datetime.now(UTC).date().isoformat()
-
-
-class Usage:
-    def __init__(self, path: Path | None) -> None:
-        self.path = path
-        self.day, self.calls = today(), 0
-        if path and path.exists():
-            saved = json.loads(path.read_text())
-            if saved.get("day") == self.day:
-                self.calls = int(saved.get("calls", 0))
-
-    def record(self, call: CallRecord) -> None:
-        if call.cached:
-            return
-        if self.day != today():
-            self.day, self.calls = today(), 0
-        self.calls += 1
-
-    def save(self) -> None:
-        if self.path:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps({"day": self.day, "calls": self.calls}))
-
-    def today_calls(self) -> int:
-        return self.calls if self.day == today() else 0
+def daily_cap() -> EchoError:
+    return EchoError(429, "daily_cap", "Echo has used today's Qloo calls. Featured shows still open.")
 
 
 class Engine:
@@ -96,15 +70,15 @@ class Engine:
         step_delay: float,
         client_factory: ClientFactory,
         analyses: AnalysisStore,
-        usage_path: Path | None,
+        counters: Counters,
         daily_cap: int,
     ) -> None:
         self.mock = mock
         self.step_delay = step_delay
         self.client_factory = client_factory
         self.analyses = analyses
+        self.counters = counters
         self.daily_cap = daily_cap
-        self.usage = Usage(usage_path)
         self.example = load_example()
         self.featured_ids: list[str] = []
         if mock and isinstance(analyses, LocalStore):
@@ -115,11 +89,11 @@ class Engine:
     @asynccontextmanager
     async def client(self) -> AsyncIterator[QlooClient]:
         """A Qloo client that counts fresh calls and stops at the daily cap. Cached calls still work."""
-        async with self.client_factory(on_call=self.usage.record, before_fetch=self.check_cap) as client:
+        async with self.client_factory(before_fetch=self.take_call, counters=self.counters) as client:
             try:
                 yield client
             finally:
-                self.usage.save()
+                await self.counters.save()
 
     async def get(self, analysis_id: str) -> Analysis:
         analysis = await self.analyses.get(analysis_id)
@@ -140,9 +114,14 @@ class Engine:
                 return guest
         raise EchoError(404, "not_found", "There's no guest with that ref in this analysis.")
 
-    def check_cap(self) -> None:
-        if not self.mock and self.usage.today_calls() >= self.daily_cap:
-            raise EchoError(429, "daily_cap", "Echo has used today's Qloo calls. Featured shows still open.")
+    async def check_cap(self) -> None:
+        if not self.mock and await self.counters.calls_today() >= self.daily_cap:
+            raise daily_cap()
+
+    async def take_call(self) -> None:
+        """The client's before_fetch hook: counts the fresh call it's about to make, or refuses it at the cap."""
+        if not await self.counters.take_call(self.daily_cap):
+            raise daily_cap()
 
     async def show(self, show_id: str) -> Show:
         if self.mock:
@@ -159,7 +138,7 @@ class Engine:
     async def start(self, show_id: str, filters: Filters, tasks: BackgroundTasks | None = None) -> Analysis:
         if not self.mock and (existing := await self.analyses.find(request_key(show_id, filters))):
             return existing
-        self.check_cap()
+        await self.check_cap()
         show = await self.show(show_id)
         if not self.mock and (existing := await self.analyses.find(request_key(show.id, filters))):
             return existing
@@ -245,8 +224,10 @@ def create_app(
     store: Path | AnalysisStore | None = None,
     featured: list[str] | None = None,
     daily_cap: int | None = None,
+    counters: Counters | None = None,
 ) -> FastAPI:
-    """`store` is a folder for local files or a ready store; by default Postgres when DATABASE_URL is set."""
+    """`store` is a folder for local files or a ready store; by default Postgres when DATABASE_URL is set. With a
+    folder, today's count goes next to it; otherwise `counters` are Redis when the Upstash variables are set."""
     settings = get_settings()
     mock = settings.mock if mock is None else mock
     if mock:
@@ -255,13 +236,19 @@ def create_app(
         analyses = LocalStore(store)
     else:
         analyses = store or analysis_store(settings.cache_dir / "analyses")
-    usage_dir = store.parent if isinstance(store, Path) else settings.cache_dir
+    if counters is None:
+        if mock:
+            counters = LocalCounters(None)
+        elif isinstance(store, Path):
+            counters = LocalCounters(store.parent / "usage.json")
+        else:
+            counters = qloo_counters()
     engine = Engine(
         mock,
         step_delay,
         client_factory,
         analyses,
-        None if mock else usage_dir / "usage.json",
+        counters,
         settings.daily_qloo_calls if daily_cap is None else daily_cap,
     )
     warm_up = [] if mock else (settings.featured if featured is None else featured)
@@ -273,6 +260,7 @@ def create_app(
         if task:
             task.cancel()
         await analyses.close()
+        await engine.counters.close()
 
     app = FastAPI(title="Echo engine", version="1", lifespan=lifespan)
     app.state.engine = engine
@@ -306,15 +294,15 @@ def create_app(
         return Health(
             ok=True,
             mock=engine.mock,
-            qloo_calls_today=engine.usage.today_calls(),
-            qloo_calls_left=QUOTA.month_remaining,
+            qloo_calls_today=await engine.counters.calls_today(),
+            qloo_calls_left=await engine.counters.month_left(),
         )
 
     @app.get("/shows")
     async def shows(q: str = Query(min_length=2, max_length=100)) -> ShowList:
         if engine.mock:
             return ShowList.model_validate({"shows": engine.example["shows"]})
-        engine.check_cap()
+        await engine.check_cap()
         async with engine.client() as client:
             return ShowList(shows=await pipeline.search_shows(client, q))
 

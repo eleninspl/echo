@@ -40,6 +40,10 @@ def state(client: TestClient):
     return client.app.state.engine
 
 
+def calls_today(engine: TestClient) -> int:
+    return engine.get("/health").json()["qloo_calls_today"]
+
+
 def run(engine: TestClient, show_id: str = SHOW_ID, **filters) -> dict:
     started = engine.post("/analyses", json={"show_id": show_id, "filters": filters})
     assert started.status_code == 202, started.text
@@ -178,7 +182,7 @@ def test_a_weak_top_person_does_not_make_the_show_unusable(engine):
 
 def test_the_daily_cap_stops_fresh_calls_everywhere(engine):
     analysis = run(engine)
-    state(engine).daily_cap = state(engine).usage.today_calls()
+    state(engine).daily_cap = calls_today(engine)
     response = engine.get(f"/analyses/{analysis['id']}/guests/g1")
     assert response.status_code == 429
     assert response.json()["error"] == "daily_cap"
@@ -195,7 +199,7 @@ def test_a_run_that_reaches_the_cap_fails_with_daily_cap(engine):
 def test_usage_is_saved_once_the_client_closes(engine, tmp_path):
     run(engine)
     saved = json.loads((tmp_path / "usage.json").read_text())
-    assert saved["calls"] == state(engine).usage.today_calls() > 0
+    assert saved["calls"] == calls_today(engine) > 0
 
 
 def test_an_llm_failure_is_an_llm_error_and_can_be_retried(engine, monkeypatch):

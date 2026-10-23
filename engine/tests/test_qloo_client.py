@@ -5,15 +5,8 @@ import httpx
 import pytest
 
 from echo_engine.params import InvalidParamError, check_insights_params
-from echo_engine.qloo_client import (
-    QlooClient,
-    QlooError,
-    Quota,
-    RateLimiter,
-    cache_key,
-    normalize_params,
-)
-from echo_engine.store import DiskCache
+from echo_engine.qloo_client import QlooClient, QlooError, cache_key, month_left, normalize_params
+from echo_engine.store import DiskCache, LocalCounters, RateLimiter
 
 PERSON_QUERY = {"filter.type": "urn:entity:person", "signal.interests.entities": "abc", "take": 5}
 
@@ -217,7 +210,34 @@ def test_rate_limiter_spaces_requests():
     assert all(0.05 < w <= 0.2 for w in waits)
 
 
-def test_quota_reads_the_month_header():
-    quota = Quota()
-    quota.update(httpx.Response(200, headers={"x-month-ratelimit-remaining": "49107"}))
-    assert quota.month_remaining == 49107
+def test_month_left_reads_the_month_header():
+    assert month_left(httpx.Response(200, headers={"x-month-ratelimit-remaining": "49107"})) == 49107
+    assert month_left(httpx.Response(200)) is None
+
+
+def test_the_client_reports_the_quota_to_its_counters():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": []}, headers={"x-month-ratelimit-remaining": "49107"})
+
+    counters = LocalCounters(None)
+    run(make_client(handler, counters=counters).search("x"))
+    assert run(counters.month_left()) == 49107
+
+
+def test_before_fetch_runs_for_fresh_calls_only(tmp_path):
+    fetches: list[str] = []
+
+    async def before_fetch() -> None:
+        fetches.append("fresh")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": []})
+
+    client = make_client(handler, tmp_path, before_fetch=before_fetch)
+
+    async def twice() -> None:
+        await client.search("x")
+        await client.search("x")
+
+    run(twice())
+    assert fetches == ["fresh"]
