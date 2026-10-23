@@ -15,9 +15,13 @@ const bigShoulders = Big_Shoulders({
   adjustFontFallback: false,
 });
 
+const DESCRIPTION =
+  "Echo finds podcast guests your audience will love, who bring a new audience that will love your show back.";
+
 export const metadata: Metadata = {
   title: { default: "Echo", template: "%s · Echo" },
-  description: "Find the podcast guest who carries your voice to new ears.",
+  description: DESCRIPTION,
+  openGraph: { title: "Echo", description: DESCRIPTION, siteName: "Echo", type: "website" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

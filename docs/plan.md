@@ -122,6 +122,13 @@ Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see ql
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
+**Deploying the web app** (W12). Its own Vercel project from this repo, Root Directory `web`; Vercel detects Next.js, so there's no `vercel.json`. One variable, `NEXT_PUBLIC_ENGINE_URL`: the engine's production URL. It's fixed into the browser bundle at build time, so changing it takes a redeploy, and a Vercel build without it stops with an error. In order:
+
+1. The engine first (Deploying the engine, below), for its URL.
+2. The web project with `NEXT_PUBLIC_ENGINE_URL`, then deploy.
+3. The web app's production URL into the engine's `ECHO_WEB_ORIGINS`, then redeploy the engine. CORS takes exact origins, so a preview deployment of the web app can't call the engine unless its URL is listed too.
+4. Check on the production URL: the header shows neither "Example data" nor "Engine offline", a featured show opens at once, a search runs to the end.
+
 **Errors.** The engine's `message` is already written for the host, so the app shows it as it comes and adds one next step:
 
 - `show_unusable`, `daily_cap`: the featured shows, which still open.
