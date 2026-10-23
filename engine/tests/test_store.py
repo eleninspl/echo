@@ -304,7 +304,7 @@ def test_the_upstash_variables_choose_redis(monkeypatch):
     assert isinstance(store.qloo_counters.__wrapped__(), LocalCounters)
     assert store.qloo_limiter() is store.LOCAL_LIMITER
 
-    monkeypatch.setenv("KV_REST_API_URL", "https://kv.example.com")
+    monkeypatch.setenv("KV_REST_API_URL", "kv.example.com")  # as Upstash's console copies it
     monkeypatch.setenv("KV_REST_API_TOKEN", "kv-token")
     assert store.qloo_counters.__wrapped__().redis.url == "https://kv.example.com"
     monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://upstash.example.com")

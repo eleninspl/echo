@@ -44,6 +44,8 @@ from .qloo_client import QlooClient, QlooError
 from .store import AnalysisStore, Counters, LocalCounters, LocalStore, analysis_store, qloo_counters, request_key
 
 log = logging.getLogger("echo.app")
+# httpx logs every request at INFO: on Vercel about 150 lines a run, mostly Upstash. Qloo calls are in each analysis.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 ClientFactory = Callable[..., QlooClient]
 
 

@@ -18,6 +18,11 @@ def env(*names: str) -> str:
     return ""
 
 
+def with_scheme(url: str) -> str:
+    """Upstash's console copies the REST URL without https://, which httpx can't use."""
+    return url if not url or "://" in url else f"https://{url}"
+
+
 class Settings:
     def __init__(self) -> None:
         load_dotenv(REPO_ROOT / ".env")
@@ -28,7 +33,7 @@ class Settings:
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
         self.database_url = os.environ.get("DATABASE_URL", "").strip()
         # Upstash's own names, or the ones Vercel's Marketplace integration may set instead.
-        self.upstash_url = env("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL")
+        self.upstash_url = with_scheme(env("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"))
         self.upstash_token = env("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN")
         self.mock = os.environ.get("ECHO_MOCK", "").strip() == "1"
         self.web_origins = [
