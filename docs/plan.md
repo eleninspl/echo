@@ -141,8 +141,8 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 
 | Date | What |
 | --- | --- |
-| 23 Oct | Done: Q1 to Q17, the web app (W1 to W11, W13), both deployed |
-| 24 to 26 Oct | L, once someone has it and the provider is chosen; featured shows; W12, the production check; fixes |
+| 23 Oct | Done: Q1 to Q17, the web app (W1 to W13), both deployed and checked on real shows |
+| 24 to 26 Oct | L, once someone has it and the provider is chosen; featured shows; fixes |
 | 27 Oct | **Freeze** |
 | 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit |
 
