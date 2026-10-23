@@ -10,6 +10,7 @@ SHOW_TITLE = "Example Show with Sam Host"
 ITUNES_ID = "1000000001"
 MAP_KINDS = ("artist", "tv_show", "movie", "book", "brand", "podcast")
 TAG_SUBTYPE = "urn:tag:keyword:media"
+THEME_SUBTYPE = "urn:tag:theme:qloo"
 
 
 def score(*parts: str) -> float:
@@ -71,18 +72,22 @@ def show_entity(entity_id: str) -> dict:
     }
 
 
-def tags_for(signal: str) -> list[dict]:
+def tags_for(signal: str, types: str) -> list[dict]:
+    """Like Qloo: a person's list of all types is all themes, while a show's has none, so they meet only in the
+    show's list of themes."""
+    themes = types == THEME_SUBTYPE or signal != SHOW_ID
+    subtype = THEME_SUBTYPE if themes else TAG_SUBTYPE
     offset = 0 if signal == SHOW_ID else int(signal[-2:]) % 7
     tags = [
         {
-            "tag_id": f"urn:tag:keyword:media:tag_{i}",
-            "name": f"Tag {i}",
-            "subtype": TAG_SUBTYPE,
+            "tag_id": f"{subtype}:tag_{i}",
+            "name": f"{'Theme' if themes else 'Tag'} {i}",
+            "subtype": subtype,
             "query": {"affinity": 1},
         }
         for i in range(offset, offset + 30)
     ]
-    tags.append({"tag_id": "urn:tag:keyword:media:religion", "name": "Religion", "subtype": TAG_SUBTYPE})
+    tags.append({"tag_id": f"{subtype}:religion", "name": "Religion", "subtype": subtype})
     tags.append({"tag_id": "urn:tag:religion:qloo:x", "name": "Something", "subtype": "urn:tag:religion:qloo"})
     return tags
 
@@ -102,7 +107,7 @@ def insights(params: dict[str, str]) -> httpx.Response:
         ]
         return httpx.Response(200, json={"results": {"demographics": blocks}})
     if kind == "urn:tag":
-        return httpx.Response(200, json={"results": {"tags": tags_for(signal)}})
+        return httpx.Response(200, json={"results": {"tags": tags_for(signal, params["filter.tag.types"])}})
     if lens:
         ids = lens.split(",")
         if kind == "urn:entity:podcast" and signal.startswith("aaaaaaaa"):
