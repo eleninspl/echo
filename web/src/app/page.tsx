@@ -10,8 +10,9 @@ const TERMS = [
 export default function Home() {
   return (
     <>
-      <div className="bg-field text-on-field">
-        <div className="grid-lines mx-auto grid w-full max-w-7xl gap-x-8 gap-y-12 px-4 pt-14 pb-16 sm:px-8 sm:pt-20 md:grid-cols-12 md:pb-24">
+      {/* The field fills the page down to the footer while there are no featured shows below it. */}
+      <div className="flex flex-1 flex-col bg-field text-on-field">
+        <div className="grid-lines mx-auto grid w-full max-w-7xl flex-1 content-start gap-x-8 gap-y-12 px-4 pt-14 pb-16 sm:px-8 sm:pt-20 md:grid-cols-12 md:pb-24">
           <div className="flex flex-col gap-10 md:col-span-8">
             <h1 className="font-display text-[clamp(3.25rem,9vw,6rem)] leading-[0.88] font-extrabold tracking-tight text-balance uppercase">
               Find the guest who carries your voice to new ears

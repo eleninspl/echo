@@ -161,7 +161,11 @@ function GuestRow({ id, guest, rank, showMap, picked, full, onToggle, onHighligh
             <p className="text-ink-soft">{idea.pitch}</p>
           </div>
         ) : (
-          <p className="text-sm text-ink-soft">Echo writes the episode idea and evidence for the top 10.</p>
+          <p className="text-sm text-ink-soft">
+            {evidence
+              ? "Echo hasn't written an episode idea for this guest yet."
+              : "Echo writes the episode idea and evidence for the top 10."}
+          </p>
         )}
         {evidence && <Evidence evidence={evidence} />}
       </div>
