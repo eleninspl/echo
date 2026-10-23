@@ -52,7 +52,7 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | Q10 | Drop past guests: candidates whose full name is in one of the last 200 episode titles on Apple | 0.25 | done |
 | Q11 | Fixes from the #5 review, below | 0.5 | done |
 | Q12 | `store.py`: analyses, the Qloo and Apple caches behind one interface, local files or Postgres ([Hosting](#hosting)) | 0.5 | done |
-| Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | must |
+| Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | done |
 | Q14 | Deploy: the Vercel project, Neon and Upstash, env vars, spend limit; check background runs | 0.5 | must |
 | Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | must |
 | Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | must |
@@ -111,13 +111,14 @@ A Vercel function keeps nothing between requests and several instances can run a
 | --- | --- |
 | `Engine.analyses` in memory, and `.cache/analyses/*.json` | Neon Postgres, table `analyses`: id, request key, status, the analysis as JSON. The run writes it after every step, because a poll can land on another instance. |
 | `DiskCache` in `.cache/qloo/` and `.cache/apple/` | Neon Postgres, table `cache`: key, gzipped body, expiry. Measured locally: about 27 KB a call, 1 MB a fresh analysis. Expired rows are deleted on about one write in 100. |
-| `Usage` in `.cache/usage.json`, `QUOTA` in memory | Upstash Redis: one counter per day, and the last monthly quota Qloo reported |
-| `LIMITER`, 9 a second per process | Upstash Redis: one limit of 9 a second for all instances |
+| `LocalCounters`: today's count in `.cache/usage.json`, the monthly quota in memory | `RedisCounters` in Upstash Redis: one counter per UTC day, taken before each fresh call so instances can't pass the cap together, and the last monthly quota Qloo reported |
+| `RateLimiter`, 9 a second per process, evenly spaced | `RedisLimiter` in Upstash Redis: at most 9 calls in each clock second for all instances. Two full seconds back to back can put up to 18 calls within a second of each other; a 429 is retried. |
 | Featured shows warmed at startup | `scripts/warm.py` (Q15), run after each scoring change |
 
 - **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, `store.py` uses `.cache/` and memory, as today. Tests use the local store; the Postgres tests run when `TEST_DATABASE_URL` points at a throwaway UTF8 database. Neon's pooler doesn't keep prepared statements, so psycopg never prepares them.
+- **Redis** is Upstash's REST API over HTTPS (`httpx`, no new dependency), so there's no connection to lose when Vercel freezes an instance. Each fresh Qloo call is 3 requests and 5 commands (about 250,000 commands if all 50,000 monthly calls were used). Every key expires. Redis tests run on a fake Upstash, and on the real one when `TEST_UPSTASH_REDIS_REST_URL` and `TEST_UPSTASH_REDIS_REST_TOKEN` are set; they use their own keys, so the production database will do.
 - **Background runs.** `POST /analyses` answers 202 and the run goes on in the same function. A fresh run takes 8 to 16 s, well inside the 300 s default. Check on the first deploy that Vercel keeps the instance alive until the run ends; if it doesn't, the run moves to Vercel Queues. A run that hasn't saved for 3 minutes reads as failed (`engine_error`) and isn't reused, so a stopped run never polls forever.
-- **Env vars** on the engine project: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, plus the ones in `.env.example`. `ECHO_CACHE_DIR` is for local runs only.
+- **Env vars** on the engine project: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which the Marketplace integration may set instead), plus the ones in `.env.example`. `ECHO_CACHE_DIR` is for local runs only.
 - Set a spend limit on the Vercel team before the first deploy.
 
 ## API

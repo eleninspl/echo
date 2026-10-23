@@ -1,5 +1,5 @@
-"""Async client for the Qloo hackathon API: retries, private disk cache, and a log of every call
-(without the key) for the "What Qloo saw" panel."""
+"""Async client for the Qloo hackathon API: a throttle shared by every instance, retries, a private cache, and a log
+of every call (without the key) for the "What Qloo saw" panel."""
 
 from __future__ import annotations
 
@@ -17,38 +17,10 @@ import httpx
 
 from .config import get_settings
 from .params import check_insights_params
-from .store import Cache, response_cache
+from .store import Cache, Counters, Limiter, qloo_counters, qloo_limiter, response_cache
 
 Params = dict[str, Any]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
-REQUESTS_PER_SECOND = 9
-
-
-class RateLimiter:
-    def __init__(self, per_second: float) -> None:
-        self.interval = 1 / per_second
-        self._next_slot = 0.0
-
-    async def wait(self, sleep: Callable[[float], Awaitable[None]]) -> None:
-        now = time.monotonic()
-        slot = max(now, self._next_slot)
-        self._next_slot = slot + self.interval
-        if slot > now:
-            await sleep(slot - now)
-
-
-@dataclass
-class Quota:
-    month_remaining: int | None = None
-
-    def update(self, response: httpx.Response) -> None:
-        remaining = response.headers.get("x-month-ratelimit-remaining", "")
-        if remaining.isdigit():
-            self.month_remaining = int(remaining)
-
-
-LIMITER = RateLimiter(REQUESTS_PER_SECOND)
-QUOTA = Quota()
 
 
 class QlooError(RuntimeError):
@@ -109,10 +81,11 @@ class QlooClient:
         max_retries: int = 4,
         timeout: float = 20.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
-        on_call: Callable[[CallRecord], None] | None = None,
-        before_fetch: Callable[[], None] | None = None,
-        limiter: RateLimiter | None = LIMITER,
+        before_fetch: Callable[[], Awaitable[None]] | None = None,
+        limiter: Limiter | None = None,
+        counters: Counters | None = None,
     ) -> None:
+        """Product code makes clients with `from_settings`, which adds the shared throttle and counters."""
         settings = get_settings()
         api_key = api_key if api_key is not None else settings.qloo_api_key
         if not api_key:
@@ -127,16 +100,17 @@ class QlooClient:
         self.max_retries = max_retries
         self._sleep = sleep
         self._semaphore = asyncio.Semaphore(max_concurrency)
-        self._on_call = on_call
         self._before_fetch = before_fetch
         self._limiter = limiter
+        self._counters = counters
         self.log: list[CallRecord] = []
 
     @classmethod
     def from_settings(cls, **kwargs: Any) -> QlooClient:
         settings = get_settings()
-        cache = response_cache("qloo", settings.cache_ttl_days * 86400)
-        return cls(cache=cache, **kwargs)
+        kwargs.setdefault("limiter", qloo_limiter())
+        kwargs.setdefault("counters", qloo_counters())
+        return cls(cache=response_cache("qloo", settings.cache_ttl_days * 86400), **kwargs)
 
     async def __aenter__(self) -> QlooClient:
         return self
@@ -147,25 +121,20 @@ class QlooClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    def _record(self, record: CallRecord) -> None:
-        self.log.append(record)
-        if self._on_call:
-            self._on_call(record)
-
     async def get(self, path: str, params: Params) -> Any:
         query = normalize_params(params)
         key = cache_key(path, query)
         if self.cache and (hit := await self.cache.get(key)) is not None:
-            self._record(CallRecord(path, query, 200, 0, cached=True))
+            self.log.append(CallRecord(path, query, 200, 0, cached=True))
             return hit
         if self._before_fetch:
-            self._before_fetch()
+            await self._before_fetch()
 
         started = time.monotonic()
         async with self._semaphore:
             response = await self._get_with_retries(path, query)
         duration_ms = int((time.monotonic() - started) * 1000)
-        self._record(CallRecord(path, query, response.status_code, duration_ms, cached=False))
+        self.log.append(CallRecord(path, query, response.status_code, duration_ms, cached=False))
 
         if response.status_code != 200:
             raise QlooError(response.status_code, path, response.text)
@@ -181,7 +150,8 @@ class QlooClient:
                 if self._limiter:
                     await self._limiter.wait(self._sleep)
                 response = await self._http.get(path, params=query)
-                QUOTA.update(response)
+                if self._counters and (remaining := month_left(response)) is not None:
+                    await self._counters.set_month_left(remaining)
                 if response.status_code not in RETRY_STATUSES or attempt >= self.max_retries:
                     return response
                 delay = _retry_after(response) or _backoff(attempt)
@@ -209,6 +179,11 @@ class QlooClient:
     async def entities(self, ids: list[str]) -> list[dict]:
         data = await self.get("/entities", {"entity_ids": ids})
         return data.get("results", [])
+
+
+def month_left(response: httpx.Response) -> int | None:
+    remaining = response.headers.get("x-month-ratelimit-remaining", "")
+    return int(remaining) if remaining.isdigit() else None
 
 
 def _backoff(attempt: int) -> float:

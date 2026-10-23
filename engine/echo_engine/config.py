@@ -10,6 +10,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HACKATHON_BASE_URL = "https://hackathon.api.qloo.com"
 
 
+def env(*names: str) -> str:
+    """The first of `names` that is set."""
+    for name in names:
+        if value := os.environ.get(name, "").strip():
+            return value
+    return ""
+
+
 class Settings:
     def __init__(self) -> None:
         load_dotenv(REPO_ROOT / ".env")
@@ -19,6 +27,9 @@ class Settings:
         self.cache_dir = Path(os.environ.get("ECHO_CACHE_DIR", REPO_ROOT / ".cache"))
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
         self.database_url = os.environ.get("DATABASE_URL", "").strip()
+        # Upstash's own names, or the ones Vercel's Marketplace integration may set instead.
+        self.upstash_url = env("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL")
+        self.upstash_token = env("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN")
         self.mock = os.environ.get("ECHO_MOCK", "").strip() == "1"
         self.web_origins = [
             origin.strip()
