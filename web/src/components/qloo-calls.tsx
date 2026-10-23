@@ -6,7 +6,6 @@ const time = (call: QlooCall) => (call.cached ? "Cached" : `${call.duration_ms} 
 export function QlooCalls({ calls }: { calls: QlooCall[] }) {
   if (!calls.length) return null;
   const fresh = calls.filter((call) => !call.cached);
-  const seconds = (fresh.reduce((total, call) => total + call.duration_ms, 0) / 1000).toFixed(1);
   return (
     <section aria-labelledby="qloo" className="border-t-2 border-ink">
       <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
@@ -15,7 +14,8 @@ export function QlooCalls({ calls }: { calls: QlooCall[] }) {
         </h2>
         <p className="mt-3 max-w-3xl text-ink-soft">
           This analysis made {calls.length} {calls.length === 1 ? "call" : "calls"} to Qloo:{" "}
-          {fresh.length} fresh, taking {seconds} s, and {calls.length - fresh.length} answered from the cache. Each one
+          {fresh.length} fresh and {calls.length - fresh.length} answered from the cache. Many run at once, so their times
+          overlap. Each one
           describes an audience as a group; no personal data goes to Qloo.
         </p>
         <details className="group mt-6">

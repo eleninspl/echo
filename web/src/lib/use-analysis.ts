@@ -10,6 +10,8 @@ const MISSES = 5;
 
 export type AnalysisState = {
   analysis: Analysis | null;
+  // Whether this page saw the analysis running before it was done.
+  watched: boolean;
   error: EchoError | null;
   retry: () => void;
   // Changes the loaded analysis in place, for a rewritten idea; the engine has saved the same change.
@@ -20,6 +22,7 @@ export type AnalysisState = {
 // does nothing. `onDone` is called once the analysis is done.
 export function useAnalysis(id: string | null, onDone?: (analysis: Analysis) => void): AnalysisState {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [watched, setWatched] = useState(false);
   const [error, setError] = useState<EchoError | null>(null);
   const [attempt, setAttempt] = useState(0);
   const done = useRef(onDone);
@@ -33,12 +36,15 @@ export function useAnalysis(id: string | null, onDone?: (analysis: Analysis) => 
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let misses = 0;
+    let sawRunning = false;
 
     async function poll(id: string) {
       try {
         const next = await echo.analysis(id, controller.signal);
         misses = 0;
+        sawRunning ||= next.status === "running";
         setAnalysis(next);
+        setWatched(sawRunning);
         setError(null);
         if (next.status === "running") timer = setTimeout(() => poll(id), POLL_MS);
         if (next.status === "done") done.current?.(next);
@@ -68,5 +74,5 @@ export function useAnalysis(id: string | null, onDone?: (analysis: Analysis) => 
     setAnalysis((current) => (current ? change(current) : current));
   }, []);
 
-  return { analysis, error, retry, update };
+  return { analysis, watched, error, retry, update };
 }

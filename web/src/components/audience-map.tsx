@@ -20,8 +20,8 @@ export function AudienceMap({ rows }: { rows: MapRow[] }) {
                 {category(row.category)}
               </h3>
               <ol className="mt-2 flex flex-col">
-                {row.items.map((item) => (
-                  <li key={item.name} className="border-b border-rule py-1.5 text-sm">
+                {row.items.map((item, index) => (
+                  <li key={`${item.name}-${index}`} className="border-b border-rule py-1.5 text-sm">
                     {item.name}
                   </li>
                 ))}

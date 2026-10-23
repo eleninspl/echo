@@ -64,11 +64,8 @@ body {
   overflow-wrap: break-word;
 }
 
-/* Show and guest names come from Qloo and can hold one long word; at display size it must still wrap
-   on a phone. "anywhere" also lets the flex items holding them shrink. */
-.font-display {
-  overflow-wrap: anywhere;
-}
+/* Display text breaks inside a word only as a last resort: the bill and the venue line size names to fit
+   their longest word (lib/fit.ts). */
 
 /* Vermilion is kept for sweet spots, so selection takes the field's blue. */
 ::selection {

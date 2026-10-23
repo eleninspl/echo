@@ -7,6 +7,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
+import { fitLongestWord } from "@/lib/fit";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
@@ -34,12 +35,15 @@ export function AnalysisView({ id }: { id: string }) {
   // path, Back returns to the one before, and the chat stays as it was.
   const pathname = usePathname();
   const shown = pathname.startsWith(PREFIX) ? decodeURIComponent(pathname.slice(PREFIX.length)) : id;
-  const { analysis, error, retry, update } = useAnalysis(shown);
+  const { analysis, watched, error, retry, update } = useAnalysis(shown);
+  // A run the chat watched finish prints in too, though this page only loads it once it's done.
+  const [chatRun, setChatRun] = useState<string | null>(null);
   const [picks, setPicks] = useState<{ id: string; refs: string[] }>({ id: "", refs: [] });
   const picked = analysis && picks.id === analysis.id ? picks.refs : [];
   const [highlighted, setHighlighted] = useState<string | null>(null);
 
   const rerun = useCallback((next: Analysis) => {
+    setChatRun(next.id);
     window.history.pushState(null, "", `${PREFIX}${encodeURIComponent(next.id)}`);
   }, []);
   const rewrite = useCallback(
@@ -76,7 +80,7 @@ export function AnalysisView({ id }: { id: string }) {
         ) : analysis.status === "failed" ? (
           <Failed analysis={analysis} />
         ) : (
-          <Bill key={analysis.id} guests={analysis.guests} />
+          <Bill key={analysis.id} guests={analysis.guests} printIn={watched || chatRun === analysis.id} />
         )}
       </Field>
       {analysis.status === "done" && (
@@ -134,9 +138,14 @@ function Venue({ analysis }: { analysis: Analysis }) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-5">
         <ShowCover show={show} size={96} />
-        <h1 className="font-display text-[clamp(2.75rem,8vw,6rem)] leading-[0.88] font-extrabold tracking-tight text-balance uppercase">
-          {show.title}
-        </h1>
+        <div className="@container min-w-0 flex-1">
+          <h1
+            className="font-display leading-[0.88] font-extrabold tracking-tight text-balance uppercase"
+            style={fitLongestWord(show.title, "clamp(2.75rem,8vw,6rem)")}
+          >
+            {show.title}
+          </h1>
+        </div>
       </div>
       {(show.description || phrases.length > 0) && (
         <div className="flex max-w-3xl flex-col gap-2 text-on-field-soft">
