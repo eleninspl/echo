@@ -61,6 +61,13 @@ body {
   background: var(--stock);
   color: var(--ink);
   font-family: var(--font-archivo), system-ui, sans-serif;
+  overflow-wrap: break-word;
+}
+
+/* Show and guest names come from Qloo and can hold one long word; at display size it must still wrap
+   on a phone. "anywhere" also lets the flex items holding them shrink. */
+.font-display {
+  overflow-wrap: anywhere;
 }
 
 /* Vermilion is kept for sweet spots, so selection takes the field's blue. */
