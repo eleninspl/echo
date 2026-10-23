@@ -11,7 +11,7 @@ from echo_engine.app import create_app
 from echo_engine.models import Filters
 from echo_engine.qloo_client import QlooClient
 from scripts import warm
-from tests.fake_qloo import SHOW_ID, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler
+from tests.fake_qloo import SHOW_ID, SHOW_TITLE, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler
 
 
 def fake_client(**kwargs) -> QlooClient:
@@ -157,6 +157,14 @@ def test_guest_details_without_the_llm(engine):
     assert details["episode"] is None
     assert details["audience_map"]
     assert all(row["items"] for row in details["adds"])
+
+
+def test_a_guest_map_leaves_the_show_out(engine):
+    analysis = run(engine)
+    for guest in analysis["guests"][:4]:
+        details = engine.get(f"/analyses/{analysis['id']}/guests/{guest['ref']}").json()
+        names = {item["name"] for key in ("audience_map", "adds") for row in details[key] for item in row["items"]}
+        assert names and SHOW_TITLE not in names
 
 
 def test_analyses_survive_a_restart(tmp_path, monkeypatch, engine):

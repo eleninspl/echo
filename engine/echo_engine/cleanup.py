@@ -67,7 +67,9 @@ def host_names(text: str) -> tuple[list[str], set[str]]:
     return [item if len(item.split()) > 1 else f"{item} {surname}" for item in items], set()
 
 
-def host_matcher(title: str, author: str | None) -> Callable[[str], bool]:
+def host_matcher(title: str, author: str | None, description: str | None = None) -> Callable[[str], bool]:
+    """Hosts by name from the title and Apple's author line, and by full name from Qloo's description of the show,
+    which names its hosts when the author line is a network ("Ann Example and Bo Sample talk sports")."""
     full_names: set[str] = set()
     single_names: set[str] = set()
     for text in (author or "", host_part(title)):
@@ -75,6 +77,7 @@ def host_matcher(title: str, author: str | None) -> Callable[[str], bool]:
         full_names.update(names)
         single_names.update(singles)
     full_texts = [f" {normalize(text)} " for text in (title, author or "") if text]
+    about = f" {normalize(description or '')} "
 
     def is_host(name: str) -> bool:
         parts = words(name)
@@ -82,6 +85,8 @@ def host_matcher(title: str, author: str | None) -> Callable[[str], bool]:
             return False
         joined = " ".join(parts)
         if joined in full_names or any(f" {joined} " in text for text in full_texts):
+            return True
+        if len(parts) > 1 and f" {joined} " in about:
             return True
         if len(parts) > 2 and f"{parts[0]} {parts[-1]}" in full_names:
             return True

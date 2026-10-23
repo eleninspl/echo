@@ -170,7 +170,10 @@ async def show_entity(client: QlooClient, show_id: str) -> dict:
     return podcasts[0]
 
 
-async def map_lists(client: QlooClient, entity_id: str) -> dict[str, list[MapItem]]:
+async def map_lists(client: QlooClient, entity_id: str, leave_out: str | None = None) -> dict[str, list[MapItem]]:
+    """The audience map of `entity_id`, without itself and without `leave_out` (the show, on a guest's map)."""
+    skip = {entity_id.upper(), (leave_out or "").upper()}
+
     async def one(kind: str) -> list[MapItem]:
         try:
             data = await client.insights(
@@ -183,7 +186,7 @@ async def map_lists(client: QlooClient, entity_id: str) -> dict[str, list[MapIte
         return [
             MapItem(name=e["name"].strip(), image_url=image_of(e), affinity=round(affinity(e) or 0.0, 3))
             for e in entities_of(data)
-            if e.get("entity_id") != entity_id and clean_entity(e)
+            if (e.get("entity_id") or "").upper() not in skip and clean_entity(e)
         ]
 
     lists = await asyncio.gather(*(one(kind) for _, kind in MAP_TYPES))
@@ -544,7 +547,7 @@ async def fill_guests(
         return not is_dead(person) and not is_minor(person, today) and is_public_figure(person)
 
     pool = merge([p for p in c1 if keep(p)], [p for p in c2 if keep(p)], [p for p in c3 if keep(p)])
-    is_host = host_matcher(show.title, author)
+    is_host = host_matcher(show.title, author, show.description)
     people = [
         Person(id=p["entity_id"], name=p["name"], description=english(properties(p).get("short_descriptions")))
         for p in pool[: POOL_SIZE * 2]
@@ -616,7 +619,9 @@ async def fill_guests(
 
 
 async def guest_maps(client: QlooClient, analysis: Analysis, guest: Guest) -> GuestMaps:
-    show_lists, guest_lists = await asyncio.gather(map_lists(client, analysis.show.id), map_lists(client, guest.id))
+    show_lists, guest_lists = await asyncio.gather(
+        map_lists(client, analysis.show.id), map_lists(client, guest.id, analysis.show.id)
+    )
     adds = {}
     for category, items in guest_lists.items():
         known = {normalize(item.name) for item in show_lists.get(category, [])}

@@ -24,6 +24,9 @@ def test_hosts_from_author_line_and_title():
     assert not by_names("Somebody Else")
     in_title = host_matcher("The Ann Example Podcast", None)
     assert in_title("Ann Example") and not in_title("Ann Other")
+    in_description = host_matcher("Example Take", "Example Network", "Ann Example and Bo Sample talk sports.")
+    assert in_description("Bo Sample") and in_description("Ann Example")
+    assert not in_description("Bo Other") and not in_description("Sample")
 
 
 def test_public_figures_minors_and_duplicates():
