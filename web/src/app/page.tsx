@@ -19,10 +19,10 @@ export default function Home() {
             <ShowFinder />
           </div>
           <aside aria-labelledby="terms" className="md:col-span-4 md:pt-2">
-            <h2 id="terms" className="text-sm font-semibold tracking-wide uppercase">
-              Echo scores every guest three ways
+            <h2 id="terms" className="sr-only">
+              How Echo scores a guest
             </h2>
-            <dl className="mt-4 flex flex-col border-t-2 border-on-field">
+            <dl className="flex flex-col border-t-2 border-on-field">
               {TERMS.map(({ term, means }) => (
                 <div key={term} className="border-b border-field-rule py-4">
                   <dt className="font-display text-4xl leading-none font-extrabold uppercase">{term}</dt>

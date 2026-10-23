@@ -9,11 +9,19 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
-// The logo's ring alone, the one bullet the app uses.
-export function Ring({ className = "" }: { className?: string }) {
+// The logo's ring alone, the one bullet the app uses. Filled in vermilion, it marks a sweet spot,
+// so the mark doesn't rest on hue alone.
+export function Ring({ className = "", sweet = false }: { className?: string; sweet?: boolean }) {
   return (
     <svg aria-hidden viewBox="0 0 12 12" className={`inline-block shrink-0 ${className}`}>
-      <circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" strokeWidth="2.2" />
+      <circle
+        cx="6"
+        cy="6"
+        r="4"
+        fill={sweet ? "var(--vermilion)" : "none"}
+        stroke="currentColor"
+        strokeWidth={sweet ? 1.6 : 2.2}
+      />
     </svg>
   );
 }

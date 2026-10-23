@@ -5,8 +5,6 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
-    // The repo root has its own package-lock.json for the probes; the app is this folder.
-    root: __dirname,
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

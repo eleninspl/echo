@@ -15,7 +15,7 @@ export function Bill({ guests }: { guests: Guest[] }) {
   const top = guests.slice(0, 10).filter((guest) => !headliners.includes(guest));
   const further = guests.slice(10).filter((guest) => !headliners.includes(guest));
   const tiers = [
-    { guests: headliners, className: "text-[clamp(2.5rem,7vw,5.5rem)] font-black gap-x-6", ring: "size-[0.32em]" },
+    { guests: headliners, className: "text-[clamp(2.5rem,7vw,5.5rem)] font-black gap-x-8", ring: "size-[0.32em]" },
     { guests: top, className: "text-[clamp(1.625rem,3.6vw,2.75rem)] font-extrabold gap-x-5", ring: "size-[0.36em]" },
     { guests: further, className: "text-[1.375rem] font-bold gap-x-4", ring: "size-[0.4em]" },
   ];
@@ -25,7 +25,7 @@ export function Bill({ guests }: { guests: Guest[] }) {
     <section aria-labelledby="bill" className="flex flex-col gap-8">
       <h2 id="bill" className="max-w-3xl text-xl font-semibold text-balance">
         {sweet.length
-          ? `${COUNT[sweet.length] ?? sweet.length} ${sweet.length === 1 ? "guest clears" : "guests clear"} all three: your listeners over-index on them, and their fans are new to you.`
+          ? `${COUNT[sweet.length] ?? sweet.length} ${sweet.length === 1 ? "guest clears" : "guests clear"} all three: your listeners over-index on them, their fans over-index on your show, and those fans are new to you.`
           : "No guest clears all three yet. These come closest."}
       </h2>
       <div className="flex flex-col gap-6 border-t-2 border-on-field pt-6">
@@ -38,11 +38,23 @@ export function Bill({ guests }: { guests: Guest[] }) {
               >
                 {tier.guests.map((guest) => (
                   <li key={guest.ref} className="print" style={{ "--order": order++ } as CSSProperties}>
-                    <a href={`#guest-${guest.ref}`} className="inline-flex items-baseline gap-[0.18em] hover:underline">
-                      <Ring
-                        className={`${tier.ring} self-center ${guest.label === "sweet_spot" ? "text-vermilion" : "text-on-field-soft"}`}
-                      />
-                      {guest.name}
+                    <a href={`#guest-${guest.ref}`} className="group inline-flex flex-col">
+                      <span className="inline-flex items-baseline gap-[0.18em] group-hover:underline">
+                        <Ring
+                          sweet={guest.label === "sweet_spot"}
+                          className={`${tier.ring} self-center ${guest.label === "sweet_spot" ? "text-on-field" : "text-on-field-soft"}`}
+                        />
+                        {guest.name}
+                        {guest.label === "sweet_spot" && <span className="sr-only"> (sweet spot)</span>}
+                      </span>
+                      {/* The headliners' credit line, as a bill prints it under the name. */}
+                      {index === 0 && guest.description && (
+                        <span className="mt-1.5 flex pl-[0.5em]">
+                          <span className="font-sans text-base font-semibold tracking-normal normal-case">
+                            {guest.description}
+                          </span>
+                        </span>
+                      )}
                     </a>
                   </li>
                 ))}
@@ -51,7 +63,7 @@ export function Bill({ guests }: { guests: Guest[] }) {
         )}
       </div>
       <p className="flex items-center gap-2 text-sm text-on-field-soft">
-        {sweet.length > 0 && <Ring className="size-3.5 text-vermilion" />}
+        {sweet.length > 0 && <Ring sweet className="size-3.5 text-on-field" />}
         <span>
           {sweet.length > 0 && "Sweet spot. "}Billing is the Echo score, fit, love back and reach together, not fame.
         </span>

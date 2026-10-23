@@ -1,5 +1,5 @@
 import type { Guest, Label } from "@/lib/echo";
-import { AGES, LABELS, score } from "@/lib/format";
+import { AGES, LABELS, labelMeans, score } from "@/lib/format";
 
 const TAG: Record<Label, string> = {
   sweet_spot: "bg-vermilion text-tag-ink border-vermilion",
@@ -14,7 +14,7 @@ const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicb
 export function GuestTable({ guests }: { guests: Guest[] }) {
   return (
     <section aria-labelledby="guests">
-      <div className="grid-lines mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
         <h2 id="guests" className="font-display text-5xl leading-none font-extrabold uppercase">
           The guests
         </h2>
@@ -53,14 +53,14 @@ function GuestRow({ guest, rank }: { guest: Guest; rank: number }) {
           <span className={`border-2 px-2 py-0.5 text-xs font-bold tracking-wide uppercase ${TAG[guest.label]}`}>
             {LABELS[guest.label].name}
           </span>
-          <span className="text-sm text-ink-soft">{LABELS[guest.label].means}</span>
+          <span className="text-sm text-ink-soft">{labelMeans(guest.label, scores.reach === null)}</span>
         </p>
         <Links links={guest.links} />
       </div>
       <dl className="col-start-2 flex flex-col gap-3 md:col-span-3 md:col-start-auto">
         <Meter name="Fit" value={scores.fit} />
         <Meter name="Love back" value={scores.love_back} />
-        <Meter name="Reach" value={scores.reach} missing="Too few of their fans' podcasts to tell" />
+        <Meter name="Reach" value={scores.reach} />
       </dl>
       <div className="col-start-2 flex flex-col gap-4 md:col-span-4 md:col-start-auto">
         {idea ? (
@@ -78,18 +78,26 @@ function GuestRow({ guest, rank }: { guest: Guest; rank: number }) {
   );
 }
 
-function Meter({ name, value, missing }: { name: string; value: number | null; missing?: string }) {
+function Meter({ name, value }: { name: string; value: number | null }) {
+  if (value === null) {
+    return (
+      <div>
+        <div className="flex items-baseline justify-between gap-3 text-sm">
+          <dt>{name}</dt>
+          <dd className="font-semibold">Not scored</dd>
+        </div>
+        <p className="mt-1 text-xs text-ink-soft">Too few of their fans&apos; podcasts came back to tell.</p>
+      </div>
+    );
+  }
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <dt>{name}</dt>
-        <dd className="font-display text-2xl leading-none font-extrabold tabular-nums">
-          {value === null ? <span title={missing}>{score(value)}</span> : score(value)}
-          {value === null && <span className="sr-only">{missing}</span>}
-        </dd>
+        <dd className="font-display text-2xl leading-none font-extrabold tabular-nums">{score(value)}</dd>
       </div>
       <div aria-hidden className="mt-1 h-1.5 bg-rule">
-        {value !== null && <div className="h-full bg-ink" style={{ width: `${Math.max(value * 100, 2)}%` }} />}
+        <div className="h-full bg-ink" style={{ width: `${Math.max(value * 100, 2)}%` }} />
       </div>
     </div>
   );

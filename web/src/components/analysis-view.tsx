@@ -35,7 +35,7 @@ export function AnalysisView({ id }: { id: string }) {
   return (
     <>
       <title>{`${analysis.show.title} · Echo`}</title>
-      <Field>
+      <Field fill={analysis.status !== "done"}>
         <Venue analysis={analysis} />
         {error ? (
           <Problem problem={describe(error)}>
@@ -60,10 +60,11 @@ export function AnalysisView({ id }: { id: string }) {
   );
 }
 
-function Field({ children }: { children: ReactNode }) {
+// The printed band. It fills the page down to the footer when nothing follows it.
+function Field({ children, fill = true }: { children: ReactNode; fill?: boolean }) {
   return (
-    <div className="bg-field text-on-field">
-      <div className="grid-lines mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 pt-12 pb-16 sm:px-8 sm:pt-16 sm:pb-20">
+    <div className={`flex flex-col bg-field text-on-field ${fill ? "flex-1" : ""}`}>
+      <div className="grid-lines mx-auto flex w-full max-w-7xl flex-1 flex-col gap-12 px-4 pt-12 pb-16 sm:px-8 sm:pt-16 sm:pb-20">
         {children}
       </div>
     </div>

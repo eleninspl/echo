@@ -27,12 +27,12 @@ export function useFeatured(): Featured[] | null {
 
 export function FeaturedList({ featured, compact = false }: { featured: Featured[]; compact?: boolean }) {
   return (
-    <ul className={compact ? "flex flex-col gap-2" : "grid gap-px bg-rule sm:grid-cols-2"}>
+    <ul className={compact ? "flex flex-col gap-2" : "grid border-t-2 border-ink md:grid-cols-2 md:gap-x-8"}>
       {featured.map(({ show, analysis_id }) => (
-        <li key={analysis_id} className={compact ? "" : "bg-stock"}>
+        <li key={analysis_id} className={compact ? "" : "border-b border-rule"}>
           <Link
             href={`/analyses/${encodeURIComponent(analysis_id)}`}
-            className={`group flex items-center gap-4 ${compact ? "" : "p-4 sm:p-6"}`}
+            className={`group flex items-center gap-4 ${compact ? "" : "py-5"}`}
           >
             <ShowCover show={show} size={compact ? 40 : 64} />
             <span className="min-w-0">
