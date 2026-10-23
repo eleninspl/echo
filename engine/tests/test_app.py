@@ -1,10 +1,8 @@
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from echo_engine.app import create_app, load_example
 from echo_engine.models import Analysis, ChatDecision, GuestDetails, ShowList
-from echo_engine.qloo_client import QlooClient
 
 SHOW_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -12,19 +10,6 @@ SHOW_ID = "00000000-0000-0000-0000-000000000001"
 @pytest.fixture
 def mock() -> TestClient:
     return TestClient(create_app(mock=True, step_delay=0))
-
-
-def offline_client() -> QlooClient:
-    return QlooClient(
-        api_key="test-key",
-        transport=httpx.MockTransport(lambda request: httpx.Response(500)),
-        sleep=lambda seconds: None,
-    )
-
-
-@pytest.fixture
-def real() -> TestClient:
-    return TestClient(create_app(mock=False, client_factory=offline_client))
 
 
 def test_example_matches_the_contract():
@@ -93,9 +78,3 @@ def test_drafts_and_revise_rules(mock):
 def test_briefing(mock):
     markdown = mock.post("/briefings", json={"analysis_id": "an_example", "guest_ref": "g1"}).json()["markdown"]
     assert markdown.startswith("# ")
-
-
-def test_real_mode_says_what_is_not_built(real):
-    response = real.get("/shows", params={"q": "example"})
-    assert response.status_code == 501
-    assert response.json()["error"] == "not_implemented"

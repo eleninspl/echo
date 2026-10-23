@@ -24,6 +24,7 @@ export type Idea = { reason: string; title: string; pitch: string };
 
 export type Guest = {
   ref: string;
+  id: string;
   name: string;
   description: string | null;
   image_url: string | null;
@@ -65,7 +66,7 @@ export type Episode = {
   questions: string[];
 };
 
-export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]; episode: Episode };
+export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]; episode: Episode | null };
 export type Message = { role: "user" | "assistant"; content: string };
 
 export type ChatReply = {

@@ -5,7 +5,15 @@ import httpx
 import pytest
 
 from echo_engine.params import InvalidParamError, check_insights_params
-from echo_engine.qloo_client import DiskCache, QlooClient, QlooError, cache_key, normalize_params
+from echo_engine.qloo_client import (
+    DiskCache,
+    QlooClient,
+    QlooError,
+    Quota,
+    RateLimiter,
+    cache_key,
+    normalize_params,
+)
 
 PERSON_QUERY = {"filter.type": "urn:entity:person", "signal.interests.entities": "abc", "take": 5}
 
@@ -23,6 +31,7 @@ def make_client(handler, tmp_path=None, **kwargs) -> QlooClient:
         cache=cache,
         transport=httpx.MockTransport(handler),
         sleep=fake_sleep,
+        limiter=None,
         **kwargs,
     )
     client.sleeps = sleeps  # type: ignore[attr-defined]
@@ -126,11 +135,33 @@ def test_param_guard_rejects_undocumented_param():
         check_insights_params({"filter.type": "urn:entity:person", "filter.release_year.min": 2000})
 
 
-def test_param_guard_rejects_demographics_even_though_qloo_accepts_them():
-    with pytest.raises(InvalidParamError, match="privacy"):
-        check_insights_params({"filter.type": "urn:entity:person", "signal.demographics.age": "25_to_29"})
-    with pytest.raises(InvalidParamError, match="privacy"):
-        check_insights_params({"filter.type": "urn:entity:person", "filter.gender": "female"})
+def test_param_guard_rejects_gender_and_audiences_even_though_qloo_accepts_them():
+    for param, value in [
+        ("signal.demographics.gender", "female"),
+        ("signal.demographics.audiences", "urn:audience:x"),
+        ("filter.gender", "female"),
+        ("filter.date_of_birth.min", "2000-01-01"),
+    ]:
+        with pytest.raises(InvalidParamError, match="privacy"):
+            check_insights_params({"filter.type": "urn:entity:person", param: value})
+
+
+def test_param_guard_allows_the_v1_signals():
+    check_insights_params(
+        {
+            "filter.type": "urn:entity:person",
+            "signal.interests.entities": "a",
+            "signal.interests.entities.weight": "very_high",
+            "signal.demographics.age": "25_to_29",
+            "signal.location.query": "Greece",
+        }
+    )
+    check_insights_params(
+        {"filter.type": "urn:tag", "signal.interests.entities": "a", "filter.tag.types": "t", "take": 50}
+    )
+    check_insights_params({"filter.type": "urn:demographics", "signal.interests.entities": "a,b"})
+    with pytest.raises(InvalidParamError):
+        check_insights_params({"filter.type": "urn:demographics", "take": 5})
 
 
 def test_param_guard_accepts_documented_params():
@@ -167,3 +198,26 @@ def test_videogame_is_the_working_type_name():
     check_insights_params({"filter.type": "urn:entity:videogame", "signal.interests.entities": "abc"})
     with pytest.raises(InvalidParamError):
         check_insights_params({"filter.type": "urn:entity:video_game", "signal.interests.entities": "abc"})
+
+
+def test_rate_limiter_spaces_requests():
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    limiter = RateLimiter(10)
+
+    async def three() -> None:
+        for _ in range(3):
+            await limiter.wait(fake_sleep)
+
+    run(three())
+    assert len(waits) == 2
+    assert all(0.05 < w <= 0.2 for w in waits)
+
+
+def test_quota_reads_the_month_header():
+    quota = Quota()
+    quota.update(httpx.Response(200, headers={"x-month-ratelimit-remaining": "49107"}))
+    assert quota.month_remaining == 49107
