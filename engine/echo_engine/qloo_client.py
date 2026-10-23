@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import random
 import time
 from collections.abc import Awaitable, Callable
@@ -17,8 +18,9 @@ import httpx
 
 from .config import get_settings
 from .params import check_insights_params
-from .store import Cache, Counters, Limiter, qloo_counters, qloo_limiter, response_cache
+from .store import Cache, Counters, Limiter, RedisError, qloo_counters, qloo_limiter, response_cache
 
+log = logging.getLogger("echo.qloo")
 Params = dict[str, Any]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 
@@ -146,21 +148,30 @@ class QlooClient:
     async def _get_with_retries(self, path: str, query: dict[str, str]) -> httpx.Response:
         attempt = 0
         while True:
+            if self._limiter:
+                await self._limiter.wait(self._sleep)
             try:
-                if self._limiter:
-                    await self._limiter.wait(self._sleep)
                 response = await self._http.get(path, params=query)
-                if self._counters and (remaining := month_left(response)) is not None:
-                    await self._counters.set_month_left(remaining)
-                if response.status_code not in RETRY_STATUSES or attempt >= self.max_retries:
-                    return response
-                delay = _retry_after(response) or _backoff(attempt)
             except httpx.TransportError:
                 if attempt >= self.max_retries:
                     raise
                 delay = _backoff(attempt)
+            else:
+                await self._report_quota(response)
+                if response.status_code not in RETRY_STATUSES or attempt >= self.max_retries:
+                    return response
+                delay = _retry_after(response) or _backoff(attempt)
             attempt += 1
             await self._sleep(delay)
+
+    async def _report_quota(self, response: httpx.Response) -> None:
+        """Best effort: the quota is only shown on /health, so a Redis failure here never stops a call."""
+        if self._counters is None or (remaining := month_left(response)) is None:
+            return
+        try:
+            await self._counters.set_month_left(remaining)
+        except RedisError:
+            log.warning("couldn't save the monthly quota", exc_info=True)
 
     # Endpoint helpers -------------------------------------------------------------------------
 

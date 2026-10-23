@@ -6,7 +6,15 @@ import pytest
 
 from echo_engine.params import InvalidParamError, check_insights_params
 from echo_engine.qloo_client import QlooClient, QlooError, cache_key, month_left, normalize_params
-from echo_engine.store import DiskCache, LocalCounters, RateLimiter
+from echo_engine.store import (
+    DiskCache,
+    LocalCounters,
+    RateLimiter,
+    RedisCounters,
+    RedisError,
+    RedisLimiter,
+    Upstash,
+)
 
 PERSON_QUERY = {"filter.type": "urn:entity:person", "signal.interests.entities": "abc", "take": 5}
 
@@ -24,8 +32,7 @@ def make_client(handler, tmp_path=None, **kwargs) -> QlooClient:
         cache=cache,
         transport=httpx.MockTransport(handler),
         sleep=fake_sleep,
-        limiter=None,
-        **kwargs,
+        **{"limiter": None, **kwargs},
     )
     client.sleeps = sleeps  # type: ignore[attr-defined]
     return client
@@ -241,3 +248,33 @@ def test_before_fetch_runs_for_fresh_calls_only(tmp_path):
 
     run(twice())
     assert fetches == ["fresh"]
+
+
+def upstash_down() -> Upstash:
+    def timeout(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    return Upstash("https://fake.upstash.io", "test-token", transport=httpx.MockTransport(timeout))
+
+
+def test_an_upstash_timeout_is_a_redis_error_and_is_not_retried_as_qloos():
+    qloo_calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        qloo_calls.append(request)
+        return httpx.Response(200, json={"results": []})
+
+    client = make_client(handler, limiter=RedisLimiter(upstash_down(), 9))
+    with pytest.raises(RedisError, match="ConnectTimeout"):
+        run(client.search("x"))
+    assert qloo_calls == []
+    assert client.sleeps == []
+
+
+def test_reporting_the_quota_is_best_effort():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": [{"name": "X"}]}, headers={"x-month-ratelimit-remaining": "9"})
+
+    client = make_client(handler, counters=RedisCounters(upstash_down()))
+    assert run(client.search("x")) == [{"name": "X"}]
+    assert len(client.log) == 1

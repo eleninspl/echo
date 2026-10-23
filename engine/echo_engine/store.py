@@ -378,7 +378,11 @@ class Upstash:
                 transport=self.transport,
             )
         body = [[str(part) for part in command] for command in commands]
-        response = await self._http.post("/pipeline", json=body)
+        try:
+            response = await self._http.post("/pipeline", json=body)
+        except httpx.HTTPError as error:
+            # Never an httpx error, so the Qloo client can't take it for one of Qloo's and retry.
+            raise RedisError(f"Upstash didn't answer: {error!r}") from error
         if response.status_code != 200:
             raise RedisError(f"Upstash returned {response.status_code}: {response.text[:200]}")
         results = response.json()
