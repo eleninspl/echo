@@ -67,7 +67,9 @@ Update this section whenever something changes.
 - **23 Oct:** Eleni reviewed and merged #5, and takes Q from here. Hosting stays Vercel. Q11 to Q16 in `docs/plan.md` cover the #5 review fixes and the move to Postgres and Redis (PR #6). Who takes L and the web app, and the LLM provider, are still open.
 - **23 Oct:** Q11 done: the #5 review fixes (PR #7). A real run on the investor judge's show works; its evidence repeats across guests (Q17, should).
 - **23 Oct:** Q12 done (PR #8): `engine/echo_engine/store.py` keeps analyses and the Qloo and Apple caches in `.cache/` locally, or in Postgres when `DATABASE_URL` is set. Checked once with the real Qloo on a local Postgres.
-- **Next:** Q13 (Redis). Agree who takes L and the web app by 24 Oct.
+- **23 Oct (evening):** two Claude sessions work in parallel, one on the engine's Q tasks and one on the web app; a coordinating session reviews and merges their PRs. Neither edits this Status section.
+- **23 to 24 Oct (night):** Q13 (Redis counters and throttle, #9, #10), Q15 (featured shows written by `engine/scripts/warm.py`, #11), Q14 preparation (`engine/vercel.json`, the deploy steps in `docs/plan.md`, #12) and Q17 (evidence that differs per guest, one more Qloo call per analysis, #13) merged. Web app W1 to W5 merged (#14): the plan in `docs/plan.md`, "Web app tasks", the design (a lineup bill), the landing page and the analysis page against mock mode.
+- **Next:** Eleni provisions the engine's Vercel project, Neon and Upstash (`docs/plan.md`, "Deploying the engine"), then Q14 and Q16. Featured shows to pick. Web W6 onwards. Who takes L, and the LLM provider, still open.
 
 ## Keeping this file current
 
