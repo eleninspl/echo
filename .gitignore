@@ -14,9 +14,15 @@ venv/
 .pytest_cache/
 *.egg-info/
 
-# Node
+# Node / Next.js
 node_modules/
 dist/
+.next/
+out/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
 
 # OS / editors
 .DS_Store
