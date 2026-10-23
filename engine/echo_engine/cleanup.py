@@ -93,13 +93,11 @@ def host_matcher(title: str, author: str | None) -> Callable[[str], bool]:
     return is_host
 
 
-def dedupe(people: Iterable[dict]) -> list[dict]:
-    seen: set[str] = set()
-    kept = []
+def dedupe(people: Iterable[dict], score: Callable[[dict], float]) -> list[dict]:
+    """One person per normalised name: the one with the higher score, in the place of the first."""
+    best: dict[str, dict] = {}
     for person in people:
         key = normalize(person["name"])
-        if key in seen:
-            continue
-        seen.add(key)
-        kept.append(person)
-    return kept
+        if key not in best or score(person) > score(best[key]):
+            best[key] = person
+    return list(best.values())

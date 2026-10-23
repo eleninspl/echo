@@ -5,6 +5,7 @@ import httpx
 SHOW_ID = "11111111-1111-4111-8111-111111111111"
 THIN_SHOW_ID = "22222222-2222-4222-8222-222222222222"
 ANCHOR_ID = "33333333-3333-4333-8333-333333333333"
+WEAK_TOP_SHOW_ID = "44444444-4444-4444-8444-444444444444"
 SHOW_TITLE = "Example Show with Sam Host"
 ITUNES_ID = "1000000001"
 MAP_KINDS = ("artist", "tv_show", "movie", "book", "brand", "podcast")
@@ -117,6 +118,8 @@ def insights(params: dict[str, str]) -> httpx.Response:
         start = 20 if "filter.popularity.max" in params else 0
         if ANCHOR_ID in signal:
             start = 40
+        if signal.startswith(WEAK_TOP_SHOW_ID) and "filter.popularity.max" not in params:
+            start = 9  # Person 09's love back lens has no affinity
         people = [person(i, round(0.95 - (i - start) * 0.002, 4)) for i in range(start, start + 50)]
         return httpx.Response(200, json={"results": {"entities": people}})
     if kind == "urn:entity:podcast" and signal.startswith("aaaaaaaa"):
@@ -141,7 +144,7 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"results": [{"entity_id": ANCHOR_ID, "name": "Example Film"}]})
     if request.url.path == "/entities":
         ids = params["entity_ids"].upper().split(",")
-        if ids[0] in (SHOW_ID.upper(), THIN_SHOW_ID.upper()):
+        if ids[0] in (SHOW_ID.upper(), THIN_SHOW_ID.upper(), WEAK_TOP_SHOW_ID.upper()):
             return httpx.Response(200, json={"results": [show_entity(ids[0].lower())]})
         return httpx.Response(400, json={"error": "entity_ids should be an array of valid UUIDs"})
     if request.url.path == "/v2/insights":
