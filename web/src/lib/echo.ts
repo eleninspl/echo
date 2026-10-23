@@ -102,7 +102,8 @@ export class EchoError extends Error {
   }
 }
 
-const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL ?? "http://localhost:8000";
+// Without a trailing slash, so a URL pasted with one still works.
+const ENGINE_URL = (process.env.NEXT_PUBLIC_ENGINE_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 // Code for a request that never got an answer: the engine is down or the network dropped.
 export const OFFLINE = "offline";
