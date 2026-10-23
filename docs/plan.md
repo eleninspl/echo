@@ -205,6 +205,7 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 
 | Method | Path | Body or params | Returns |
 | --- | --- | --- | --- |
+| GET | `/` | | `{ service, health, docs }`: what the engine is, for anyone who opens its URL. `/docs` is FastAPI's interactive API reference. |
 | GET | `/health` | | `{ ok, qloo_calls_today, qloo_calls_left }` |
 | GET | `/shows` | `q` (2 to 100 chars, on submit, not per keystroke) | `{ shows: [Show] }`, up to 5. Empty: not in Qloo. |
 | GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }`, empty until `scripts/warm.py` has run |
