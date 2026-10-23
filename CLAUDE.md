@@ -66,7 +66,8 @@ Update this section whenever something changes.
 - **23 Oct:** the web app, W1 to W11 and W13, built against mock mode (#14, #15, #18 to #23). Two Claude sessions worked in parallel, one on the engine and one on the web app; a coordinating session reviewed and merged every PR and keeps this section.
 - **23 Oct, live:** engine `https://echo-qloo.vercel.app`, web `https://echo-web-mu-taupe.vercel.app`. Neon Postgres and Upstash Redis are standalone accounts (`docs/plan.md`, "Deploying the engine"). End to end on 8 real shows: every run finished in 5 to 10 s.
 - **Not built: L, the LLM side.** Ideas, the full episode, chat, drafts and the briefing answer "not built yet" in production. The provider isn't chosen and nobody has taken L.
-- **Next:** the open points in `docs/plan.md`, "To agree": who builds L and with which provider, the four featured shows, politicians among the guests, the web app's domain. W12, the web app's production check, is in progress.
+- **23 Oct:** W12, the web app's production check on four real shows, and its fixes (#29, #30): a host found by name in the show's description, and the show left out of a guest's map.
+- **Next:** the open points in `docs/plan.md`, "To agree": who builds L and with which provider, the four featured shows, politicians among the guests, the web app's domain.
 
 ## Keeping this file current
 
