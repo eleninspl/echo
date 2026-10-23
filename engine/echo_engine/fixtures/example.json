@@ -20,6 +20,118 @@
       "image_url": null
     }
   ],
+  "mock_failures": [
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f1",
+        "title": "Fails: show_unusable",
+        "description": "The run fails with show_unusable while finding guests.",
+        "image_url": null
+      },
+      "at": "candidates",
+      "error": "show_unusable",
+      "message": "Echo can't analyse this show yet: Qloo knows too few people for it."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f2",
+        "title": "Fails: filters_too_narrow",
+        "description": "The run fails with filters_too_narrow while removing hosts.",
+        "image_url": null
+      },
+      "at": "clean",
+      "error": "filters_too_narrow",
+      "message": "No guests match those filters. Try a broader one."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f3",
+        "title": "Fails: unknown_country",
+        "description": "The run fails with unknown_country while finding guests.",
+        "image_url": null
+      },
+      "at": "candidates",
+      "error": "unknown_country",
+      "message": "Qloo doesn't recognise that country."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f4",
+        "title": "Fails: daily_cap during the run",
+        "description": "The run fails with daily_cap while scoring.",
+        "image_url": null
+      },
+      "at": "score",
+      "error": "daily_cap",
+      "message": "Echo has used today's Qloo calls. Featured shows still open."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f5",
+        "title": "Fails: daily_cap on start",
+        "description": "POST /analyses answers 429 daily_cap.",
+        "image_url": null
+      },
+      "at": "start",
+      "status": 429,
+      "error": "daily_cap",
+      "message": "Echo has used today's Qloo calls. Featured shows still open."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f6",
+        "title": "Fails: qloo_error",
+        "description": "The run fails with qloo_error while collecting the evidence.",
+        "image_url": null
+      },
+      "at": "evidence",
+      "error": "qloo_error",
+      "message": "Qloo didn't answer. Try again in a minute."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f7",
+        "title": "Fails: llm_error during the run",
+        "description": "The run fails with llm_error while writing episode ideas.",
+        "image_url": null
+      },
+      "at": "ideas",
+      "error": "llm_error",
+      "message": "Echo couldn't write the episode ideas. Try again in a minute."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f8",
+        "title": "Fails: engine_error",
+        "description": "The run fails with engine_error while scoring.",
+        "image_url": null
+      },
+      "at": "score",
+      "error": "engine_error",
+      "message": "Something went wrong in Echo. Try again."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000f9",
+        "title": "Slow: running for 20 s",
+        "description": "The run finishes like the example, after 20 seconds.",
+        "image_url": null
+      },
+      "seconds": 20
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000fa",
+        "title": "Fails: llm_error on guest details",
+        "description": "The run finishes like the example; guest details answer 502 llm_error.",
+        "image_url": null
+      },
+      "at": "guest_details",
+      "status": 502,
+      "error": "llm_error",
+      "message": "Echo couldn't write the episode idea. Try again in a minute."
+    }
+  ],
   "analysis": {
     "id": "an_example",
     "status": "done",

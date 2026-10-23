@@ -38,6 +38,23 @@ One person each. **Q** talks to Qloo and does the maths: Eleni, from 23 Oct. **L
 
 With `ECHO_MOCK=1` every route answers from the example, so the web app and the LLM prompts can be built before the pipeline works. Without it, a stub returns 501 `not_implemented` until it's built.
 
+Mock mode also has invented shows that fail or stall like a real run, so the web app can show every case (`mock_failures` in the example). Search for "fails", "slow" or an error code to find them, or post their IDs:
+
+| Show ID | What happens |
+| --- | --- |
+| `00000000-0000-0000-0000-0000000000f1` | The run fails at "Finding guests" with `show_unusable` |
+| `00000000-0000-0000-0000-0000000000f2` | The run fails at "Removing hosts and past guests" with `filters_too_narrow` |
+| `00000000-0000-0000-0000-0000000000f3` | The run fails at "Finding guests" with `unknown_country` |
+| `00000000-0000-0000-0000-0000000000f4` | The run fails at "Scoring" with `daily_cap` |
+| `00000000-0000-0000-0000-0000000000f5` | `POST /analyses` answers 429 `daily_cap` |
+| `00000000-0000-0000-0000-0000000000f6` | The run fails at "Collecting the evidence" with `qloo_error` |
+| `00000000-0000-0000-0000-0000000000f7` | The run fails at "Writing episode ideas" with `llm_error` |
+| `00000000-0000-0000-0000-0000000000f8` | The run fails at "Scoring" with `engine_error` |
+| `00000000-0000-0000-0000-0000000000f9` | The run stays `running` for 20 s, then finishes like the example |
+| `00000000-0000-0000-0000-0000000000fa` | The run finishes like the example; guest details answer 502 `llm_error` |
+
+Each message is the one the real engine sends. Outside mock mode the engine ignores these shows.
+
 | # | Q: Qloo side | Days | |
 | --- | --- | --- | --- |
 | Q1 | Client ready: throttle, cache, quota count, a call log per analysis, `params.py` allows the signals below | 0.25 | done |

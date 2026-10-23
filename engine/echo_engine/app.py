@@ -80,6 +80,8 @@ class Engine:
         self.counters = counters
         self.daily_cap = daily_cap
         self.example = load_example()
+        # Invented shows that fail or stall the way a real run can, for the web app to show each case. Mock only.
+        self.failures = {failure["show"]["id"]: failure for failure in self.example["mock_failures"]}
         if mock and isinstance(analyses, LocalStore):
             analyses.remember(Analysis.model_validate(self.example["analysis"]))
 
@@ -120,9 +122,20 @@ class Engine:
         if not await self.counters.take_call(self.daily_cap):
             raise daily_cap()
 
+    def mock_shows(self, q: str) -> list[Show]:
+        """The failing shows whose title has `q` in it, up to 5, or else the example shows."""
+        failing = [f["show"] for f in self.failures.values() if q.lower() in f["show"]["title"].lower()]
+        return [Show.model_validate(show) for show in (failing[:5] or self.example["shows"])]
+
+    def mock_fails(self, show_id: str, at: str) -> None:
+        """Raises the error a failing example show stands for, if it fails `at` this point."""
+        failure = self.failures.get(show_id, {})
+        if self.mock and failure.get("at") == at:
+            raise EchoError(failure["status"], failure["error"], failure["message"])
+
     async def show(self, show_id: str) -> Show:
         if self.mock:
-            for show in self.example["shows"]:
+            for show in [*self.example["shows"], *(f["show"] for f in self.failures.values())]:
                 if show["id"] == show_id:
                     return Show.model_validate(show)
             raise EchoError(404, "not_found", "There's no show with that ID.")
@@ -142,6 +155,7 @@ class Engine:
             return existing
         await self.check_cap()
         show = await self.show(show_id)
+        self.mock_fails(show.id, "start")
         if reuse and (existing := await self.analyses.find(request_key(show.id, filters))):
             return existing
         analysis = Analysis(
@@ -180,10 +194,17 @@ class Engine:
         await self.analyses.put(analysis)
 
     async def run_mock(self, analysis: Analysis) -> None:
-        example = Analysis.model_validate(self.example["analysis"])
+        """The example's analysis, or the failure or delay a failing example show stands for."""
+        failure = self.failures.get(analysis.show.id, {})
+        delay = failure["seconds"] / len(analysis.steps) if "seconds" in failure else self.step_delay
         for step in analysis.steps:
-            await asyncio.sleep(self.step_delay)
+            if step.key == failure.get("at"):
+                fail(analysis, failure["error"], failure["message"])
+                await self.analyses.put(analysis)
+                return
+            await asyncio.sleep(delay)
             step.done = True
+        example = Analysis.model_validate(self.example["analysis"])
         analysis.audience_map = example.audience_map
         analysis.guests = example.guests
         analysis.left_out = example.left_out
@@ -290,7 +311,7 @@ def create_app(
     @app.get("/shows")
     async def shows(q: str = Query(min_length=2, max_length=100)) -> ShowList:
         if engine.mock:
-            return ShowList.model_validate({"shows": engine.example["shows"]})
+            return ShowList(shows=engine.mock_shows(q))
         await engine.check_cap()
         async with engine.client() as client:
             return ShowList(shows=await pipeline.search_shows(client, q))
@@ -317,6 +338,7 @@ def create_app(
     async def guest_details(analysis_id: str, ref: str) -> GuestDetails:
         analysis = await engine.done(analysis_id)
         guest = engine.guest(analysis, ref)
+        engine.mock_fails(analysis.show.id, "guest_details")
         maps = await engine.guest_maps(analysis, guest)
         if engine.mock:
             episode = GuestDetails.model_validate({**engine.example["guest_details"], "ref": ref}).episode
