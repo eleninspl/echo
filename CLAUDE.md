@@ -2,74 +2,65 @@
 
 Entry to the Qloo Agentic Hackathon 2026. Echo finds podcast guests a show's audience will love, who bring a new audience that will love the show back.
 
-**Deadline: 30 October 2026, 23:45 New York** (31 October, 05:45 Athens). A live hosted demo is mandatory.
+**Deadline: 30 October 2026, 23:45 New York** (31 October, 05:45 Athens). A live hosted demo is mandatory. Implementation freeze 27 Oct.
 
 This repo is only about the Qloo hackathon and Echo.
 
 ## Docs
 
-- `docs/echo.md`: the pitch, the flow, fit / love back / reach, rules, risks. Read before changing product behaviour.
-- `docs/hackathon.md`: submission requirements, judging, Qloo's rules.
-- `docs/qloo.md`: API reference for Echo, with what has been verified on the hackathon server.
-- `docs/qloo-map.md`: every Qloo API feature, whether it works on the hackathon server, and what Echo could use it for. Check here before assuming a feature exists or doesn't.
-- `docs/plan.md`: **v1 scope**, the engine tasks split into a Qloo side and an LLM side, and dates. Anything not in it is not in v1.
-- `docs/api.md`: v1 HTTP contract between the engine and the web app. Kept small on purpose: it's a hackathon.
-- `docs/features.md`: reference only. Qloo recipes, scoring, call budget and the checks behind them, from the long 21 Oct proposal.
+Three files, kept short. Don't add more: put new detail in one of these, and cut what's no longer true.
+
+- `docs/plan.md`: **v1 scope**, the engine tasks (Q for Qloo, L for the LLM), dates, open points and the API. Anything not in it is not in v1.
+- `docs/qloo.md`: how to call Qloo, the calls behind each step, gotchas and the scoring. Check here before assuming a Qloo feature works or doesn't.
+- `docs/echo.md`: the pitch, fit / love back / reach, rules, the hackathon's requirements and judging, risks.
+
+The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is in git history at commit 3419283. It is not the plan.
 
 ## Stack
 
-- Engine: Python, FastAPI, on Railway (`engine/`, on branch `day1/spike`). Qloo and the LLM (Anthropic API, `ANTHROPIC_API_KEY`) are both called from the engine.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Railway. It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`).
 - Web app: Next.js, TypeScript. No code yet.
-- OpenClaw/Telegram bot: not in v1. Whether to add it after the freeze is open in `docs/plan.md`.
+- No bot in v1 (open in `docs/plan.md`).
 
 ## Setup
 
 Set keys with `scripts/set-env.sh KEY`, or `pbpaste | scripts/set-env.sh KEY`. Never print, log or commit values from `.env`.
 
-- `npm run typecheck`
-- `npm run probe [show names...]`: scores guests for each show and writes a local report to `.cache/probe/` (never commit it).
-- `npm run map-api [show name]`: checks every Qloo feature once (about 55 calls, cached) and writes a local report to `.cache/map/`. Rerun it after Qloo changes something, and update `docs/qloo-map.md`.
+Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`.
 
-Code: Qloo client in `src/lib/qloo/` (throttled, cached, tracks quota). Echo's Qloo calls in `src/lib/echo/signals.ts`.
+TypeScript probes, for checking the API only (not product code): `npm run typecheck`, `npm run probe [show names...]` and `npm run map-api [show name]` (about 55 calls, cached). Both write local reports to `.cache/`, never committed. Rerun `map-api` after Qloo changes something and update `docs/qloo.md`.
 
 ## Qloo API rules
 
-Full detail in `docs/qloo.md`. The rules that break things if ignored:
+The ones that break things if ignored. More in `docs/qloo.md`.
 
-- Host is `https://hackathon.api.qloo.com` only. `api.qloo.com` and `staging.api.qloo.com` reject hackathon keys with 401.
-- Auth is the `X-Api-Key` header. Every call is GET with query-string params, no JSON body.
+- Host `https://hackathon.api.qloo.com` only (other hosts give 401). `X-Api-Key` header. GET only, query-string params.
 - Use `/search`, `/v2/tags`, `/v2/insights`, `/entities`, `/v2/analysis/compare`. Never `/recommendations`, `/recs` or `/v2/insights/search`.
-- Invalid params are silently ignored and return 200 with empty `entities`. An empty result usually means a param that isn't valid for that `filter.type`.
-- Tags need IDs from `/v2/tags`, never free text.
-- **Quota: 10 requests per second, 50,000 per month** (raised from 5 and 10,000 on 21 Oct; resets around 20 Nov), covering build and judging. Always go through the client in `src/lib/qloo/` (throttled and cached). Count calls before adding any per-guest request.
-- Insights returns people who have died (`properties.date_of_death`) and a show's own hosts. Filter both out before showing guests.
+- Product code calls Qloo only through `QlooClient` in `engine/` (throttled, cached in `.cache/`, checks params per `filter.type`).
+- **Quota: 10 a second, 50,000 a month** for build and judging, resets around 20 Nov. Count calls before adding any per-guest request.
+- Invalid params are ignored silently: 200 with empty or unchanged results.
+- A lens (`filter.results.entities`) returns 200 even when Qloo can't use the signal, with no `query.affinity`. Check for the affinity. Some shows are never returned as a result, so love back can't be scored for them.
+- Insights returns people who have died (`properties.date_of_death`), a show's own hosts and near-duplicates. Filter all three before showing guests.
 - Some people return 400 when used as an input. Skip them.
-- Video games are `urn:entity:videogame`. The guide's `video_game` returns 400.
-- `/entities` can't look up iTunes IDs. Search Qloo by Apple's title and compare `properties.external.itunes.id`.
-- A lens (`filter.results.entities`) returns 200 even for a signal Qloo can't use, with no `query.affinity`. Check for the affinity, not the status. Some shows are never returned as a result at all, so love back can't be scored for them.
-- Entity weight `high` behaves like no weight. Use `very_high`, `medium` or `mid`.
-- Audience IDs go in as the `urn:audience:...` value from `id`. The UUID in `entity_id` is silently ignored.
-- `signal.interests.entities.weight` is one value for all entities (`very_low` to `very_high`), not one per entity.
-- Person tags include Wikipedia categories about religion, sexuality and similar, and `urn:tag` returns religion and ethnicity subtypes. Use an allow-list of tag subtypes for themes and reasons, never a block-list. Never use the political, beliefs or communities audience types.
+- `urn:entity:videogame`, not `video_game`. Entity weight `high` is the same as none. Tags need IDs from `/v2/tags`.
+- Tags include religion, sexuality, ethnicity and similar. Allow-list tag subtypes and screen names; never a block-list alone.
 
 ## Data rules
 
 - Never commit Qloo response data, including result names, scores or entity IDs copied into docs: the repo goes public. Cache only in `.cache/` (git-ignored). Private server-side caching is allowed.
 - Results describe groups. Never score private individuals, never send personal data to Qloo, never present a match as a prediction about one person.
-- No bulk scraping. Usage limits aren't published and every call shares one quota.
+- No bulk scraping.
 
 ## Status
 
 Update this section whenever something changes.
 
-- **20 Oct:** docs and `scripts/set-env.sh` on branch `docs/echo-plan`, PR #1. Qloo client and coverage probe (TypeScript) on branch `probe/qloo-coverage`, no PR. It overlaps the Python engine on `day1/spike` (PR #2); which one to keep is undecided. No app yet.
-- **Probe result: go.** Coverage is good for comedy, music and sports shows. Fit and love back work. The fit against reach trade-off shows up clearly for comedy shows. Reach v1 (top 50 podcast overlap) saturates and needs a v2. Details in `docs/qloo.md` under "Findings from real calls".
-- **21 Oct:** every Qloo API feature checked on the hackathon server and mapped in `docs/qloo-map.md`. Quota raised to 10 a second and 50,000 a month.
-- **21 Oct:** proposed inputs, features and contract in `docs/features.md` and `docs/api.md` on branch `docs/echo-contract`, not yet agreed with the teammate. Reach v2 is chosen there ("unfamiliar podcasts", F10).
-- **22 Oct:** the top 3 present live on air on 5 Nov (`docs/hackathon.md`). The investor judge's shows are in Qloo and fully scorable, and their hosts come back as guest candidates, so host filtering has to catch them.
-- **22 Oct (call):** v1 is the engine and the web app only. The long proposal was cut to `docs/plan.md` and a 9-endpoint `docs/api.md`. No path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side (Q1 to Q10) and an LLM side (L1 to L7), one person each. The chat in the web app is the agent.
-- **Next:** agree plan.md's three open points, then build against api.md.
+- **20 to 21 Oct:** Python Qloo client and spike in `engine/`, logo in `brand/`, TypeScript probes. Coverage probe: go. Every Qloo feature checked on the hackathon server. Quota raised to 10 a second and 50,000 a month.
+- **21 Oct:** a long proposal for features and the contract, merged into the engine branch on 22 Oct.
+- **22 Oct:** the top 3 present live on air on 5 Nov. The investor judge's shows are in Qloo and scorable; their hosts come back as candidates.
+- **22 Oct (call):** v1 is the engine and the web app only. The proposal was cut to three short docs: no path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side and an LLM side, one person each. The chat in the web app is the agent.
+- **Next:** agree the three open points in `docs/plan.md`, then build.
 
 ## Keeping this file current
 
-When a decision is made, an API fact is verified or disproved, or the plan moves, update this file and the matching doc in the same change. Keep this file short and put detail in `docs/`. Mark an API fact as verified only after a real call to the hackathon server.
+When a decision is made, an API fact is verified or disproved, or the plan moves, update this file and the matching doc in the same change. Mark an API fact as verified only after a real call to the hackathon server.

@@ -1,81 +1,135 @@
 # Plan (v1)
 
-What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo needs. The HTTP contract is [api.md](api.md). [features.md](features.md) is the long reference: use it for exact Qloo recipes and the checks behind them, not for scope. Anything not on this page is not in v1.
+What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo needs: anything not on this page is not in v1. The Qloo calls and the scoring are in [qloo.md](qloo.md).
 
-## v1 in one paragraph
+## v1
 
-Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Next.js). The host types their show, picks it from a short list, and Echo shows their audience map, then 10 guests the audience will like, whose own fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can talk to Echo ("I want younger listeners", "someone less famous", "an episode about a film") and Echo re-runs with new filters. The host picks one or more guests and gets a personal invitation draft for each, plus a briefing before recording. Echo sends nothing.
+Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Next.js). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
 
-## The flow
+1. **Find the show.** Qloo search, up to 5 podcasts with image and description; the host picks one. A show Qloo doesn't have, or one with too little data, gets "Echo can't analyse this show yet" and the featured shows.
+2. **Audience map** across music, film, TV, books, brands and podcasts.
+3. **Candidates:** the people the audience likes most, plus a fame-capped list.
+4. **Clean-up:** drop people who have died, hosts, duplicates and (should) past guests.
+5. **Score and rank:** fit (fame-adjusted), love back, reach, a label, and evidence (shared tastes, new podcasts, age groups).
+6. **Ideas** for the top 10: reason, episode title, two-line pitch.
+7. **Details** on click: the full episode idea, and the guest's audience map next to the show's.
+8. **Chat:** the LLM turns a request into filters (fame, age group, country, episode about a film, artist or brand) and runs again, or rewrites one idea.
+9. **Invite:** drafts for the picked guests, revisable ("shorter"), shown with a copy button.
+10. **Briefing** before recording.
+11. **What Qloo saw:** every Qloo call of the analysis.
 
-1. **Find the show.** Qloo `/search` for podcasts, up to 5 results with image and description. The host picks one. A show Qloo doesn't have, or one with too little data, gets one message ("Echo can't analyse this show yet") and the featured shows. No stand-in path in v1.
-2. **Audience map.** What the show's audience likes more than average across music, film, TV, books, brands and podcasts.
-3. **Candidates.** The people the audience likes most, plus a second list with fame capped, so it isn't only celebrities.
-4. **Clean-up.** Drop people who have died, the show's hosts, duplicates, and (should) past guests.
-5. **Score and rank.** Fit (fame-adjusted), love back, reach. Label each guest (sweet spot, safe, far, long shot, balanced). Evidence for each: shared tastes, podcasts their fans like that the show's don't, the age groups they bring.
-6. **Ideas.** For the top 10: a one-line reason, an episode title and a two-line pitch, written from the evidence only.
-7. **Details on click.** The full episode idea (segments and questions), and the guest's own audience map next to the show's, so the host sees what they'd add.
-8. **Chat.** The host asks for a change in words. The LLM turns it into filters (fame, age group, country, episode about a film, artist or brand) and re-runs, or rewrites one guest's idea.
-9. **Invite.** The host picks one or more guests. One draft each, revisable with an instruction ("shorter"). The web app shows the final text with a copy button.
-10. **Briefing.** One page before recording: who the guest is, what their audience likes, where the two audiences meet, questions to ask.
-11. **What Qloo saw.** Every Qloo call of the analysis, listed. Needed for the technical-use criterion.
+3 or 4 featured shows, precomputed, open instantly from the landing page.
 
-Featured shows (3 or 4, precomputed) open instantly from the landing page.
-
-## Not in v1
-
-Shows Qloo doesn't have (stand-in shows, people or topics), Apple, Spotify and RSS links, the Telegram/OpenClaw bot, logins, sessions and tokens, SSE, rate-limit headers, sending or approving anything, check or compare named guests, mirror, past guests as a signal, grow toward an interest audience, a city or another show, topic tags as anchors, the plain-AI comparison and backtest as features (make them offline for the pitch if there's time), an after-episode summary.
+**Not in v1:** shows Qloo doesn't have, Apple, Spotify or RSS links, the Telegram/OpenClaw bot, logins, sessions, SSE, sending or approving, checking a named guest, grow toward interests, cities or another show, topic tags, the plain-AI comparison (make it offline for the pitch if there's time), an after-episode summary.
 
 ## Engine tasks
 
-The engine splits in two, one person each. **Q** is everything that talks to Qloo and does the maths. **L** is everything that talks to the LLM. They meet in Python: Q's pipeline returns an `Analysis` dict (the shape in [api.md](api.md)), L's functions take it and add text. Until L is ready, Q uses stubs that return placeholder text; until Q is ready, L works on the example in api.md.
+One person each. **Q** talks to Qloo and does the maths. **L** talks to the LLM. They meet in Python: Q's pipeline builds the analysis dict (the shape under API below) and L's functions take it and add text. Until the other half is ready, each works against the example in this page.
 
-### Q: Qloo side
-
-| # | Task | Recipe | Days | |
-| --- | --- | --- | --- | --- |
-| Q1 | Qloo client ready: throttle, disk cache, quota count, per-analysis call log, `videogame` type, the signals the pipeline needs allowed in `params.py` | features.md section 3, decision 3 | 0.25 | must |
-| Q2 | `GET /shows`: Qloo search for podcasts, 5 results | F1 step 3 | 0.25 | must |
-| Q3 | Audience map: 6 categories, top items with affinity | F5 | 0.5 | must |
-| Q4 | Candidates (plain and fame-capped) and clean-up: dead, duplicates, hosts (calls L1) | F6, F7 | 0.5 | must |
-| Q5 | Fit, love back, reach, Echo score, labels, ranking, as pure functions with tests on invented data | F8 to F10, section 2 | 1 | must |
-| Q6 | Evidence for the top 10: shared tags (allow-listed subtypes only), new podcasts, age groups | F11, F16 | 0.5 | must |
-| Q7 | Filters: fame ceiling, grow toward an age group, grow toward a country, episode about an entity | F12 b1 and b3, F13 c2, F15 | 0.5 | must |
-| Q8 | Guest details: the guest's own audience map (6 calls, on click, cached) | F5 with the guest as signal | 0.25 | must |
-| Q9 | Routes in [api.md](api.md), analyses run in the background and are polled, a daily cap on new analyses, featured shows precomputed at start, deploy to Railway | | 0.75 | must |
-| Q10 | Past guests: match L6's names to Qloo people and drop them | F4 | 0.25 | should |
-
-About 4.75 days.
-
-### L: LLM side
-
-| # | Task | Days | |
+| # | Q: Qloo side | Days | |
 | --- | --- | --- | --- |
-| L1 | Host check: from the show's title and Qloo description, which candidates are hosts or regular co-hosts | 0.25 | must |
-| L2 | Ideas for the top 10 in one call: reason, episode title, two-line pitch, from the evidence only | 0.5 | must |
-| L3 | Details: the full episode idea for one guest | 0.25 | must |
-| L4 | Chat: messages plus the current filters in; the model calls one of three tools (re-run with filters, rewrite one idea, just answer) and replies | 1 | must |
-| L5 | Invitation drafts for 1 to 5 guests, and revise with an instruction | 0.5 | must |
-| L6 | Briefing for one guest | 0.25 | must |
+| Q1 | Client ready: throttle, cache, quota count, a call log per analysis, `params.py` allows the signals below | 0.25 | must |
+| Q2 | `GET /shows` | 0.25 | must |
+| Q3 | Audience map | 0.5 | must |
+| Q4 | Candidates, usability check and clean-up (calls L1 for hosts) | 0.5 | must |
+| Q5 | Fit, love back, reach, Echo score, labels, order: pure functions, tested on invented data | 1 | must |
+| Q6 | Evidence for the top 10, with the tag allow-list and name screen | 0.5 | must |
+| Q7 | Filters: fame, age, country, episode about | 0.5 | must |
+| Q8 | Guest details: the guest's audience map and what it adds | 0.25 | must |
+| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start, Railway | 0.75 | must |
+| Q10 | Drop past guests: match L7's names to Qloo people | 0.25 | should |
+
+| # | L: LLM side | Days | |
+| --- | --- | --- | --- |
+| L1 | Host check: which candidates are the show's hosts or regular co-hosts | 0.25 | must |
+| L2 | Ideas for the top 10 in one call | 0.5 | must |
+| L3 | The full episode idea for one guest | 0.25 | must |
+| L4 | Chat: three tools (run again with filters, rewrite one idea, just answer) | 1 | must |
+| L5 | Drafts for 1 to 5 guests, and revise | 0.5 | must |
+| L6 | Briefing | 0.25 | must |
 | L7 | Past guests: names from the show's recent episode titles (Apple lookup by the iTunes ID Qloo gives) | 0.25 | should |
 
-About 3 days. L has the lighter half, so L also starts the web app on the api.md example on day 1.
-
-Rules for every prompt: write only from the evidence passed in, never invent facts about a person, never mention sensitive traits, never call a match a prediction about one listener. Model `claude-sonnet-5-5`, prompts kept as plain strings in the engine.
+Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Model `claude-sonnet-5-5`.
 
 ## Dates
 
 | Date | Q | L |
 | --- | --- | --- |
-| 22 to 23 Oct | Q1 to Q4 | L1, L2, web app on the example |
+| 23 Oct | Q1 to Q4 | L1, L2, web app on the example |
 | 24 Oct | Q5 to Q7 | L3, L4 |
 | 25 Oct | Q8, Q9, deploy | L5, L6, web app on the live engine |
 | 26 Oct | Q10, featured shows, the investor judge's show end to end | L7, fixes |
 | 27 Oct | **Freeze** | |
-| 27 to 30 Oct | Together: Devpost text, README, screenshots, repo public, submit on 29 Oct | |
+| 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit | |
 
 ## To agree
 
-1. **The bot.** The pitch says Echo works through OpenClaw. v1 has no bot: the chat in the web app is the agent. Either change the pitch line, or add the bot after the freeze if both halves are done early.
-2. **Who takes Q and who takes L.** The Python Qloo client already exists on `day1/spike`, so its author taking Q is the quickest start.
-3. **Featured shows.** Pick 3 or 4 by 25 Oct (features.md decision 12).
+1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
+2. **Who takes Q and who takes L.** The author of the Python Qloo client gets the quickest start on Q.
+3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot; its title goes in an env var, never the repo.
+
+## API
+
+JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message": "<text for the host>" }`. Examples are invented, never Qloo data.
+
+| Method | Path | Body or params | Returns |
+| --- | --- | --- | --- |
+| GET | `/health` | | `{ ok, qloo_calls_today, qloo_calls_left }` |
+| GET | `/shows` | `q` (2 to 100 chars, on submit, not per keystroke) | `{ shows: [Show] }`, up to 5. Empty: not in Qloo. |
+| GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }` |
+| POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
+| GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
+| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } }` |
+| POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
+| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note? }`, or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
+| POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }` |
+
+`Show` is `{ id, title, description, image_url }`.
+
+`filters`: `fame` is `any`, `less_famous` or `rising`; `age` is null or a Qloo age bucket (`24_and_younger` to `55_and_older`); `country` is null or an English country name; `episode_about` is null or `{ query, type }` with type `movie`, `tv_show`, `artist`, `brand` or `videogame`.
+
+Chat `action`: `rerun` (poll the new `analysis_id`), `rewrite` (`guest_ref` and the new `idea`) or `none`.
+
+The analysis, when done:
+
+```json
+{
+  "id": "an_00000002",
+  "status": "done",
+  "show": { "id": "00000000-0000-0000-0000-000000000001", "title": "Example Show", "description": "A weekly interview show about food.", "image_url": "https://example.com/show.jpg" },
+  "filters": { "fame": "any", "age": null, "country": null, "episode_about": { "query": "Example Film", "type": "movie", "used": "Example Film (2019)" } },
+  "steps": [{ "key": "map", "label": "Mapping your audience", "done": true }],
+  "audience_map": [{ "category": "music", "items": [{ "name": "Example Band", "image_url": "https://example.com/band.jpg", "affinity": 0.93 }] }],
+  "guests": [
+    {
+      "ref": "g1",
+      "name": "Guest A",
+      "description": "Stand-up comedian and actor",
+      "image_url": "https://example.com/a.jpg",
+      "links": { "imdb": "https://www.imdb.com/name/nm0000001/" },
+      "label": "sweet_spot",
+      "scores": { "fit": 0.74, "love_back": 0.41, "reach": 0.52, "echo": 0.55 },
+      "evidence": { "shared_tastes": ["Example tag"], "new_podcasts": ["Example Podcast B"], "ages": ["25_to_29", "30_to_34"] },
+      "idea": { "reason": "Your listeners and Guest A's fans both over-index on example tag.", "title": "Example episode title", "pitch": "Two sentences on the episode." }
+    }
+  ],
+  "left_out": [{ "name": "Host Person", "why": "host" }],
+  "qloo_calls": [{ "path": "/v2/insights", "params": { "filter.type": "urn:entity:person", "take": "50" }, "results": 50, "ms": 412, "cached": false }]
+}
+```
+
+- Steps while running: `map`, `candidates`, `clean`, `score`, `evidence`, `ideas`.
+- `guests`: up to 20, best first, all on the chart. The top 10 have `evidence` and `idea`; the rest have null.
+- `scores` are percentiles from 0 to 1 ([qloo.md](qloo.md#scoring)). `fit` is fame-adjusted.
+- `episode_about.used` is null when Qloo couldn't use the entity; the web app says so.
+- `left_out.why` is `host` or `past_guest`. People who have died are dropped silently.
+- Failed: `"status": "failed"` with `"error": { "error": "show_unusable", "message": "Echo can't analyse this show yet." }`, or `qloo_error`.
+
+| Status | `error` |
+| --- | --- |
+| 400 | `bad_request`, `unknown_country` |
+| 404 | `not_found` |
+| 429 | `daily_cap`: the daily Qloo-call cap (`ECHO_DAILY_QLOO_CALLS`) is reached. Featured and earlier analyses still open. |
+| 502 | `qloo_error`, `llm_error` |
+
+Analyses are saved as JSON on the Railway volume next to the Qloo cache, so they survive restarts. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.

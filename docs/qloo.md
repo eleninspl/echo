@@ -1,144 +1,122 @@
 # Qloo for Echo
 
-Qloo holds a taste graph of more than 250 million things people like, across music artists, film, TV, books, podcasts, games, people, places, brands and destinations. Given a few things an audience likes, it predicts what else that audience is likely to enjoy, including in other categories. It answers from patterns across large groups and holds no accounts for individuals.
+How to call Qloo, the exact calls behind each v1 step, and the scoring. Everything here was checked on the hackathon server between 20 and 22 Oct (about 900 calls). The check-by-check record (C1 to C90) and the recipes we cut from v1 are in `docs/features.md` at commit 3419283.
 
-Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-llm-hackathon-developer-guide) and the reference pages it links to. Facts marked **verified** were confirmed with a real call to the hackathon server.
-
-Every API feature and whether it works on the hackathon server: [qloo-map.md](qloo-map.md).
-
-## What Echo uses it for
-
-| Echo step | Call |
-| --- | --- |
-| Find the show | `/search` with `types=urn:entity:podcast` |
-| Map the audience | `/v2/insights` with the show as `signal.interests.entities`, one call per `filter.type` (artist, book, movie, tv_show, brand, place) |
-| Find candidates | `/v2/insights`, `filter.type=urn:entity:person`, show as signal |
-| Fit | Candidate's `query.affinity` from the call above, or `filter.results.entities=<guest>` to score one guest directly |
-| Love back | `/v2/insights`, `filter.type=urn:entity:podcast`, guest as signal, `filter.results.entities=<show>` |
-| Reach | `/v2/analysis/compare` with the show as `a` and the guest as `b` |
-| Who the new listeners are | `/v2/insights`, `filter.type=urn:demographics`, guest as signal |
-| Episode theme | `/v2/insights`, `filter.type=urn:tag` (taste analysis) for show and guest, then the tags they share |
+Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-llm-hackathon-developer-guide) and the reference pages it links to.
 
 ## Basics
 
-- Base URL: `https://hackathon.api.qloo.com`. **Verified.** Hackathon keys get 401 on `api.qloo.com` and `staging.api.qloo.com`.
-- Auth: `X-Api-Key` header. **Verified.**
-- Every call is GET with params in the query string. POST to `/v2/insights` fails with "No path matching request parameters".
-- Recommended flow: get IDs from `/search` (entities) or `/v2/tags` (tags), then pass them to `/v2/insights`.
+- Host `https://hackathon.api.qloo.com` only. Hackathon keys get 401 on `api.qloo.com` and `staging.api.qloo.com`.
+- Auth is the `X-Api-Key` header. Every call is GET with query-string params. POST fails with "No path matching request parameters".
+- **10 requests a second, 50,000 a month**, covering build and judging. Resets around 20 Nov. Read from the `x-second-ratelimit-*` and `x-month-ratelimit-*` headers.
+- Go through `QlooClient` in `engine/`: throttled, cached in `.cache/`, checks params per `filter.type`. Private caching is allowed with no time limit. Qloo data never goes in the repo.
+- `take` is at most 50; `offset=50` gives the next 50. On a lens, send `take=50` or only 20 come back.
 
-## Endpoints
+## Gotchas
 
-### `GET /search`: find entity IDs by name (**verified**)
+- **Invalid params are ignored silently**: 200 with empty or unchanged results. An empty result usually means a param that isn't valid for that `filter.type`.
+- **A lens hides bad signals.** `filter.results.entities` answers 200 with every requested entity even when Qloo can't use the signal, with no `query.affinity`. Check for the affinity, not the status. Unscored is never 0.
+- **Some shows are never returned as a result.** They work as a signal, but love back can't be scored for them. Mostly shows below popularity 0.6.
+- **Some people can't be an input**: 400 "All of the provided signal.interests.entities were invalid". It is per `filter.type`: the same person can fail on podcast lists and work on person lists.
+- Video games are `urn:entity:videogame`. The guide's `video_game` returns 400.
+- Entity weight `high` is the same as no weight. `very_high`, `medium` and `mid` are real steps. The weight is one value for all entities.
+- An unknown location returns 400 "unable to resolve to a valid locality". An unknown tag ID returns 200 with results.
+- Lists over about 210 IDs in one URL fail with 414. Chunk `filter.results.entities` into 50s.
+- `/entities` can't look up iTunes IDs. External IDs are under `properties.external`.
+- Insights returns people who have died and a show's own hosts. A person never appears in their own list, and a show never appears in its own podcast list.
+- Thin data: shows below popularity 0.6 mostly have no demographics block, and people with null popularity can't be scored.
+- Explainability gives near-equal scores to every input, and compare between a podcast and a person shares few tags. Neither is used for reasons.
+- Trending stops in September 2025 and is empty for people. Not used.
 
-Params: `query`, `types`, `take`, `page`, `sort_by` (`match`, `distance`, `popularity`), `filter.popularity`, `filter.tags`, `filter.location`, `filter.radius`.
+## The calls behind each v1 step
 
-Response: `{ results: [...] }`. Each result has `entity_id`, `name`, `types`, `popularity` (0 to 1), `tags`, `disambiguation`, `properties` (`short_description`, `short_descriptions`, `image`, `external`).
+"Plain C1" below means `GET /v2/insights?filter.type=urn:entity:person&signal.interests.entities=<show>&take=50`.
 
-### `GET /v2/insights`: recommendations and analysis (**verified** for people)
+| Step | Call | Calls |
+| --- | --- | --- |
+| Find the show | `/search?query=<text>&types=urn:entity:podcast&take=5`. Uses `entity_id`, `name`, `popularity`, `properties.image`, `properties.short_description`. | 1 |
+| Usable? | The plain C1 has at least 10 living people, and the love back lens (below) for its top person returns the show with an affinity. Otherwise `show_unusable`. | 1 extra, reused |
+| Audience map | `/v2/insights?filter.type=urn:entity:<t>&signal.interests.entities=<show>&take=10` for `t` in `artist, tv_show, movie, book, brand, podcast` | 6 |
+| Candidates | The plain C1, and C2: the same with `filter.popularity.max=0.7`. Take from the two alternately by affinity, skipping duplicates, until 20. C1 and C2 affinities compare directly. | 2 |
+| Love back | Per guest: `filter.type=urn:entity:podcast&signal.interests.entities=<guest>&take=50`. If the show is in it, its `query.affinity` is love back and its position is the rank. If not, a lens: the same with `filter.results.entities=<show>`. The show is outside the top 50 for about 72% of guests. | about 34 |
+| Reach | The union of every guest's top 10 podcasts from the love back call (without the show), in chunks of 50: `filter.type=urn:entity:podcast&signal.interests.entities=<show>&filter.results.entities=<chunk>&take=50` | 1 to 3 |
+| New listeners | `filter.type=urn:demographics&signal.interests.entities=<show>,<all guest IDs>`. One block per entity. `query.age` per bucket, -1 to 1. Drop `query.gender`. | 1 |
+| Shared tastes | `filter.type=urn:tag&signal.interests.entities=<show or guest>&filter.tag.types=<allow-list>&take=50`, once for the show and once per top 10 guest | 11 |
+| Guest details | The audience map call with the guest as signal, `take=20` | 6, on click |
 
-`filter.type` is required. Values from the hackathon guide: `urn:entity:artist`, `urn:entity:book`, `urn:entity:brand`, `urn:entity:destination`, `urn:entity:movie`, `urn:entity:person`, `urn:entity:place`, `urn:entity:podcast`, `urn:entity:tv_show`, `urn:entity:videogame`. The guide writes `video_game`, which returns 400 (**verified**). Also `urn:demographics` (audience makeup) and `urn:tag` (taste analysis). Music is `artist`, never `music`.
+About 58 calls and 12 s for a fresh analysis, 0 when cached.
 
-Params valid for person, podcast, artist, tv_show, movie, book and brand:
+### Filters
 
-- Signals: `signal.interests.entities`, `signal.interests.tags`, `signal.demographics.age`, `signal.demographics.gender`, `signal.demographics.audiences`, `signal.demographics.audiences.weight`
-- Filters: `filter.exclude.entities`, `filter.exclude.tags`, `operator.exclude.tags`, `filter.tags`, `operator.filter.tags`, `filter.popularity.min`, `filter.popularity.max` (0 to 1), `filter.results.entities`, `filter.results.entities.query`, `filter.parents.types`, `filter.external.exists`, `operator.filter.external.exists`
-- Other: `bias.trends`, `take` (1 to 50, default 20), `offset`, `page`, `feature.explainability`
-- Person only: `filter.date_of_birth.min`, `filter.date_of_birth.max`, `filter.date_of_death.min`, `filter.date_of_death.max`, `filter.gender`
+| Filter | What changes | Extra calls |
+| --- | --- | --- |
+| `fame: less_famous` or `rising` | `filter.popularity.max=0.7` or `0.4` on C1, and no C2 | -1 |
+| `age` | `signal.demographics.age=<bucket>` on C1 and C2. Changes about 20 of 50. | +1 (fit lens) |
+| `country` | `signal.location.query=<English country name>` on C1 and C2. Country names resolve; a region like "Europe" hasn't been tried. | +1 (fit lens) |
+| `episode_about` | `/search?query=<q>&types=urn:entity:<type>&take=1`, then C3: C1 with `signal.interests.entities=<show>,<entity>`. Take from C3 first, up to a third of the 20. If C3 comes back identical to C1 in order, Qloo ignored the entity: report `used: null` and carry on. Books are often unusable, so they aren't offered. | +3 (search, C3, fit lens) |
 
-`filter.results.entities` limits results to the listed IDs. Use it to read one entity's affinity toward the input, which is how Echo scores fit and love back for a given guest.
+**Fit lens.** With any signal beyond the show, list affinities no longer mean "the show's audience likes them", so fit is re-read: `filter.type=urn:entity:person&signal.interests.entities=<show>&filter.results.entities=<the 20 IDs>&take=50`.
 
-`signal.demographics.age` values: `24_and_younger`, `25_to_29`, `30_to_34`, `35_to_44`, `45_to_54`, `55_and_older`. Gender: `male`, `female`.
+### Clean-up, before scoring
 
-Response (**verified**): `{ success, results: { entities: [...] }, query }`. Each entity has `entity_id`, `name`, `type`, `subtype`, `popularity`, `tags`, `properties`, `external`, `disambiguation`, and `query` with `affinity` (0 to 1), `explainability` and `measurements`.
+1. Died: `properties.date_of_death` is set.
+2. Minors: `properties.date_of_birth` less than 18 years ago. Read for this check only, never shown or kept.
+3. Not a public figure: no `urn:tag:occupation:person` tag and no `imdb_id`, `wikidata`, `musicbrainz_artist_id`, `spotify_artist_id`, `library_of_congress_authority_id` or `goodreads_author_id`. Social handles don't count.
+4. Hosts: the LLM host check (L1), plus names matching the show's Qloo description.
+5. Past guests (should): names from the show's recent episode titles (L7), matched to Qloo people.
+6. Duplicates: the same normalised name, keep the higher affinity.
+7. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
 
-### `GET /v2/analysis/compare`: what two sets of tastes share and where they differ
+### Evidence for the top 10
 
-Params: `a.signal.interests.entities`, `b.signal.interests.entities` (both required), `filter.type`, `filter.subtype` (`urn:tag:occupation`, `urn:tag:genre`), `model` (`descriptive`, `predictive`), `take` (1 to 50), `page`, `offset`.
+- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo, urn:tag:plot:qloo, urn:tag:style:qloo`. Then a name screen: a hand-written list of generic words for religion, sexuality, gender, ethnicity, health, disability, addiction, politics and money trouble drops any tag or item that matches, because the allowed types still contain them. The screen runs on everything shown or sent to the LLM.
+- **New podcasts:** the guest's top 10 podcasts with the lowest show affinity from the reach call, top 3, screened.
+- **Ages:** `delta[b] = guest.age[b] - show.age[b]`. Show the up to 2 buckets with the largest delta above 0.2. With no show block, the guest's own buckets of at least 0.2. Many less famous guests have no block: say so.
 
-Response (**verified**): `results.tags` (tags both sides share, each with `query.score`), `results.a` and `results.b` (tags only on one side, with `query.count`), `results.matchEntities`. Tags carry `tag_id`, `name`, `type`, `subtype`, `entity_id`, `popularity`.
+## Scoring
 
-Comparing a podcast with a person is not useful: the two use different tag vocabularies, so they share almost no tags and the contrast is near 100% for everyone. Worth trying podcast against podcast, or person against person.
+Raw affinities are bunched (fit spreads of 0.03 to 0.13 in a show), so every score is a percentile within the 20 scored guests: `pct(x_i) = (number of j with x_j < x_i) / (n - 1)`, ties share the lower value.
 
-### `GET /v2/insights?filter.type=urn:demographics`: audience makeup
+- **Fit:** `fit_raw` = the guest's affinity from C1 or C2, or from the fit lens. **Fame-adjusted:** `fit_adj = fit_raw - (a + b · popularity)`, with `a` and `b` from least squares over the 20 (skip when n < 8). Raw fit tracks fame at 0.56 to 0.87; adjusted, the top 5 stop drifting to the most famous. The score, labels and chart use `fit_adj`.
+- **Love back:** `love_raw` from the love back call.
+- **Reach:** `reach_raw = 1 - mean(show affinity of the guest's top 10 podcasts)`, over the podcasts that came back with an affinity. Null if fewer than 5 did. It never saturates and doesn't reward fame. It correlates with love back at -0.73 to -0.97: the trade-off is real.
+- **Echo score:** `echo = ((fit_adj_pct + 0.05) · (love_pct + 0.05) · (reach_pct + 0.05)) ^ (1/3) / 1.05`. A null reach uses 0.5 here. The 0.05 stops one zero wiping a guest out; the geometric mean ranks a balanced guest above a lopsided one.
+- **Order:** echo, then `love_raw`, then lower popularity, then `entity_id`.
 
-Pass an entity or tag as signal. Response: `results.demographics[]`, each with `entity_id`, `query.age` (score per age bucket) and `query.gender` (`male`, `female`). Positive means the group over-indexes, negative means it under-indexes. **Verified** 21 Oct: it returns one block per input entity, so a show and several guests fit in one call.
+Labels, first match wins:
 
-### `GET /v2/insights?filter.type=urn:tag`: taste analysis
+| Label | Rule | On the card |
+| --- | --- | --- |
+| `sweet_spot` | fit ≥ 0.5, love ≥ 0.33, reach ≥ 0.33 | Your audience over-indexes on them; their audience is new to you and likely to enjoy the show. |
+| `far` | reach ≥ 0.67, love < 0.33 | Brings new people who may not stay. |
+| `long_shot` | fit < 0.33 | Their fans might come; your audience is lukewarm. |
+| `safe` | reach < 0.33 | Your audience is likely to enjoy it; few new listeners. |
+| `balanced` | otherwise | Decent on each, not top on any. |
 
-Returns tags tied to an entity. Combine with `signal.interests.entities`, `filter.tag.types` and `filter.parents.types`. Response: `results.tags[]` with `tag_id`, `name`, `types`, `subtype`, `tag_value`. **Verified** 21 Oct: tags carry `query.affinity`, `filter.tag.types` narrows to one type, and `diversify.by=subtype` spreads the types. A person's tags include religion and ethnicity subtypes, so allow-list subtypes.
+With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fit < 0.33, else `balanced`. Expect 1 to 4 sweet spots in 20, sometimes 0; the headline then says "No guest clears all three yet. These come closest."
 
-### `GET /v2/tags`: find tag IDs by keyword
+**Chart:** x is `reach_pct` ("How new their audience is"), y is `fit_adj_pct` ("Fit beyond fame"), dot size is `love_pct`, colour is the label. The sweet-spot zone is x ≥ 0.33 and y ≥ 0.5; only its big dots are sweet spots.
 
-Tags must be IDs from here, never free text. There is no static tag list. **Verified** 21 Oct: `filter.query` searches by keyword, `filter.tag.types` narrows by type, and `/v2/tags/types` lists the types.
+## Keep out
 
-### `GET /entities?entity_ids=...`: look up entities by ID
-
-Also accepts external IDs such as `external.spotify.ids`, `external.imdb.ids`, `external.wikidata.ids`. **Verified** 21 Oct: several IDs per call, and lookup by Wikidata and IMDb ID. A returned entity's external IDs are in `properties.external`.
-
-## Findings from real calls
-
-Results themselves are not written down here, because Qloo response data must not go into this repo.
-
-- **20 Oct, a top celebrity-interview podcast → people (take 8):**
-  - The picks were plausible for the show but every one was very famous (popularity above 0.85), which confirms the famous-names risk in `echo.md`. Try `filter.popularity.max`.
-  - The top pick had died. Insights returns people who have died, so Echo must drop them. `properties` may carry a date of death; check.
-  - Affinity scores were bunched tightly near the top of the 0 to 1 range, so raw affinity alone won't separate candidates much.
-  - With a single input entity, explainability gives every result a score of 1, so it says nothing. Reasons for a match have to come from shared tags or compare.
-
-- **20 Oct, coverage probe (`npm run probe`)** on 6 shows: 2 comedy, 2 music, 2 sports. Per show: top 10 people, plus top 10 with `filter.popularity.max=0.7`. Full report stays local in `.cache/probe/`.
-  - **Coverage is good.** All 6 shows were found, and every show returned around 20 relevant people. Results follow the audience, not the topic: a music interview show's audience pointed mostly to public radio journalists rather than musicians.
-  - **The popularity cap works on people** and brings back lesser-known names at slightly lower affinity.
-  - **People who have died** carry `properties.date_of_death`. 0 to 4 per show were dropped.
-  - **Some people can't be an input.** 0 or 1 per show returned 400 "All of the provided signal.interests.entities were invalid". Skip them.
-  - **Hosts come back as guests for their own show.** Echo must exclude them.
-  - **Fit (affinity) is tightly bunched** within a show (spreads of 0.03 to 0.13). Use rank or percentile, not the raw value.
-  - **Love back** comes free when the show appears in the guest's top 50 podcasts (read its affinity there), with `filter.results.entities` as the fallback. Where the show ranks in the guest's list is the sharpest signal.
-  - **The fit against reach trade-off is real** for the two comedy shows (correlation around -0.4 and -0.6): guests who fit best bring the fewest new listeners. More famous guests also had lower reach there.
-  - **Reach v1 (overlap of top 50 podcast lists) saturates.** For several shows most guests share almost nothing with the show's top 50, so reach sits near 1 and stops separating anyone. One show had no spread at all (0.94 to 1.00). Needs a v2.
-  - **Echo's ranking changes the answer.** Of Echo's top 5 per show, 1 to 3 would not appear in a fit-only top 5. Only 0 to 2 of about 20 candidates per show landed in the sweet spot (above the median on all three).
-  - **Person tags include Wikipedia categories** about religion, sexuality and similar. Never use these for themes or reasons.
-  - `query.measurements.audience_growth` was 0, consistent with flat trend data.
+- Person fields: `/entities` and insights return gender, birth date, citizenship, spouse and children. Echo shows name, short description, image and links only.
+- Never filter or pick guests by gender. Never use the political, beliefs, communities, global issues, investing or spending audience types.
+- Copy reads "your listeners over-index on", never "your listeners like", and never says anything about one listener or one guest's fans as people.
 
 ## Errors
 
 | Symptom | Cause |
 | --- | --- |
-| 401 | Wrong host. Use `hackathon.api.qloo.com`. |
-| 401 "No API key found in request" | Key not in the `X-Api-Key` header. |
-| 404 or no response | Base URL with no path. |
-| "No path matching request parameters" | Used POST. |
-| 403 "You do not have permission to access urn:entity:..." | Entity type not available. |
-| "at least one valid signal or filter is required" | Invalid tag or audience IDs. |
-| 200 with empty `entities` | A param isn't valid for that `filter.type` (silently ignored), or no data. |
-| 400 "All of the provided signal.interests.entities were invalid" | The entity has too little data to be used as an input. **Verified** for some people. |
-| 429 `{"error_msg":"Rate limit exceeded"}` | Over the per-second limit (5 on 20 Oct, 10 since 21 Oct). **Verified.** |
-| 400 "The value urn:entity:video_game is not supported for filter.type" | Use `urn:entity:videogame`. **Verified.** |
-| 400 "signal.interests.entities.weight must be a positive number or one of very_low, low, mid, medium, high, very_high" | The weight is one value for all entities, not a list. **Verified.** |
+| 401 | Wrong host, or the key isn't in `X-Api-Key` |
+| "No path matching request parameters" | POST instead of GET |
+| 200 with empty `entities` | A param that isn't valid for that `filter.type`, or no data |
+| 400 "All of the provided signal.interests.entities were invalid" | That entity can't be an input for this `filter.type` |
+| 400 "not supported for filter.type" | `video_game`; use `videogame` |
+| 400 on `signal.interests.entities.weight` | A list was sent; it takes one value |
+| 414 | Too many IDs in one URL |
+| 429 `Rate limit exceeded` | Over 10 a second; the client waits and retries |
 
-## Limits and rules
+## Probe history
 
-- **10 requests per second and 50,000 per month** per key (**verified** from the `x-second-ratelimit-*` and `x-month-ratelimit-*` response headers, 21 Oct). On 20 Oct it was 5 and 10,000. The counter restarted around 21 Oct and resets around 20 November, so this budget covers the build and judging. Judges using the live demo draw on it too. To raise it further, post project details in Discord `#api-help`.
-- The client in `src/lib/qloo/client.ts` spaces requests to 4 per second (it could go to 8 now), waits out 429s, caches every response and tracks the remaining monthly quota.
-- Keys stay active through judging and are turned off after the hackathon.
-- You can't trim response fields through the API. Verbose fields such as `akas` always come back.
-- Private server-side caching is allowed with no time limit. **Never store Qloo response data in the public repo.** Cache in `.cache/` only.
-- Results describe groups. No inferring identity, health, finances or politics. No personal data sent to Qloo. No bulk scraping.
-
-## Reported by other teams, not yet checked by us
-
-- Trend data is flat on the hackathon server and ends in September 2025.
-- Heatmaps limited to an area's boundary return errors.
-
-Echo doesn't depend on either.
-
-## First checks
-
-1. ~~Does a well-known podcast exist as a podcast entity?~~ Yes.
-2. ~~Do people come back from a show as input?~~ Yes, with affinity scores.
-3. ~~Are the top people distinctive or just the most famous?~~ Famous by default; the popularity cap fixes it.
-4. ~~Does love back work?~~ Yes.
-5. ~~What does compare return for a show and a guest?~~ Tag contrast, not useful between a podcast and a person.
-6. ~~Do `urn:demographics` and `urn:tag` return useful data for a podcast and a person?~~ Yes. Demographics handles many entities in one call. Tags need an allow-list.
-7. ~~How do we detect people who have died?~~ `properties.date_of_death`.
-8. Reach v2: something that doesn't saturate. Candidates: how differently the show and guest audiences skew by age and gender (`urn:demographics`); the show audience's affinity for the guest's top podcasts (`filter.results.entities` with up to 50 IDs, one call); overlap across artists or TV as well as podcasts. The teammate's spike found that audience-map overlap across categories spreads well. Demographics now costs one call for all guests ([qloo-map.md](qloo-map.md)).
-9. How to spot a show's own hosts in its candidate list.
+- **20 Oct, coverage probe and engine spike** (13 shows: comedy, music, sports, interviews): coverage is good for those genres; the top people are plausible guests but very famous without a fame cap; hosts and near-duplicates come back; reach v1 (overlap of top 50 podcast lists) saturates, which led to the reach above.
+- **22 Oct, the investor judge's two shows:** both in Qloo with plenty of data, love back and demographics work, and their hosts come back as candidates, so host detection has to be tested on them.
