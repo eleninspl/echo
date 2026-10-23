@@ -63,9 +63,10 @@ body {
   font-family: var(--font-archivo), system-ui, sans-serif;
 }
 
+/* Vermilion is kept for sweet spots, so selection takes the field's blue. */
 ::selection {
-  background: var(--vermilion);
-  color: var(--tag-ink);
+  background: var(--field);
+  color: var(--on-field);
 }
 
 :focus-visible {
@@ -78,7 +79,7 @@ body {
 }
 
 input {
-  caret-color: var(--vermilion);
+  caret-color: var(--link);
 }
 
 html {
