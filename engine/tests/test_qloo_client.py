@@ -6,7 +6,6 @@ import pytest
 
 from echo_engine.params import InvalidParamError, check_insights_params
 from echo_engine.qloo_client import (
-    DiskCache,
     QlooClient,
     QlooError,
     Quota,
@@ -14,6 +13,7 @@ from echo_engine.qloo_client import (
     cache_key,
     normalize_params,
 )
+from echo_engine.store import DiskCache
 
 PERSON_QUERY = {"filter.type": "urn:entity:person", "signal.interests.entities": "abc", "take": 5}
 
@@ -84,8 +84,8 @@ def test_cache_hit_skips_network(tmp_path):
 
 def test_expired_cache_entry_is_refetched(tmp_path):
     cache = DiskCache(tmp_path, ttl_seconds=-1)
-    cache.set("k", "/search", {}, {"x": 1})
-    assert cache.get("k") is None
+    run(cache.set("k", "/search", {}, {"x": 1}))
+    assert run(cache.get("k")) is None
 
 
 def test_retries_429_then_succeeds_honouring_retry_after():

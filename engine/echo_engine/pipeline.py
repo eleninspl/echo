@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import zip_longest
@@ -450,25 +450,35 @@ def first_error(error: BaseException) -> BaseException:
     return error
 
 
-async def run_analysis(client: QlooClient, analysis: Analysis) -> None:
+Progress = Callable[[], Awaitable[None]]
+
+
+async def run_analysis(client: QlooClient, analysis: Analysis, progress: Progress | None = None) -> None:
+    """Fills `analysis` step by step. `progress` is awaited after each step, so the caller can save it."""
     steps = {step.key: step for step in analysis.steps}
+
+    async def done(key: str) -> None:
+        steps[key].done = True
+        if progress:
+            await progress()
+
     entity = await show_entity(client, analysis.show.id)
 
     async def fill_map() -> None:
         analysis.audience_map = rows_of(await map_lists(client, analysis.show.id))
-        steps["map"].done = True
+        await done("map")
 
     try:
         async with asyncio.TaskGroup() as group:
             group.create_task(fill_map())
-            group.create_task(fill_guests(client, analysis, steps, itunes_id_of(entity)))
+            group.create_task(fill_guests(client, analysis, done, itunes_id_of(entity)))
     except BaseExceptionGroup as error:
         raise first_error(error) from None
 
     ideas = await llm_step(llm.write_ideas(analysis), {}, "the episode ideas")
     for guest in analysis.guests:
         guest.idea = ideas.get(guest.ref)
-    steps["ideas"].done = True
+    await done("ideas")
 
 
 async def people_lists(
@@ -485,14 +495,16 @@ async def people_lists(
     return anchor, lists
 
 
-async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itunes_id: str | None) -> None:
+async def fill_guests(
+    client: QlooClient, analysis: Analysis, done: Callable[[str], Awaitable[None]], itunes_id: str | None
+) -> None:
     show, filters = analysis.show, analysis.filters
     (anchor, (c1, c2, c3)), author, titles = await asyncio.gather(
         people_lists(client, show.id, filters), author_of(itunes_id), episode_titles(itunes_id)
     )
     if filters.episode_about:
         filters.episode_about.used = anchor["name"] if anchor and c3 else None
-    steps["candidates"].done = True
+    await done("candidates")
 
     today = datetime.now(UTC).date()
 
@@ -519,7 +531,7 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
     analysis.left_out = left_out
     if len(kept) < MIN_SCORED and (filters.age or filters.country or filters.fame != "any"):
         raise AnalysisFailed("filters_too_narrow", "No guests match those filters. Try a broader one.")
-    steps["clean"].done = True
+    await done("clean")
 
     selected, reserve = kept[:POOL_SIZE], kept[POOL_SIZE:]
     loves = await asyncio.gather(*(love_back(client, p["entity_id"], show.id) for p in selected))
@@ -549,7 +561,7 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
         item.anchor_raw = anchor_scores.get(item.person["entity_id"]) if anchor_lens else None
     ranked = score(scored)
     analysis.guests = [guest_of(item, f"g{i + 1}") for i, item in enumerate(ranked)]
-    steps["score"].done = True
+    await done("score")
 
     top = ranked[:EXPLAINED]
     show_tags, guest_tags, ages = await asyncio.gather(
@@ -564,7 +576,7 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
             new_podcasts=new_podcasts(item.love, reach_scores),
             ages=over_index(ages.get(item.person["entity_id"], {}), show_age),
         )
-    steps["evidence"].done = True
+    await done("evidence")
 
 
 async def guest_maps(client: QlooClient, analysis: Analysis, guest: Guest) -> GuestMaps:

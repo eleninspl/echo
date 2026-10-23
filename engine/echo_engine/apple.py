@@ -1,20 +1,20 @@
 import httpx
 
-from .config import get_settings
-from .qloo_client import DiskCache, cache_key
+from .qloo_client import cache_key
+from .store import Cache, response_cache
 
 LOOKUP_URL = "https://itunes.apple.com/lookup"
 TTL_SECONDS = 7 * 86400
 
 
-def _cache() -> DiskCache:
-    return DiskCache(get_settings().cache_dir / "apple", TTL_SECONDS)
+def _cache() -> Cache:
+    return response_cache("apple", TTL_SECONDS)
 
 
 async def lookup(params: dict[str, str]) -> list[dict]:
     cache = _cache()
     key = cache_key(LOOKUP_URL, params)
-    if (hit := cache.get(key)) is not None:
+    if (hit := await cache.get(key)) is not None:
         return hit
     try:
         async with httpx.AsyncClient(timeout=6) as client:
@@ -24,7 +24,7 @@ async def lookup(params: dict[str, str]) -> list[dict]:
         results = None
     if results is None:
         return []
-    cache.set(key, LOOKUP_URL, params, results)
+    await cache.set(key, LOOKUP_URL, params, results)
     return results
 
 

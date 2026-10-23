@@ -42,6 +42,7 @@ from .models import (
     Step,
 )
 from .qloo_client import QUOTA, CallRecord, QlooClient, QlooError
+from .store import AnalysisStore, LocalStore, analysis_store, request_key
 
 log = logging.getLogger("echo.app")
 ClientFactory = Callable[..., QlooClient]
@@ -88,38 +89,28 @@ class Usage:
         return self.calls if self.day == today() else 0
 
 
-def request_key(show_id: str, filters: Filters) -> str:
-    return json.dumps([show_id.upper(), filters.model_dump(exclude={"episode_about": {"used"}})], sort_keys=True)
-
-
 class Engine:
     def __init__(
-        self, mock: bool, step_delay: float, client_factory: ClientFactory, store: Path | None, daily_cap: int
+        self,
+        mock: bool,
+        step_delay: float,
+        client_factory: ClientFactory,
+        analyses: AnalysisStore,
+        usage_path: Path | None,
+        daily_cap: int,
     ) -> None:
         self.mock = mock
         self.step_delay = step_delay
         self.client_factory = client_factory
-        self.store = store
+        self.analyses = analyses
         self.daily_cap = daily_cap
-        self.usage = Usage(store.parent / "usage.json" if store else None)
+        self.usage = Usage(usage_path)
         self.example = load_example()
-        self.analyses: dict[str, Analysis] = {}
-        self.by_request: dict[str, str] = {}
         self.featured_ids: list[str] = []
-        if mock:
+        if mock and isinstance(analyses, LocalStore):
             featured = Analysis.model_validate(self.example["analysis"])
-            self.analyses[featured.id] = featured
+            analyses.remember(featured)
             self.featured_ids.append(featured.id)
-        elif store and store.exists():
-            for file in sorted(store.glob("*.json")):
-                try:
-                    analysis = Analysis.model_validate_json(file.read_text())
-                except (OSError, ValueError):
-                    log.warning("skipped saved analysis %s: it doesn't match the contract", file.name)
-                    continue
-                self.analyses[analysis.id] = analysis
-                if analysis.status == "done":
-                    self.by_request[request_key(analysis.show.id, analysis.filters)] = analysis.id
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[QlooClient]:
@@ -130,14 +121,14 @@ class Engine:
             finally:
                 self.usage.save()
 
-    def get(self, analysis_id: str) -> Analysis:
-        analysis = self.analyses.get(analysis_id)
+    async def get(self, analysis_id: str) -> Analysis:
+        analysis = await self.analyses.get(analysis_id)
         if analysis is None:
             raise EchoError(404, "not_found", "There's no analysis with that ID.")
         return analysis
 
-    def done(self, analysis_id: str) -> Analysis:
-        analysis = self.get(analysis_id)
+    async def done(self, analysis_id: str) -> Analysis:
+        analysis = await self.get(analysis_id)
         if analysis.status != "done":
             raise EchoError(400, "bad_request", "That analysis hasn't finished.")
         return analysis
@@ -166,14 +157,12 @@ class Engine:
             raise EchoError(404, "not_found", "There's no show with that ID.") from None
 
     async def start(self, show_id: str, filters: Filters, tasks: BackgroundTasks | None = None) -> Analysis:
-        existing = self.by_request.get(request_key(show_id, filters))
-        if existing and existing in self.analyses and not self.mock:
-            return self.analyses[existing]
+        if not self.mock and (existing := await self.analyses.find(request_key(show_id, filters))):
+            return existing
         self.check_cap()
         show = await self.show(show_id)
-        existing = self.by_request.get(request_key(show.id, filters))
-        if existing and existing in self.analyses and not self.mock:
-            return self.analyses[existing]
+        if not self.mock and (existing := await self.analyses.find(request_key(show.id, filters))):
+            return existing
         analysis = Analysis(
             id=f"an_{uuid4().hex[:12]}",
             status="running",
@@ -181,9 +170,7 @@ class Engine:
             filters=filters,
             steps=[Step(key=key, label=label) for key, label in pipeline.STEPS],
         )
-        self.analyses[analysis.id] = analysis
-        if not self.mock:
-            self.by_request[request_key(show.id, filters)] = analysis.id
+        await self.analyses.put(analysis)
         runner = self.run_mock if self.mock else self.run
         if tasks is None:
             await runner(analysis)
@@ -195,7 +182,7 @@ class Engine:
         try:
             async with self.client() as client:
                 try:
-                    await pipeline.run_analysis(client, analysis)
+                    await pipeline.run_analysis(client, analysis, lambda: self.analyses.put(analysis))
                 finally:
                     analysis.qloo_calls = [QlooCall.model_validate(record.to_dict()) for record in client.log]
             analysis.status = "done"
@@ -209,17 +196,7 @@ class Engine:
         except Exception:
             log.exception("analysis %s failed", analysis.id)
             fail(analysis, "engine_error", "Something went wrong in Echo. Try again.")
-        if analysis.status == "failed":
-            key = request_key(analysis.show.id, analysis.filters)
-            if self.by_request.get(key) == analysis.id:
-                del self.by_request[key]
-        self.save(analysis)
-
-    def save(self, analysis: Analysis) -> None:
-        if self.store is None:
-            return
-        self.store.mkdir(parents=True, exist_ok=True)
-        (self.store / f"{analysis.id}.json").write_text(analysis.model_dump_json())
+        await self.analyses.put(analysis)
 
     async def run_mock(self, analysis: Analysis) -> None:
         example = Analysis.model_validate(self.example["analysis"])
@@ -233,6 +210,7 @@ class Engine:
         if analysis.filters.episode_about:
             analysis.filters.episode_about.used = analysis.filters.episode_about.query
         analysis.status = "done"
+        await self.analyses.put(analysis)
 
     async def guest_maps(self, analysis: Analysis, guest: Guest) -> GuestMaps:
         if self.mock:
@@ -264,17 +242,26 @@ def create_app(
     mock: bool | None = None,
     step_delay: float = 0.6,
     client_factory: ClientFactory = QlooClient.from_settings,
-    store: Path | None = None,
+    store: Path | AnalysisStore | None = None,
     featured: list[str] | None = None,
     daily_cap: int | None = None,
 ) -> FastAPI:
+    """`store` is a folder for local files or a ready store; by default Postgres when DATABASE_URL is set."""
     settings = get_settings()
     mock = settings.mock if mock is None else mock
+    if mock:
+        analyses: AnalysisStore = LocalStore(None)
+    elif isinstance(store, Path):
+        analyses = LocalStore(store)
+    else:
+        analyses = store or analysis_store(settings.cache_dir / "analyses")
+    usage_dir = store.parent if isinstance(store, Path) else settings.cache_dir
     engine = Engine(
         mock,
         step_delay,
         client_factory,
-        None if mock else (store or settings.cache_dir / "analyses"),
+        analyses,
+        None if mock else usage_dir / "usage.json",
         settings.daily_qloo_calls if daily_cap is None else daily_cap,
     )
     warm_up = [] if mock else (settings.featured if featured is None else featured)
@@ -285,6 +272,7 @@ def create_app(
         yield
         if task:
             task.cancel()
+        await analyses.close()
 
     app = FastAPI(title="Echo engine", version="1", lifespan=lifespan)
     app.state.engine = engine
@@ -332,7 +320,8 @@ def create_app(
 
     @app.get("/featured")
     async def featured_shows() -> FeaturedList:
-        items = [engine.analyses[i] for i in engine.featured_ids if i in engine.analyses]
+        found = [await engine.analyses.get(i) for i in engine.featured_ids]
+        items = [a for a in found if a is not None]
         return FeaturedList(featured=[Featured(show=a.show, analysis_id=a.id) for a in items])
 
     @app.post("/analyses", status_code=202)
@@ -342,11 +331,11 @@ def create_app(
 
     @app.get("/analyses/{analysis_id}")
     async def get_analysis(analysis_id: str) -> Analysis:
-        return engine.get(analysis_id)
+        return await engine.get(analysis_id)
 
     @app.get("/analyses/{analysis_id}/guests/{ref}")
     async def guest_details(analysis_id: str, ref: str) -> GuestDetails:
-        analysis = engine.done(analysis_id)
+        analysis = await engine.done(analysis_id)
         guest = engine.guest(analysis, ref)
         maps = await engine.guest_maps(analysis, guest)
         if engine.mock:
@@ -360,7 +349,7 @@ def create_app(
 
     @app.post("/chat")
     async def chat(body: ChatRequest, tasks: BackgroundTasks) -> ChatReply:
-        analysis = engine.done(body.analysis_id)
+        analysis = await engine.done(body.analysis_id)
         if engine.mock:
             decision = ChatDecision.model_validate(engine.example["chat"])
         else:
@@ -370,13 +359,13 @@ def create_app(
             return ChatReply(reply=decision.reply, action="rerun", analysis_id=rerun.id)
         if decision.action == "rewrite" and decision.guest_ref and decision.idea:
             engine.guest(analysis, decision.guest_ref).idea = decision.idea
-            engine.save(analysis)
+            await engine.analyses.put(analysis)
             return ChatReply(reply=decision.reply, action="rewrite", guest_ref=decision.guest_ref, idea=decision.idea)
         return ChatReply(reply=decision.reply, action="none")
 
     @app.post("/drafts")
     async def drafts(body: DraftRequest) -> DraftList:
-        analysis = engine.done(body.analysis_id)
+        analysis = await engine.done(body.analysis_id)
         guests = [engine.guest(analysis, ref) for ref in body.guest_refs]
         if not engine.mock:
             return DraftList(drafts=await llm.write_drafts(analysis, guests, body))
@@ -394,7 +383,7 @@ def create_app(
 
     @app.post("/briefings")
     async def briefing(body: BriefingRequest) -> Briefing:
-        analysis = engine.done(body.analysis_id)
+        analysis = await engine.done(body.analysis_id)
         guest = engine.guest(analysis, body.guest_ref)
         if engine.mock:
             return Briefing(markdown=fill(engine.example["briefing"], analysis, guest))
