@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useState, type ReactNode } from "react";
 
-import type { Analysis, Filters, Step } from "@/lib/echo";
+import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
@@ -12,6 +12,7 @@ import { useStart } from "@/lib/use-start";
 
 import { AudienceMap } from "./audience-map";
 import { Bill } from "./bill";
+import { Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestTable } from "./guest-table";
 import { Invite } from "./invite";
@@ -20,9 +21,28 @@ import { Problem } from "./problem";
 import { QlooCalls } from "./qloo-calls";
 import { ShowCover } from "./show-cover";
 
+const PREFIX = "/analyses/";
+
 export function AnalysisView({ id }: { id: string }) {
-  const { analysis, error, retry } = useAnalysis(id);
-  const [picked, setPicked] = useState<string[]>([]);
+  // A run the chat starts takes over the URL with history.pushState, so the analysis shown follows the
+  // path, Back returns to the one before, and the chat stays as it was.
+  const pathname = usePathname();
+  const shown = pathname.startsWith(PREFIX) ? decodeURIComponent(pathname.slice(PREFIX.length)) : id;
+  const { analysis, error, retry, update } = useAnalysis(shown);
+  const [picks, setPicks] = useState<{ id: string; refs: string[] }>({ id: "", refs: [] });
+  const picked = analysis && picks.id === analysis.id ? picks.refs : [];
+
+  const rerun = useCallback((next: Analysis) => {
+    window.history.pushState(null, "", `${PREFIX}${encodeURIComponent(next.id)}`);
+  }, []);
+  const rewrite = useCallback(
+    (guestRef: string, idea: Idea) =>
+      update((current) => ({
+        ...current,
+        guests: current.guests.map((guest) => (guest.ref === guestRef ? { ...guest, idea } : guest)),
+      })),
+    [update],
+  );
 
   if (!analysis) {
     if (!error) return <VenueSkeleton />;
@@ -49,19 +69,21 @@ export function AnalysisView({ id }: { id: string }) {
         ) : analysis.status === "failed" ? (
           <Failed analysis={analysis} />
         ) : (
-          <Bill guests={analysis.guests} />
+          <Bill key={analysis.id} guests={analysis.guests} />
         )}
       </Field>
       {analysis.status === "done" && (
         <>
+          <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
           <GuestTable
+            key={`guests-${analysis.id}`}
             id={analysis.id}
             guests={analysis.guests}
             showMap={analysis.audience_map}
             picked={picked}
-            onPick={setPicked}
+            onPick={(refs) => setPicks({ id: analysis.id, refs })}
           />
-          <Invite analysis={analysis} picked={picked} />
+          <Invite key={`invite-${analysis.id}`} analysis={analysis} picked={picked} />
           <AudienceMap rows={analysis.audience_map} />
           <LeftOut analysis={analysis} />
           <QlooCalls calls={analysis.qloo_calls} />
