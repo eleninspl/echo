@@ -35,7 +35,7 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 | Step | Call | Calls |
 | --- | --- | --- |
 | Find the show | `/search?query=<text>&types=urn:entity:podcast&take=5`. Uses `entity_id`, `name`, `popularity`, `properties.image`, `properties.short_description`. | 1 |
-| Usable? | The plain C1 has at least 10 living people, and the love back lens (below) for its top person returns the show with an affinity. Otherwise `show_unusable`. | 1 extra, reused |
+| Usable? | The plain C1 has at least 10 living people, and love back (below) gives the show an affinity for at least one of its top 3 living people. Otherwise `show_unusable`. | 1 extra, reused |
 | Audience map | `/v2/insights?filter.type=urn:entity:<t>&signal.interests.entities=<show>&take=20` for `t` in `artist, tv_show, movie, book, brand, podcast`. Screened, top 8 shown; all 20 kept for the guest comparison. | 6 |
 | Candidates | The plain C1, and C2: the same with `filter.popularity.max=0.7`. Take from the two alternately by affinity, skipping duplicates, until 20. C1 and C2 affinities compare directly. | 2 |
 | Love back | Per guest: `filter.type=urn:entity:podcast&signal.interests.entities=<guest>&take=50`. If the show is in it, its `query.affinity` is love back and its position is the rank. If not, a lens: the same with `filter.results.entities=<show>`. The show is outside the top 50 for about 72% of guests. | about 34 |

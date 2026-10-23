@@ -78,6 +78,8 @@ class Usage:
         if self.day != today():
             self.day, self.calls = today(), 0
         self.calls += 1
+
+    def save(self) -> None:
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps({"day": self.day, "calls": self.calls}))
@@ -110,13 +112,23 @@ class Engine:
             self.featured_ids.append(featured.id)
         elif store and store.exists():
             for file in sorted(store.glob("*.json")):
-                analysis = Analysis.model_validate_json(file.read_text())
+                try:
+                    analysis = Analysis.model_validate_json(file.read_text())
+                except (OSError, ValueError):
+                    log.warning("skipped saved analysis %s: it doesn't match the contract", file.name)
+                    continue
                 self.analyses[analysis.id] = analysis
                 if analysis.status == "done":
                     self.by_request[request_key(analysis.show.id, analysis.filters)] = analysis.id
 
-    def client(self) -> QlooClient:
-        return self.client_factory(on_call=self.usage.record)
+    @asynccontextmanager
+    async def client(self) -> AsyncIterator[QlooClient]:
+        """A Qloo client that counts fresh calls and stops at the daily cap. Cached calls still work."""
+        async with self.client_factory(on_call=self.usage.record, before_fetch=self.check_cap) as client:
+            try:
+                yield client
+            finally:
+                self.usage.save()
 
     def get(self, analysis_id: str) -> Analysis:
         analysis = self.analyses.get(analysis_id)
@@ -170,6 +182,8 @@ class Engine:
             steps=[Step(key=key, label=label) for key, label in pipeline.STEPS],
         )
         self.analyses[analysis.id] = analysis
+        if not self.mock:
+            self.by_request[request_key(show.id, filters)] = analysis.id
         runner = self.run_mock if self.mock else self.run
         if tasks is None:
             await runner(analysis)
@@ -185,8 +199,7 @@ class Engine:
                 finally:
                     analysis.qloo_calls = [QlooCall.model_validate(record.to_dict()) for record in client.log]
             analysis.status = "done"
-            self.by_request[request_key(analysis.show.id, analysis.filters)] = analysis.id
-        except pipeline.AnalysisFailed as error:
+        except (pipeline.AnalysisFailed, EchoError) as error:
             fail(analysis, error.code, error.message)
         except QlooError:
             log.exception("Qloo failed during %s", analysis.id)
@@ -196,6 +209,10 @@ class Engine:
         except Exception:
             log.exception("analysis %s failed", analysis.id)
             fail(analysis, "engine_error", "Something went wrong in Echo. Try again.")
+        if analysis.status == "failed":
+            key = request_key(analysis.show.id, analysis.filters)
+            if self.by_request.get(key) == analysis.id:
+                del self.by_request[key]
         self.save(analysis)
 
     def save(self, analysis: Analysis) -> None:
@@ -249,6 +266,7 @@ def create_app(
     client_factory: ClientFactory = QlooClient.from_settings,
     store: Path | None = None,
     featured: list[str] | None = None,
+    daily_cap: int | None = None,
 ) -> FastAPI:
     settings = get_settings()
     mock = settings.mock if mock is None else mock
@@ -257,7 +275,7 @@ def create_app(
         step_delay,
         client_factory,
         None if mock else (store or settings.cache_dir / "analyses"),
-        settings.daily_qloo_calls,
+        settings.daily_qloo_calls if daily_cap is None else daily_cap,
     )
     warm_up = [] if mock else (settings.featured if featured is None else featured)
 
@@ -334,7 +352,10 @@ def create_app(
         if engine.mock:
             episode = GuestDetails.model_validate({**engine.example["guest_details"], "ref": ref}).episode
         else:
-            episode = await pipeline.optional(llm.write_episode(analysis, guest, maps), None)
+            try:
+                episode = await pipeline.llm_step(llm.write_episode(analysis, guest, maps), None, "the episode idea")
+            except pipeline.AnalysisFailed as error:
+                raise EchoError(502, error.code, error.message) from None
         return GuestDetails(ref=ref, audience_map=maps.audience_map, adds=maps.adds, episode=episode)
 
     @app.post("/chat")

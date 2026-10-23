@@ -138,6 +138,7 @@ class QlooClient:
         timeout: float = 20.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         on_call: Callable[[CallRecord], None] | None = None,
+        before_fetch: Callable[[], None] | None = None,
         limiter: RateLimiter | None = LIMITER,
     ) -> None:
         settings = get_settings()
@@ -155,6 +156,7 @@ class QlooClient:
         self._sleep = sleep
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._on_call = on_call
+        self._before_fetch = before_fetch
         self._limiter = limiter
         self.log: list[CallRecord] = []
 
@@ -184,6 +186,8 @@ class QlooClient:
         if self.cache and (hit := self.cache.get(key)) is not None:
             self._record(CallRecord(path, query, 200, 0, cached=True))
             return hit
+        if self._before_fetch:
+            self._before_fetch()
 
         started = time.monotonic()
         async with self._semaphore:

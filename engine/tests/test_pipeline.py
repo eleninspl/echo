@@ -1,11 +1,16 @@
+import asyncio
+import json
+
 import httpx
 import pytest
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
-from echo_engine import apple
+from echo_engine import apple, llm
 from echo_engine.app import create_app
+from echo_engine.models import Filters
 from echo_engine.qloo_client import QlooClient
-from tests.fake_qloo import SHOW_ID, THIN_SHOW_ID, handler
+from tests.fake_qloo import SHOW_ID, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler
 
 
 def fake_client(**kwargs) -> QlooClient:
@@ -29,6 +34,10 @@ def engine(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setattr(apple, "author", author)
     monkeypatch.setattr(apple, "episode_titles", titles)
     return TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+
+
+def state(client: TestClient):
+    return client.app.state.engine
 
 
 def run(engine: TestClient, show_id: str = SHOW_ID, **filters) -> dict:
@@ -150,3 +159,61 @@ def test_llm_routes_say_they_are_not_built(engine):
     response = engine.post("/briefings", json={"analysis_id": analysis["id"], "guest_ref": "g1"})
     assert response.status_code == 501
     assert response.json()["error"] == "not_implemented"
+
+
+def test_a_running_analysis_is_reused(engine):
+    async def start_twice() -> tuple[str, str]:
+        first = await state(engine).start(SHOW_ID, Filters(), BackgroundTasks())
+        second = await state(engine).start(SHOW_ID, Filters(), BackgroundTasks())
+        return first.id, second.id
+
+    first, second = asyncio.run(start_twice())
+    assert first == second
+
+
+def test_a_weak_top_person_does_not_make_the_show_unusable(engine):
+    analysis = run(engine, WEAK_TOP_SHOW_ID)
+    assert analysis["status"] == "done", analysis["error"]
+
+
+def test_the_daily_cap_stops_fresh_calls_everywhere(engine):
+    analysis = run(engine)
+    state(engine).daily_cap = state(engine).usage.today_calls()
+    response = engine.get(f"/analyses/{analysis['id']}/guests/g1")
+    assert response.status_code == 429
+    assert response.json()["error"] == "daily_cap"
+    assert engine.get(f"/analyses/{analysis['id']}").json()["status"] == "done"
+
+
+def test_a_run_that_reaches_the_cap_fails_with_daily_cap(engine):
+    state(engine).daily_cap = 10
+    analysis = run(engine)
+    assert analysis["status"] == "failed"
+    assert analysis["error"]["error"] == "daily_cap"
+
+
+def test_usage_is_saved_once_the_client_closes(engine, tmp_path):
+    run(engine)
+    saved = json.loads((tmp_path / "usage.json").read_text())
+    assert saved["calls"] == state(engine).usage.today_calls() > 0
+
+
+def test_an_llm_failure_is_an_llm_error_and_can_be_retried(engine, monkeypatch):
+    async def broken(analysis):
+        raise RuntimeError("the model timed out")
+
+    monkeypatch.setattr(llm, "write_ideas", broken)
+    failed = run(engine)
+    assert failed["status"] == "failed"
+    assert failed["error"]["error"] == "llm_error"
+    monkeypatch.undo()
+    retried = engine.post("/analyses", json={"show_id": SHOW_ID, "filters": {}}).json()["id"]
+    assert retried != failed["id"]
+
+
+def test_a_bad_saved_analysis_is_skipped(tmp_path, engine):
+    analysis = run(engine)
+    (tmp_path / "analyses" / "an_broken.json").write_text('{"id": "an_broken"}')
+    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+    assert again.get(f"/analyses/{analysis['id']}").json()["status"] == "done"
+    assert again.get("/analyses/an_broken").status_code == 404

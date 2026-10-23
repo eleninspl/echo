@@ -50,22 +50,23 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | Q8 | Guest details: the guest's audience map and what it adds | 0.25 | done |
 | Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start (`ECHO_FEATURED`) | 0.75 | done, for one process; Q12 to Q15 move it to Vercel |
 | Q10 | Drop past guests: candidates whose full name is in one of the last 200 episode titles on Apple | 0.25 | done |
-| Q11 | Fixes from the #5 review, below | 0.5 | must |
+| Q11 | Fixes from the #5 review, below | 0.5 | done |
 | Q12 | `store.py`: analyses, the Qloo and Apple caches behind one interface, local files or Postgres ([Hosting](#hosting)) | 0.5 | must |
 | Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | must |
 | Q14 | Deploy: the Vercel project, Neon and Upstash, env vars, spend limit; check background runs | 0.5 | must |
 | Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | must |
 | Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | must |
+| Q17 | Evidence that differs per guest: on the investor judge's show, 9 of 20 guests share one reach value and the same two "new podcasts", and shared tastes are mostly one tag | 0.5 | should |
 
 **Q11, the #5 review** ([comments](https://github.com/eleninspl/echo-qloo/pull/5)):
 
-- Check the daily cap on guest details and briefings too, not only on search and new analyses.
+- The daily cap is checked by the Qloo client before every fresh call, so it covers every route; cached calls, like a featured show's, still work.
 - `usable()`: a top person with no love back affinity moves on to the next of three, instead of failing the show.
 - A running analysis is registered under its request key, so the same show and filters don't start a second run.
 - A saved analysis that doesn't validate is skipped and logged, not a crash at startup.
 - `optional()` catches only `NotImplementedError`; any other LLM error fails the step with `llm_error`.
 - Duplicate names keep the higher affinity, as qloo.md says.
-- Past guests: count how many titles only mention a person on the 7 test shows, and require a guest pattern ("with X", "ft. X", "X:" at the start) if it's more than a few.
+- Past guests: checked on the investor judge's show, where every match was a real guest, so the rule stays. Recheck on the featured shows (Q16).
 - Smaller: the usage count is written once per run, not per call; one helper instead of `nothing`, `none` and `no_author`.
 
 Every Q task is done when its tests pass against the fake Qloo and the local store, ruff is clean, and it works once against the real server.
@@ -176,13 +177,13 @@ The analysis, when done:
 - `episode_about.used` is null when Qloo couldn't use the entity; the web app says so.
 - `left_out.why` is `host` or `past_guest`. People who have died are dropped silently.
 - `id` on a guest is the Qloo entity ID. `idea` and `episode` stay null until the LLM side writes them.
-- Failed: `"status": "failed"` with `"error": { "error": "<code>", "message": "<text for the host>" }`. Codes: `show_unusable` (too few people, or love back can't be scored), `unknown_country`, `filters_too_narrow` (no guests match), `qloo_error`, `engine_error`.
+- Failed: `"status": "failed"` with `"error": { "error": "<code>", "message": "<text for the host>" }`. Codes: `show_unusable` (too few people, or love back can't be scored), `unknown_country`, `filters_too_narrow` (no guests match), `daily_cap` (reached during the run), `qloo_error`, `llm_error`, `engine_error`.
 
 | Status | `error` |
 | --- | --- |
 | 400 | `bad_request` |
 | 404 | `not_found` |
-| 429 | `daily_cap`: the daily Qloo-call cap (`ECHO_DAILY_QLOO_CALLS`) is reached. Featured and earlier analyses still open. |
+| 429 | `daily_cap`: the daily Qloo-call cap (`ECHO_DAILY_QLOO_CALLS`) is reached. Checked before every fresh Qloo call, so anything cached, like featured and earlier analyses, still opens. |
 | 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 

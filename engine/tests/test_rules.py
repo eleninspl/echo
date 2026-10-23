@@ -31,8 +31,8 @@ def test_public_figures_minors_and_duplicates():
     assert is_minor({"properties": {"date_of_birth": "2015-06-01"}}, date(2026, 10, 23))
     assert not is_minor({"properties": {"date_of_birth": "1990"}}, date(2026, 10, 23))
     assert not is_minor({}, date(2026, 10, 23))
-    people = [{"name": "Ann Example"}, {"name": "ann example"}, {"name": "Bo Sample"}]
-    assert [p["name"] for p in dedupe(people)] == ["Ann Example", "Bo Sample"]
+    people = [{"name": "Ann Example", "a": 0.5}, {"name": "Bo Sample", "a": 0.7}, {"name": "ann example", "a": 0.9}]
+    assert [p["name"] for p in dedupe(people, lambda p: p["a"])] == ["ann example", "Bo Sample"]
 
 
 def genre(name: str) -> dict:

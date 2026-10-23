@@ -215,12 +215,8 @@ async def person_list(client: QlooClient, params: dict[str, Any]) -> list[dict]:
         raise
 
 
-async def nothing() -> list[dict]:
-    return []
-
-
-async def no_author() -> str | None:
-    return None
+async def ready[T](value: T) -> T:
+    return value
 
 
 async def candidate_lists(
@@ -231,8 +227,8 @@ async def candidate_lists(
     third = {**first, "signal.interests.entities": f"{show_id},{anchor_id}"} if anchor_id else None
     c1, c2, c3 = await asyncio.gather(
         person_list(client, first),
-        person_list(client, second) if second else nothing(),
-        person_list(client, third) if third else nothing(),
+        person_list(client, second) if second else ready([]),
+        person_list(client, third) if third else ready([]),
     )
     if c3 and [p["entity_id"] for p in c3] == [p["entity_id"] for p in c1]:
         c3 = []
@@ -304,22 +300,29 @@ async def usable(client: QlooClient, show_id: str, plain: list[dict]) -> None:
         raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: Qloo knows too few people for it.")
     for person in living[:3]:
         result = await love_back(client, person["entity_id"], show_id)
-        if result is None:
-            continue
-        if result.love is None:
-            raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: Qloo can't score love back.")
-        return
-    raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet.")
+        if result is not None and result.love is not None:
+            return
+    raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: Qloo can't score love back.")
 
 
 async def optional(work: Awaitable[Any], fallback: Any) -> Any:
+    """Best effort, for Apple: any failure gives the fallback."""
+    try:
+        return await work
+    except Exception:
+        log.exception("optional step failed")
+        return fallback
+
+
+async def llm_step(work: Awaitable[Any], fallback: Any, what: str) -> Any:
+    """An LLM call: a stub that isn't built gives the fallback, any other failure is an llm_error."""
     try:
         return await work
     except NotImplementedError:
         return fallback
-    except Exception:
-        log.exception("optional step failed")
-        return fallback
+    except Exception as error:
+        log.exception("LLM step failed: %s", what)
+        raise AnalysisFailed("llm_error", f"Echo couldn't write {what}. Try again in a minute.") from error
 
 
 async def episode_titles(itunes_id: str | None) -> list[str]:
@@ -462,7 +465,7 @@ async def run_analysis(client: QlooClient, analysis: Analysis) -> None:
     except BaseExceptionGroup as error:
         raise first_error(error) from None
 
-    ideas = await optional(llm.write_ideas(analysis), {})
+    ideas = await llm_step(llm.write_ideas(analysis), {}, "the episode ideas")
     for guest in analysis.guests:
         guest.idea = ideas.get(guest.ref)
     steps["ideas"].done = True
@@ -475,7 +478,7 @@ async def people_lists(
     plain_params = {"filter.type": PERSON, "signal.interests.entities": show_id, "take": LIST_TAKE}
     filtered = list_params(show_id, filters) != plain_params
     plain, lists = await asyncio.gather(
-        person_list(client, plain_params) if filtered else nothing(),
+        person_list(client, plain_params) if filtered else ready([]),
         candidate_lists(client, show_id, filters, anchor["entity_id"] if anchor else None),
     )
     await usable(client, show_id, plain if filtered else lists[0])
@@ -502,7 +505,7 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
         Person(id=p["entity_id"], name=p["name"], description=english(properties(p).get("short_descriptions")))
         for p in pool[: POOL_SIZE * 2]
     ]
-    llm_hosts = await optional(llm.find_hosts(show, people), set())
+    llm_hosts = await llm_step(llm.find_hosts(show, people), set(), "the host check")
     past = past_guest_ids(titles, pool)
     kept, left_out = [], []
     for person in pool:
@@ -512,7 +515,7 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
             left_out.append(LeftOut(name=person["name"], why="past_guest"))
         else:
             kept.append(person)
-    kept = dedupe(kept)
+    kept = dedupe(kept, lambda person: affinity(person) or 0.0)
     analysis.left_out = left_out
     if len(kept) < MIN_SCORED and (filters.age or filters.country or filters.fame != "any"):
         raise AnalysisFailed("filters_too_narrow", "No guests match those filters. Try a broader one.")
@@ -533,11 +536,12 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
     ids = [s.person["entity_id"] for s in scored]
     needs_fit_lens = bool(filters.age or filters.country or c3)
     podcast_ids = [p for s in scored for p in s.love.podcasts]
+    fit_lens = {"filter.type": PERSON, "signal.interests.entities": show.id}
     anchor_lens = {"filter.type": PERSON, "signal.interests.entities": anchor["entity_id"]} if anchor and c3 else None
     fit_scores, reach_scores, anchor_scores = await asyncio.gather(
-        lens(client, {"filter.type": PERSON, "signal.interests.entities": show.id}, ids) if needs_fit_lens else none(),
+        lens(client, fit_lens, ids) if needs_fit_lens else ready({}),
         lens(client, {"filter.type": PODCAST, "signal.interests.entities": show.id}, podcast_ids),
-        lens(client, anchor_lens, ids) if anchor_lens else none(),
+        lens(client, anchor_lens, ids) if anchor_lens else ready({}),
     )
     for item in scored:
         item.fit_raw = fit_scores.get(item.person["entity_id"], affinity(item.person) or 0.0)
@@ -561,10 +565,6 @@ async def fill_guests(client: QlooClient, analysis: Analysis, steps: dict, itune
             ages=over_index(ages.get(item.person["entity_id"], {}), show_age),
         )
     steps["evidence"].done = True
-
-
-async def none() -> dict[str, float]:
-    return {}
 
 
 async def guest_maps(client: QlooClient, analysis: Analysis, guest: Guest) -> GuestMaps:
