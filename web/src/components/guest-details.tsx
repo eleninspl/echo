@@ -6,11 +6,15 @@ import { echo, type Episode, type GuestDetails as Details, type MapRow } from "@
 import { describe, type HostError } from "@/lib/errors";
 import { category } from "@/lib/format";
 
+import { Briefing } from "./briefing";
+
 type Load = { state: "loading" } | { state: "done"; details: Details } | { state: "failed"; problem: HostError };
 
 // The full episode idea and the guest's audience next to the show's. Loaded once, when first opened:
 // on the live engine it costs Qloo calls and an LLM call.
-export function GuestDetails({ id, guestRef, showMap }: { id: string; guestRef: string; showMap: MapRow[] }) {
+type Props = { id: string; guestRef: string; guestName: string; showMap: MapRow[] };
+
+export function GuestDetails({ id, guestRef, guestName, showMap }: Props) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -74,6 +78,12 @@ export function GuestDetails({ id, guestRef, showMap }: { id: string; guestRef: 
           marks what their fans bring that isn&apos;t on your map.
         </p>
         <Compare showMap={showMap} guestMap={details.audience_map} adds={details.adds} />
+      </section>
+      <section aria-labelledby={`brief-${guestRef}`} className="border-t border-rule pt-6 md:col-span-11">
+        <h4 id={`brief-${guestRef}`} className="mb-3 font-display text-2xl leading-none font-extrabold uppercase">
+          Before you record
+        </h4>
+        <Briefing id={id} guestRef={guestRef} guestName={guestName} />
       </section>
     </div>
   );

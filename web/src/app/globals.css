@@ -133,8 +133,8 @@ a {
   animation-delay: calc(var(--order, 0) * 45ms);
 }
 
-/* The logo's ring, sounding beside the step that's running. */
-@keyframes ping {
+/* The logo's ring, sounding beside the step that's running. Not Tailwind's own `ping`. */
+@keyframes echo-ping {
   from {
     transform: scale(1);
     opacity: 0.7;
@@ -146,7 +146,23 @@ a {
 }
 
 .ping {
-  animation: ping 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  animation: echo-ping 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Printing a briefing prints only that briefing, copied to the end of body (components/briefing.tsx). */
+.print-only {
+  display: none;
+}
+
+@media print {
+  body:has(> .print-only) > :not(.print-only) {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+    color: #000;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

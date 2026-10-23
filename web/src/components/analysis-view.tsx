@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { Analysis, Filters, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
@@ -14,12 +14,14 @@ import { AudienceMap } from "./audience-map";
 import { Bill } from "./bill";
 import { FeaturedFallback } from "./featured";
 import { GuestTable } from "./guest-table";
+import { Invite } from "./invite";
 import { Ring } from "./logo";
 import { Problem } from "./problem";
 import { ShowCover } from "./show-cover";
 
 export function AnalysisView({ id }: { id: string }) {
   const { analysis, error, retry } = useAnalysis(id);
+  const [picked, setPicked] = useState<string[]>([]);
 
   if (!analysis) {
     if (!error) return <VenueSkeleton />;
@@ -51,7 +53,14 @@ export function AnalysisView({ id }: { id: string }) {
       </Field>
       {analysis.status === "done" && (
         <>
-          <GuestTable id={analysis.id} guests={analysis.guests} showMap={analysis.audience_map} />
+          <GuestTable
+            id={analysis.id}
+            guests={analysis.guests}
+            showMap={analysis.audience_map}
+            picked={picked}
+            onPick={setPicked}
+          />
+          <Invite analysis={analysis} picked={picked} />
           <AudienceMap rows={analysis.audience_map} />
           <LeftOut analysis={analysis} />
         </>
