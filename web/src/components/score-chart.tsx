@@ -86,6 +86,7 @@ function ScoreChart({ guests, highlighted, onSelect }: Props) {
     return { cx: PAD.left + 12 + ((slot * 14) % Math.max(lane - 24, 1)), cy: y(guest.scores.fit) };
   };
 
+  const labels = placeLabels(guests, position, radius, plot);
   const active = guests.find((guest) => guest.ref === (hovered ?? highlighted));
   const activeAt = active ? position(active) : null;
 
@@ -172,6 +173,7 @@ function ScoreChart({ guests, highlighted, onSelect }: Props) {
 
             {guests.map((guest) => {
               const { cx, cy } = position(guest);
+              const label = labels.get(guest.ref);
               const mark = MARK[guest.label];
               const on = guest.ref === hovered || guest.ref === highlighted;
               const name = `${guest.name}, ${LABELS[guest.label].name}: fit ${score(guest.scores.fit)}, love back ${score(guest.scores.love_back)}, reach ${guest.scores.reach === null ? "not scored" : score(guest.scores.reach)}`;
@@ -206,15 +208,14 @@ function ScoreChart({ guests, highlighted, onSelect }: Props) {
                     strokeDasharray={mark.dash}
                     paintOrder="stroke"
                   />
-                  {guest.label === "sweet_spot" && (
-                    // Labels near the right edge go on the dot's left so they stay inside the plot.
+                  {label && (
                     <text
-                      x={cx > plot.right - 90 ? cx - radius(guest.scores.love_back) - 6 : cx + radius(guest.scores.love_back) + 6}
+                      x={label.x}
                       y={cy + 4}
-                      textAnchor={cx > plot.right - 90 ? "end" : "start"}
+                      textAnchor={label.anchor}
                       className="fill-ink text-xs font-semibold"
                     >
-                      {guest.name}
+                      {label.text}
                     </text>
                   )}
                 </g>
@@ -250,4 +251,45 @@ function ScoreChart({ guests, highlighted, onSelect }: Props) {
       </div>
     </div>
   );
+}
+
+type Box = { left: number; right: number; top: number; bottom: number };
+type NameTag = { text: string; x: number; anchor: "start" | "end" };
+type Plot = { left: number; right: number; top: number; bottom: number };
+
+// Names for the sweet spots, best first: the full name on the dot's right, else its left, then the
+// surname the same way, else none, so a name never overlaps another or leaves the plot. The tooltip and
+// the table still name every dot.
+function placeLabels(
+  guests: Guest[],
+  position: (guest: Guest) => { cx: number; cy: number },
+  radius: (love: number) => number,
+  plot: Plot,
+): Map<string, NameTag> {
+  const placed: Box[] = [];
+  const labels = new Map<string, NameTag>();
+  for (const guest of guests.filter((guest) => guest.label === "sweet_spot")) {
+    const { cx, cy } = position(guest);
+    const gap = radius(guest.scores.love_back) + 6;
+    const surname = guest.name.trim().split(/\s+/).pop() ?? guest.name;
+    const options = [guest.name, surname].flatMap((text) => {
+      // About 0.55em a character for 12px Archivo semibold.
+      const width = text.length * 6.6;
+      return [
+        { text, x: cx + gap, anchor: "start" as const, box: { left: cx + gap, right: cx + gap + width, top: cy - 8, bottom: cy + 6 } },
+        { text, x: cx - gap, anchor: "end" as const, box: { left: cx - gap - width, right: cx - gap, top: cy - 8, bottom: cy + 6 } },
+      ];
+    });
+    const fits = options.find(
+      ({ box }) => box.left >= plot.left - 4 && box.right <= plot.right + 4 && !placed.some((other) => overlaps(box, other)),
+    );
+    if (!fits) continue;
+    placed.push(fits.box);
+    labels.set(guest.ref, { text: fits.text, x: fits.x, anchor: fits.anchor });
+  }
+  return labels;
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }

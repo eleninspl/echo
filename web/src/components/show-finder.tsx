@@ -129,7 +129,7 @@ export function ShowFinder() {
           problem={{
             code: "show_unusable",
             title: "Echo can't analyse this show yet",
-            message: `Qloo doesn't know "${search.query}", or knows too little about its audience. Check the spelling, or open a show Echo has run.`,
+            message: `Qloo doesn't know "${search.query}", or knows too little about its audience. Check the spelling, or try another show.`,
             next: "featured",
           }}
         />

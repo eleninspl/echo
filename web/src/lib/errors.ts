@@ -5,7 +5,8 @@ export type NextStep = "featured" | "previous" | "retry" | "home" | "none";
 
 type Problem = { title: string; next: NextStep };
 
-// The engine's message is written for the host and is shown as it comes; the title and next step are the app's.
+// The engine's message is written for the host and is shown as it comes, except a stub's (NOT_BUILT below);
+// the title and next step are the app's.
 const PROBLEMS: Record<string, Problem> = {
   show_unusable: { title: "Echo can't analyse this show yet", next: "featured" },
   daily_cap: { title: "Echo is resting until tomorrow", next: "featured" },
@@ -24,14 +25,17 @@ const UNKNOWN: Problem = { title: "Something went wrong", next: "retry" };
 
 export type HostError = Problem & { code: string; message: string };
 
+// A stub's message names the task that builds it ("L6: briefing"), which is for us, not the host.
+const NOT_BUILT = "This part of Echo isn't ready yet. Everything else on the page works.";
+
 export function describe(error: EchoErrorBody | EchoError | unknown): HostError {
-  if (error instanceof EchoError) {
-    return { ...(PROBLEMS[error.code] ?? UNKNOWN), code: error.code, message: error.message };
-  }
-  if (isErrorBody(error)) {
-    return { ...(PROBLEMS[error.error] ?? UNKNOWN), code: error.error, message: error.message };
-  }
+  if (error instanceof EchoError) return problem(error.code, error.message);
+  if (isErrorBody(error)) return problem(error.error, error.message);
   return { ...UNKNOWN, code: "unknown", message: "Try again in a minute." };
+}
+
+function problem(code: string, message: string): HostError {
+  return { ...(PROBLEMS[code] ?? UNKNOWN), code, message: code === "not_implemented" ? NOT_BUILT : message };
 }
 
 function isErrorBody(value: unknown): value is EchoErrorBody {

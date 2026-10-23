@@ -117,17 +117,17 @@ Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 unde
 | W9 | Invite: pick 1 to 5 guests, optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | done |
 | W10 | Briefing for one guest: rendered, with copy and print | 0.25 | done |
 | W11 | What Qloo saw: every Qloo call of the analysis, with path, params, status, time and whether it was cached | 0.25 | done |
-| W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | must |
+| W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | done |
 | W13 | Walkthrough as a judge: phone width, keyboard, screen reader, slow engine, every error below | 0.5 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
-**Deploying the web app** (W12). Its own Vercel project from this repo, Root Directory `web`; Vercel detects Next.js, so there's no `vercel.json`. One variable, `NEXT_PUBLIC_ENGINE_URL`: the engine's production URL. It's fixed into the browser bundle at build time, so changing it takes a redeploy, and a Vercel build without it stops with an error. In order:
+**Deploying the web app** (W12, done 23 Oct). Vercel project `echo-web`, from this repo with Root Directory `web` and connected to git, so `main` deploys to production: https://echo-web-mu-taupe.vercel.app (`echo-web.vercel.app` was taken). Vercel detects Next.js, so there's no `vercel.json`. One variable, `NEXT_PUBLIC_ENGINE_URL` = `https://echo-qloo.vercel.app`, set for all environments. It's fixed into the browser bundle at build time, so changing it takes a redeploy, and a Vercel build without it stops with an error. The order it went in:
 
 1. The engine first (Deploying the engine, below), for its URL.
 2. The web project with `NEXT_PUBLIC_ENGINE_URL`, then deploy.
 3. The web app's production URL into the engine's `ECHO_WEB_ORIGINS`, then redeploy the engine. CORS takes exact origins, so a preview deployment of the web app can't call the engine unless its URL is listed too.
-4. Check on the production URL: the header shows neither "Example data" nor "Engine offline", a featured show opens at once, a search runs to the end.
+4. Check on the production URL: the header shows neither "Example data" nor "Engine offline", a featured show opens at once, a search runs to the end. Done on 23 Oct with real shows at 1440 and 390, light and dark, apart from featured shows, which wait for `warm.py`.
 
 **Errors.** The engine's `message` is already written for the host, so the app shows it as it comes and adds one next step:
 

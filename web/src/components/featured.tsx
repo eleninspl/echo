@@ -73,7 +73,7 @@ export function FeaturedFallback() {
   if (!featured?.length) return null;
   return (
     <div className="mt-2">
-      <h3 className="mb-3 font-semibold">Shows Echo has run</h3>
+      <h3 className="mb-3 font-semibold">Or open a show Echo has run</h3>
       <FeaturedList featured={featured} compact />
     </div>
   );

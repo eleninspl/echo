@@ -22,7 +22,10 @@ export function AudienceMap({ rows }: { rows: MapRow[] }) {
               <ol className="mt-2 flex flex-col">
                 {row.items.map((item, index) => (
                   <li key={`${item.name}-${index}`} className="border-b border-rule py-1.5 text-sm">
-                    {item.name}
+                    {/* Long titles, books mostly, are cut at two lines so the columns stay even; the title has it all. */}
+                    <span title={item.name} className="line-clamp-2">
+                      {item.name}
+                    </span>
                   </li>
                 ))}
               </ol>

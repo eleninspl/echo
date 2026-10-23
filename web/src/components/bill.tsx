@@ -66,7 +66,7 @@ export function Bill({ guests, printIn }: { guests: Guest[]; printIn: boolean })
                   >
                     <a href={`#guest-${guest.ref}`} className="group inline-flex flex-col">
                       {/* The ring sits on the first line when a name wraps. */}
-                      <span className="inline-flex items-start gap-[0.18em] group-hover:underline">
+                      <span className="inline-flex items-start gap-[0.18em] decoration-[0.06em] underline-offset-[0.08em] group-hover:underline">
                         <Ring
                           sweet={guest.label === "sweet_spot"}
                           className={`${tier.ring} mt-[0.3em] self-start ${guest.label === "sweet_spot" ? "text-on-field" : "text-on-field-soft"}`}
