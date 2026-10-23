@@ -1,5 +1,7 @@
 # Echo features
 
+> **Reference only since 22 Oct.** v1 scope, tasks and the cut-down contract are in [plan.md](plan.md) and [api.md](api.md). Use this doc for the Qloo recipes and the checks behind them. Its priorities, endpoints and request fields describe the long 21 Oct proposal, not v1.
+
 What Echo does with the Qloo API, input by input and feature by feature. Each feature gives its Qloo recipe, its cost in calls, how it is computed and whether it has been checked on the hackathon server. The HTTP contract that exposes all of this is in [api.md](api.md).
 
 Implementation freeze is 27 Oct. Two people build the engine, the web app, the bot and the hosting in about 11 person-days. Priorities follow from that:

@@ -9,7 +9,8 @@ Online, on Devpost. The brief: "Agents are getting smarter, but they're cultural
 | Opened | 30 September 2026, 16:00 Athens |
 | **Deadline** | **30 October 2026, 23:45 New York** (31 October, 05:45 Athens) |
 | Judging | 2 to 16 November |
-| Winners | around 23 November |
+| **Final** | **5 November: the top 3 finalists present live on air** to the investor judge, the comedian judge and Qloo's CEO, answer questions, and hear the result there. Finalists are told soon after the deadline and must be free to appear and prepare. |
+| Winners | picked on air on 5 November; Devpost lists around 23 November |
 
 ## Prizes
 

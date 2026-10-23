@@ -12,14 +12,15 @@ This repo is only about the Qloo hackathon and Echo.
 - `docs/hackathon.md`: submission requirements, judging, Qloo's rules.
 - `docs/qloo.md`: API reference for Echo, with what has been verified on the hackathon server.
 - `docs/qloo-map.md`: every Qloo API feature, whether it works on the hackathon server, and what Echo could use it for. Check here before assuming a feature exists or doesn't.
-- `docs/features.md`: proposed inputs, features, scoring, call budget and the checks behind them. Section 6 lists open decisions.
-- `docs/api.md`: proposed HTTP contract for the engine, the web app and the bot.
-- `docs/plan.md`: timeline and open decisions.
+- `docs/plan.md`: **v1 scope**, the engine tasks split into a Qloo side and an LLM side, and dates. Anything not in it is not in v1.
+- `docs/api.md`: v1 HTTP contract between the engine and the web app. Kept small on purpose: it's a hackathon.
+- `docs/features.md`: reference only. Qloo recipes, scoring, call budget and the checks behind them, from the long 21 Oct proposal.
 
 ## Stack
 
-- Next.js on Vercel, TypeScript, Anthropic API (`ANTHROPIC_API_KEY`). No app code yet.
-- OpenClaw agent for outreach (Telegram, Slack or email). Its weight against the web app is an open decision in `docs/plan.md`.
+- Engine: Python, FastAPI, on Railway (`engine/`, on branch `day1/spike`). Qloo and the LLM (Anthropic API, `ANTHROPIC_API_KEY`) are both called from the engine.
+- Web app: Next.js, TypeScript. No code yet.
+- OpenClaw/Telegram bot: not in v1. Whether to add it after the freeze is open in `docs/plan.md`.
 
 ## Setup
 
@@ -65,7 +66,9 @@ Update this section whenever something changes.
 - **Probe result: go.** Coverage is good for comedy, music and sports shows. Fit and love back work. The fit against reach trade-off shows up clearly for comedy shows. Reach v1 (top 50 podcast overlap) saturates and needs a v2. Details in `docs/qloo.md` under "Findings from real calls".
 - **21 Oct:** every Qloo API feature checked on the hackathon server and mapped in `docs/qloo-map.md`. Quota raised to 10 a second and 50,000 a month.
 - **21 Oct:** proposed inputs, features and contract in `docs/features.md` and `docs/api.md` on branch `docs/echo-contract`, not yet agreed with the teammate. Reach v2 is chosen there ("unfamiliar podcasts", F10).
-- **Next:** agree the contract and split with the teammate, starting with features.md section 6, then build against api.md.
+- **22 Oct:** the top 3 present live on air on 5 Nov (`docs/hackathon.md`). The investor judge's shows are in Qloo and fully scorable, and their hosts come back as guest candidates, so host filtering has to catch them.
+- **22 Oct (call):** v1 is the engine and the web app only. The long proposal was cut to `docs/plan.md` and a 9-endpoint `docs/api.md`. No path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side (Q1 to Q10) and an LLM side (L1 to L7), one person each. The chat in the web app is the agent.
+- **Next:** agree plan.md's three open points, then build against api.md.
 
 ## Keeping this file current
 
