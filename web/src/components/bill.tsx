@@ -6,6 +6,26 @@ import { Ring } from "./logo";
 
 const COUNT = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 
+const count = (n: number) => COUNT[n] ?? String(n);
+
+// A sweet spot without a reach score is judged on fit and love back alone (docs/qloo.md, Scoring),
+// so the headline only claims all three for the ones that have them.
+function headline(sweet: Guest[]): string {
+  if (!sweet.length) return "No guest clears all three yet. These come closest.";
+  const unscored = sweet.filter((guest) => guest.scores.reach === null).length;
+  if (!unscored) {
+    return `${count(sweet.length)} ${sweet.length === 1 ? "guest clears" : "guests clear"} all three: your listeners over-index on them, their fans over-index on your show, and those fans are new to you.`;
+  }
+  const spots = `${count(sweet.length)} sweet ${sweet.length === 1 ? "spot" : "spots"}: your listeners over-index on them, and their fans over-index on your show.`;
+  const which =
+    sweet.length === 1
+      ? "There's"
+      : unscored === sweet.length
+        ? "For all of them, there's"
+        : `For ${count(unscored).toLowerCase()}, there's`;
+  return `${spots} ${which} too little data to say how new those fans are.`;
+}
+
 // The guests set as a lineup: billing size is the Echo score, so sweet spots headline.
 // With no sweet spot, the three closest headline instead.
 export function Bill({ guests }: { guests: Guest[] }) {
@@ -24,9 +44,7 @@ export function Bill({ guests }: { guests: Guest[] }) {
   return (
     <section aria-labelledby="bill" className="flex flex-col gap-8">
       <h2 id="bill" className="max-w-3xl text-xl font-semibold text-balance">
-        {sweet.length
-          ? `${COUNT[sweet.length] ?? sweet.length} ${sweet.length === 1 ? "guest clears" : "guests clear"} all three: your listeners over-index on them, their fans over-index on your show, and those fans are new to you.`
-          : "No guest clears all three yet. These come closest."}
+        {headline(sweet)}
       </h2>
       <div className="flex flex-col gap-6 border-t-2 border-on-field pt-6">
         {tiers.map(
