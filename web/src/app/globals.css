@@ -1,93 +1,98 @@
 @import "tailwindcss";
 
 /*
- * Two spot inks on poster stock. The field is the printed blue band at the top of every page;
- * vermilion marks sweet spots only. Dark keeps the same roles on night stock.
+ * A broadcast gallery after dark. Desk greys and monitor black carry the page; colour is light from
+ * the hardware: tally red for a sweet spot (on air), preview green for a guest picked to invite, amber
+ * for standby. Each score has its own meter colour, and labels and categories their scribble strips.
+ * Dark only: the gallery is lit by its screens.
  */
 :root {
-  --stock: #f4f3ef;
-  --ink: #0b0e17;
-  --ink-soft: #4b505e;
-  --rule: rgb(11 14 23 / 0.14);
-  --field: #3d7bff;
-  --on-field: #05070d;
-  --on-field-soft: #08132f;
-  --field-rule: rgb(5 7 13 / 0.2);
-  --link: #1f4fd1;
-  --vermilion: #f2482b;
-  --tag-safe: #3d7bff;
-  --tag-ink: #05070d;
-  --well: #ffffff;
-  color-scheme: light;
-}
+  --desk: #0f1011;
+  --panel: #17181a;
+  --bezel: #222326;
+  --line: #2e3033;
+  --monitor: #050505;
+  --ink: #ecedef;
+  --ink-soft: #a7a9ae;
+  --ink-dim: #898b90;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --stock: #090c14;
-    --ink: #ecebe6;
-    --ink-soft: #a3a7b3;
-    --rule: rgb(236 235 230 / 0.14);
-    --field: #1c3fa8;
-    --on-field: #f4f3ef;
-    --on-field-soft: #c9d3f2;
-    --field-rule: rgb(244 243 239 / 0.2);
-    --link: #8db0ff;
-    --vermilion: #f05a3c;
-    --tag-safe: #5a8fff;
-    --well: #11151f;
-    color-scheme: dark;
-  }
+  --tally: #ff3b3b;
+  --pvw: #22d465;
+  --amber: #ffb22e;
+
+  --fit: #39c6ff;
+  --love: #ff5aa8;
+  --reach: #ffd43d;
+
+  --safe: #5b8cff;
+  --far: #b48cff;
+  --long-shot: #ff8a3d;
+  --balanced: #93a0b0;
+
+  --music: #b48cff;
+  --film: #ff8a3d;
+  --tv: #5b8cff;
+  --books: #3ee0c4;
+  --brands: #c4f03a;
+  --podcasts: #ff5aa8;
+  --places: #ffd43d;
+
+  --on-light: #07080a;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-stock: var(--stock);
+  --color-desk: var(--desk);
+  --color-panel: var(--panel);
+  --color-bezel: var(--bezel);
+  --color-line: var(--line);
+  --color-monitor: var(--monitor);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
-  --color-rule: var(--rule);
-  --color-field: var(--field);
-  --color-on-field: var(--on-field);
-  --color-on-field-soft: var(--on-field-soft);
-  --color-field-rule: var(--field-rule);
-  --color-link: var(--link);
-  --color-vermilion: var(--vermilion);
-  --color-tag-safe: var(--tag-safe);
-  --color-tag-ink: var(--tag-ink);
-  --color-well: var(--well);
-  --font-sans: var(--font-archivo);
-  --font-display: var(--font-big-shoulders);
+  --color-ink-dim: var(--ink-dim);
+  --color-tally: var(--tally);
+  --color-pvw: var(--pvw);
+  --color-amber: var(--amber);
+  --color-fit: var(--fit);
+  --color-love: var(--love);
+  --color-reach: var(--reach);
+  --color-safe: var(--safe);
+  --color-far: var(--far);
+  --color-long-shot: var(--long-shot);
+  --color-balanced: var(--balanced);
+  --color-on-light: var(--on-light);
+  --font-sans: var(--font-barlow);
+  --font-cond: var(--font-barlow-condensed);
+  --font-silk: var(--font-michroma);
 }
 
 body {
-  background: var(--stock);
+  background: var(--desk);
   color: var(--ink);
-  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: break-word;
 }
 
-/* Display text breaks inside a word only as a last resort: the bill and the venue line size names to fit
-   their longest word (lib/fit.ts). */
-
-/* Vermilion is kept for sweet spots, so selection takes the field's blue. */
 ::selection {
-  background: var(--field);
-  color: var(--on-field);
+  background: var(--fit);
+  color: var(--on-light);
 }
 
 :focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 3px;
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
-.bg-field :focus-visible {
-  outline-color: var(--on-field);
-}
-
-input {
-  caret-color: var(--link);
+input,
+textarea {
+  caret-color: var(--amber);
 }
 
 html {
-  scrollbar-color: var(--rule) var(--stock);
+  scrollbar-color: var(--line) var(--desk);
+  /* Clears the sticky gallery bar when a link jumps to a guest. */
+  scroll-padding-top: 4rem;
 }
 
 a {
@@ -95,62 +100,284 @@ a {
   text-decoration-thickness: 1px;
 }
 
+/* Silkscreen: the small wide caps printed on a console's panels. */
+.silk {
+  font-family: var(--font-michroma), sans-serif;
+  font-size: 0.6875rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* A panel's machined face: a lit edge on top, a shadow below. */
+.panel {
+  background: var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 1px 0 rgb(0 0 0 / 0.6),
+    0 10px 24px -12px rgb(0 0 0 / 0.7);
+}
+
+/* Monitor glass: black, with a faint raster so a blank screen still reads as a screen. */
+.monitor {
+  background-color: var(--monitor);
+  background-image: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px);
+}
+
 /*
- * The 12-column grid printed as hairlines in the gutters. Goes on a page container with the
- * standard side padding (px-4 sm:px-8) and gap-x-8 columns, so the lines fall between columns.
+ * A segmented LED meter. The track is cut into --segments cells by a mask; inside it an unlit fill in
+ * the meter's hue, and a lit fill clipped to the level, which sweeps up once when it mounts.
  */
-.grid-lines {
+.meter {
+  --segments: 20;
   position: relative;
-  isolation: isolate;
-  --grid-line: var(--rule);
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 2px), transparent calc(100% - 2px));
+  mask-size: calc(100% / var(--segments)) 100%;
+  mask-repeat: repeat-x;
 }
 
-.bg-field .grid-lines {
-  --grid-line: var(--field-rule);
+.meter-v {
+  mask-image: linear-gradient(to top, #000 calc(100% - 2px), transparent calc(100% - 2px));
+  mask-size: 100% calc(100% / var(--segments));
+  mask-repeat: repeat-y;
+  mask-position: bottom;
 }
 
-@media (min-width: 768px) {
-  .grid-lines::before {
-    content: "";
-    position: absolute;
-    inset: 0 2rem;
-    z-index: -1;
-    pointer-events: none;
-    background-image: linear-gradient(to right, var(--grid-line) 1px, transparent 1px);
-    background-size: calc((100% + 2rem) / 12) 100%;
-    background-position: -1rem 0;
-  }
+.meter > .unlit {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--hue) 16%, transparent);
 }
 
-/* The bill prints tier by tier when a run finishes. */
-@keyframes print {
+.meter > .lit {
+  position: absolute;
+  inset: 0;
+  background: var(--hue);
+  clip-path: inset(0 calc(100% - var(--level)) 0 0);
+  animation: sweep 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--order, 0) * 35ms);
+}
+
+.meter-v > .lit {
+  clip-path: inset(calc(100% - var(--level)) 0 0 0);
+  animation-name: sweep-v;
+}
+
+@keyframes sweep {
   from {
     clip-path: inset(0 100% 0 0);
   }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
 }
 
-.print {
-  animation: print 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--order, 0) * 45ms);
-}
-
-/* The logo's ring, sounding beside the step that's running. Not Tailwind's own `ping`. */
-@keyframes echo-ping {
+@keyframes sweep-v {
   from {
-    transform: scale(1);
-    opacity: 0.7;
+    clip-path: inset(100% 0 0 0);
   }
-  to {
-    transform: scale(2.4);
+}
+
+/* A bar behind a row's text, as long as its value, grown in from the left. */
+.spectrum-bar {
+  background: color-mix(in srgb, var(--hue) 26%, transparent);
+  box-shadow: inset -2px 0 0 var(--hue);
+  transform-origin: left;
+  animation: grow 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--order, 0) * 50ms);
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes fade {
+  from {
     opacity: 0;
   }
 }
 
-.ping {
-  animation: echo-ping 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+.call {
+  animation: fade 400ms ease-out both;
+}
+
+/* The rundown's scope, searching while the run goes. */
+@keyframes search {
+  from {
+    left: -25%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.searching {
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--amber) 30%, transparent));
+  box-shadow: 1px 0 0 var(--amber);
+  animation: search 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* The landing page's signal path: echo rings sound from the show, and the scores flow along their arcs. */
+@keyframes ring {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(12);
+    opacity: 0;
+  }
+}
+
+.ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ring 2.7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* The diagram's labels, in its own units: larger on a phone, where the diagram is drawn smaller. */
+.signal-label {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 639px) {
+  .signal-label {
+    font-size: 27px;
+  }
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.flow {
+  stroke-dasharray: 10 4;
+  animation: flow 1.2s linear infinite;
+}
+
+/* A lamp lit from behind. */
+.lamp {
+  background: var(--hue);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hue) 60%, #000),
+    0 0 10px color-mix(in srgb, var(--hue) 55%, transparent);
+}
+
+.lamp-off {
+  background: color-mix(in srgb, var(--hue) 18%, #000);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 30%, #000);
+}
+
+/* The step Echo is on blinks like a standby cue. */
+@keyframes cue {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.cue {
+  animation: cue 1s steps(1, end) infinite;
+}
+
+/* A monitor powering on when a run's guests arrive. */
+@keyframes power {
+  from {
+    opacity: 0;
+    transform: scaleY(0.02);
+    filter: brightness(3);
+  }
+  60% {
+    opacity: 1;
+    transform: scaleY(1);
+    filter: brightness(1.6);
+  }
+}
+
+.power {
+  animation: power 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--order, 0) * 40ms);
+}
+
+/* Lit hardware keys: unlit caps by default, lit in their colour when on. */
+.key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #2d2e31, #242528);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 2px 0 #050607,
+    0 3px 6px rgb(0 0 0 / 0.4);
+  color: var(--ink);
+  font-family: var(--font-barlow-condensed), sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out,
+    background-color 120ms ease-out;
+}
+
+.key:hover:not(:disabled) {
+  background: linear-gradient(to bottom, #36373b, #2c2d30);
+}
+
+.key:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 0 0 #050607;
+}
+
+.key:disabled {
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+.key-lit {
+  background: var(--hue);
+  color: var(--on-light);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 2px 0 color-mix(in srgb, var(--hue) 40%, #000),
+    0 0 18px color-mix(in srgb, var(--hue) 35%, transparent);
+}
+
+.key-lit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--hue) 88%, #fff);
+}
+
+.key-lit:disabled {
+  background: color-mix(in srgb, var(--hue) 35%, #222);
+  color: rgb(7 8 10 / 0.7);
+}
+
+/* Inputs are recessed into the desk. */
+.well {
+  border-radius: 3px;
+  background: var(--monitor);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.8),
+    0 0 0 1px var(--line);
+  color: var(--ink);
+}
+
+.well::placeholder {
+  color: var(--ink-dim);
+}
+
+.well:focus-visible {
+  outline-offset: 0;
 }
 
 /* Printing a briefing prints only that briefing, copied to the end of body (components/briefing.tsx). */
@@ -170,8 +397,24 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .print,
-  .ping {
+  .meter > .lit,
+  .power,
+  .cue,
+  .call,
+  .spectrum-bar {
     animation: none;
+  }
+
+  .ring {
+    display: none;
+  }
+
+  .flow {
+    animation: none;
+  }
+
+  .searching {
+    animation: none;
+    left: 40%;
   }
 }

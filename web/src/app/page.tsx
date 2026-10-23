@@ -1,43 +1,26 @@
 import { FeaturedShows } from "@/components/featured";
+import { FRAME } from "@/components/gallery";
 import { ShowFinder } from "@/components/show-finder";
-
-const TERMS = [
-  { term: "Fit", means: "Your listeners over-index on them, beyond what their fame predicts." },
-  { term: "Love back", means: "Their fans over-index on your show." },
-  { term: "Reach", means: "Their fans are new to you." },
-];
+import { ScoreKey, SignalPath } from "@/components/signal";
 
 export default function Home() {
   return (
-    <>
-      {/* The field fills the page down to the footer while there are no featured shows below it. */}
-      <div className="flex flex-1 flex-col bg-field text-on-field">
-        <div className="grid-lines mx-auto grid w-full max-w-7xl flex-1 content-start gap-x-8 gap-y-12 px-4 pt-14 pb-16 sm:px-8 sm:pt-20 md:grid-cols-12 md:pb-24">
-          <div className="flex flex-col gap-10 md:col-span-8">
-            <h1 className="font-display text-[clamp(3.25rem,9vw,6rem)] leading-[0.88] font-extrabold tracking-tight text-balance uppercase">
-              Find the guest who carries your voice to new ears
-            </h1>
-            <ShowFinder />
-          </div>
-          <aside aria-labelledby="terms" className="md:col-span-4 md:pt-2">
-            <h2 id="terms" className="sr-only">
-              How Echo scores a guest
-            </h2>
-            <dl className="flex flex-col border-t-2 border-on-field">
-              {TERMS.map(({ term, means }) => (
-                <div key={term} className="border-b border-field-rule py-4">
-                  <dt className="font-display text-4xl leading-none font-extrabold uppercase">{term}</dt>
-                  <dd className="mt-1.5 text-on-field-soft">{means}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-on-field-soft">
-              A sweet spot is high on all three. It&apos;s rare, and Echo says so.
-            </p>
-          </aside>
-        </div>
+    <div
+      className={`${FRAME} grid flex-1 grid-cols-1 content-start items-start gap-6 pt-8 pb-12 sm:pt-12 lg:grid-cols-12 lg:gap-x-8`}
+    >
+      <div className="flex flex-col gap-6 lg:col-span-6 lg:pt-4">
+        <h1 className="font-cond text-[clamp(2.5rem,5.2vw,4.5rem)] leading-[0.95] font-medium tracking-[-0.01em] text-balance">
+          Find the guest who carries your voice to <span className="text-fit">new ears</span>
+        </h1>
+        <ShowFinder />
+        <ScoreKey />
       </div>
-      <FeaturedShows />
-    </>
+      <div className="lg:col-span-6">
+        <SignalPath />
+      </div>
+      <div className="lg:col-span-12">
+        <FeaturedShows />
+      </div>
+    </div>
   );
 }

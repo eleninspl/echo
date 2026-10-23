@@ -2,7 +2,7 @@ import Image from "next/image";
 
 import type { Show } from "@/lib/echo";
 
-// A show's artwork, or its initial when Qloo has no image.
+// A show's artwork, or its initial on a dark screen when Qloo has no image.
 export function ShowCover({ show, size }: { show: Show; size: number }) {
   if (show.image_url) {
     return (
@@ -12,7 +12,7 @@ export function ShowCover({ show, size }: { show: Show; size: number }) {
         width={size}
         height={size}
         unoptimized
-        className="shrink-0 bg-rule object-cover"
+        className="shrink-0 rounded-[2px] bg-monitor object-cover shadow-[0_0_0_1px_var(--line)]"
         style={{ width: size, height: size }}
       />
     );
@@ -20,8 +20,8 @@ export function ShowCover({ show, size }: { show: Show; size: number }) {
   return (
     <span
       aria-hidden
-      className="flex shrink-0 items-center justify-center border border-current font-display font-extrabold uppercase"
-      style={{ width: size, height: size, fontSize: size * 0.5 }}
+      className="monitor flex shrink-0 items-center justify-center rounded-[2px] font-cond font-medium text-ink-soft uppercase shadow-[0_0_0_1px_var(--line)]"
+      style={{ width: size, height: size, fontSize: size * 0.45 }}
     >
       {show.title.trim().charAt(0)}
     </span>

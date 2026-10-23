@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { hue } from "./gallery";
+
 // Copies text and says so; if the browser refuses, says that instead. `of` names what's copied for
 // screen readers, where several copy buttons sit on one page.
 export function CopyButton({ text, label = "Copy", of }: { text: string; label?: string; of?: string }) {
@@ -22,13 +24,20 @@ export function CopyButton({ text, label = "Copy", of }: { text: string; label?:
       <button
         type="button"
         onClick={copy}
-        className="bg-ink px-3 py-1.5 text-sm font-semibold text-stock hover:opacity-90"
+        className={`key ${state === "copied" ? "key-lit" : ""}`}
+        style={hue("var(--pvw)")}
       >
-        {label}
+        {state === "copied" ? "Copied" : label}
         {of && <span className="sr-only">, {of}</span>}
       </button>
       <span aria-live="polite" className="text-sm text-ink-soft">
-        {state === "copied" ? "Copied" : state === "failed" ? "Your browser blocked it: select the text and copy it" : ""}
+        {state === "copied" ? (
+          <span className="sr-only">Copied</span>
+        ) : state === "failed" ? (
+          "Your browser blocked it: select the text and copy it"
+        ) : (
+          ""
+        )}
       </span>
     </span>
   );

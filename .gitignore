@@ -28,3 +28,8 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Design notes from the impeccable skill, kept local (CLAUDE.md keeps three docs)
+PRODUCT.md
+DESIGN.md
+.impeccable/
