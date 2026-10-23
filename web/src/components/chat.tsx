@@ -97,7 +97,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
           <Lamp
             color={offline ? "var(--balanced)" : "var(--amber)"}
             on={pending || running?.status === "running"}
-            className={pending || running ? "cue size-2" : "size-2"}
+            className={pending || running?.status === "running" ? "cue size-2" : "size-2"}
           />
           {offline ? "Offline" : pending ? "Listening" : running?.status === "running" ? "Running again" : "Open"}
         </span>

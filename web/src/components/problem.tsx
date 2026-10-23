@@ -9,7 +9,7 @@ export function Problem({ problem, children }: { problem: HostError; children?: 
   return (
     <div role="alert" className="panel flex flex-col rounded-[4px]">
       <PanelHead title="Fault">
-        <Lamp color="var(--amber)" className="cue h-2.5 w-4" />
+        <Lamp color="var(--amber)" className="h-2.5 w-4" />
       </PanelHead>
       <div className="flex max-w-2xl flex-col gap-3 p-4">
         <h2 className="font-cond text-3xl leading-none font-semibold text-amber">{problem.title}</h2>
