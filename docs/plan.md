@@ -4,7 +4,7 @@ What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo
 
 ## v1
 
-Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js). Where each is hosted isn't decided (point 4 under To agree). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
+Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both on Vercel ([Hosting](#hosting)). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
 
 1. **Find the show.** Qloo search, up to 5 podcasts with image and description; the host picks one. A show Qloo doesn't have, or one with too little data, gets "Echo can't analyse this show yet" and the featured shows.
 2. **Audience map** across music, film, TV, books, brands and podcasts.
@@ -24,13 +24,14 @@ Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js). Wher
 
 ## Engine tasks
 
-One person each. **Q** talks to Qloo and does the maths. **L** talks to the LLM. They meet in Python, in `engine/echo_engine/`:
+One person each. **Q** talks to Qloo and does the maths: Eleni, from 23 Oct. **L** talks to the LLM: not assigned yet (point 2 under To agree). They meet in Python, in `engine/echo_engine/`:
 
 | File | Owner | What's in it |
 | --- | --- | --- |
 | `models.py` | both | The API shapes below as Pydantic models. Change them together. |
-| `app.py` | Q | The routes, background runs and mock mode. Done as a skeleton. |
-| `pipeline.py` | Q | `search_shows`, `get_show`, `run_analysis`, `guest_maps`. Stubs. `run_analysis` calls L1 and L2. |
+| `app.py` | Q | The routes, background runs and mock mode. |
+| `pipeline.py`, `scoring.py`, `cleanup.py`, `screen.py`, `apple.py` | Q | The analysis. `run_analysis` calls L1 and L2. |
+| `store.py` | Q | Analyses, caches and counters: local files, or Postgres and Redis on Vercel (Q12, Q13). |
 | `llm.py` | L | `find_hosts`, `write_ideas`, `write_episode`, `chat`, `write_drafts`, `write_briefing`, `past_guest_names`. Stubs. |
 | `qloo_client.py`, `params.py` | Q | The Qloo client. |
 | `fixtures/example.json` | both | Invented example data for mock mode and tests. |
@@ -47,8 +48,27 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | Q6 | Evidence for the top 10, with the tag allow-list and name screen | 0.5 | done |
 | Q7 | Filters: fame, age, country, episode about | 0.5 | done |
 | Q8 | Guest details: the guest's audience map and what it adds | 0.25 | done |
-| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start (`ECHO_FEATURED`), deploy | 0.75 | done except the deploy. The Vercel option also needs Postgres and Redis, about a day more ([Hosting options](#hosting-options)). |
+| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start (`ECHO_FEATURED`) | 0.75 | done, for one process; Q12 to Q15 move it to Vercel |
 | Q10 | Drop past guests: candidates whose full name is in one of the last 200 episode titles on Apple | 0.25 | done |
+| Q11 | Fixes from the #5 review, below | 0.5 | must |
+| Q12 | `store.py`: analyses, the Qloo and Apple caches behind one interface, local files or Postgres ([Hosting](#hosting)) | 0.5 | must |
+| Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | must |
+| Q14 | Deploy: the Vercel project, Neon and Upstash, env vars, spend limit; check background runs | 0.5 | must |
+| Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | must |
+| Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | must |
+
+**Q11, the #5 review** ([comments](https://github.com/eleninspl/echo-qloo/pull/5)):
+
+- Check the daily cap on guest details and briefings too, not only on search and new analyses.
+- `usable()`: a top person with no love back affinity moves on to the next of three, instead of failing the show.
+- A running analysis is registered under its request key, so the same show and filters don't start a second run.
+- A saved analysis that doesn't validate is skipped and logged, not a crash at startup.
+- `optional()` catches only `NotImplementedError`; any other LLM error fails the step with `llm_error`.
+- Duplicate names keep the higher affinity, as qloo.md says.
+- Past guests: count how many titles only mention a person on the 7 test shows, and require a guest pattern ("with X", "ft. X", "X:" at the start) if it's more than a few.
+- Smaller: the usage count is written once per run, not per call; one helper instead of `nothing`, `none` and `no_author`.
+
+Every Q task is done when its tests pass against the fake Qloo and the local store, ruff is clean, and it works once against the real server.
 
 | # | L: LLM side | Days | |
 | --- | --- | --- | --- |
@@ -60,50 +80,44 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | L6 | Briefing | 0.25 | must |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Q status on 23 Oct: everything but the deploy is built and checked on 7 real shows (see qloo.md, "Pipeline runs"). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 5 under To agree).
+Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see qloo.md, "Pipeline runs"); Q11 to Q16 are about 2.25 more. L is about 3 days, plus the web app. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 4 under To agree).
 
 ## Dates
 
-| Date | Q | L |
+| Date | Q (Eleni) | L and the web app (not assigned) |
 | --- | --- | --- |
-| 23 Oct | Q1 to Q4 | L1, L2, web app on the example |
-| 24 Oct | Q5 to Q7 (done); first deploy once hosting is chosen | L3, L4 |
-| 25 Oct | Q8, Q9, deploy | L5, L6, web app on the live engine |
-| 26 Oct | Featured shows, the investor judge's show end to end | Fixes |
+| 23 Oct | Q1 to Q10 (done); this plan | L1, L2, web app on the example |
+| 24 Oct | Q11, Q12 | L3, L4 |
+| 25 Oct | Q13, Q14: first deploy | L5, L6, web app on the live engine |
+| 26 Oct | Q15, Q16, featured shows | Fixes |
 | 27 Oct | **Freeze** | |
 | 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit | |
 
 ## To agree
 
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
-2. **Who takes Q and who takes L.** The author of the Python Qloo client gets the quickest start on Q.
+2. **Who takes L and the web app**, by 24 Oct. Q is Eleni's. If no one takes L, Eleni starts it after Q14, and v1 can't have all of L and the web app by the freeze: decide what to cut first.
 3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot; its title goes in an env var, never the repo.
-4. **Engine hosting.** Not decided. Two options, under Hosting options below: Eleni's Vercel plan (PR #4) or Railway.
-5. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
+4. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
 
-## Hosting options
+## Hosting
 
-Not decided (point 4 under To agree). The web app goes on Vercel either way. The engine today keeps its Qloo cache, saved analyses and daily count on disk in `.cache/` and runs analyses in the background of one process.
+Decided 23 Oct (Eleni): both pieces on Vercel (Pro plan), as two projects from this repo, `engine/` and `web/`. Railway was the other option (#5).
 
-### Vercel (Eleni's proposal, PR #4)
+A Vercel function keeps nothing between requests and several instances can run at once. The engine from #5 assumes one process with a disk, so this moves to two Marketplace stores in `iad1`, next to the engine:
 
-Both pieces run on Vercel (Pro plan), as two projects from this repo: `engine/` and `web/`. A Vercel function keeps nothing between requests and several instances can run at once, so what one Railway process and its volume would have held goes to two Marketplace stores, both in `iad1` next to the engine:
-
-| What | Where |
+| Today, one process | On Vercel |
 | --- | --- |
-| Analyses, featured analyses | Neon Postgres, as JSON |
-| Qloo cache | Neon Postgres, gzipped, with an expiry. Check its size on the first deploy. |
-| Qloo throttle (under 10 a second across all instances), daily cap | Upstash Redis |
+| `Engine.analyses` in memory, and `.cache/analyses/*.json` | Neon Postgres, table `analyses`: id, request key, status, the analysis as JSON. The run writes it after every step, because a poll can land on another instance. |
+| `DiskCache` in `.cache/qloo/` and `.cache/apple/` | Neon Postgres, table `cache`: key, gzipped body, expiry. Check its size on the first deploy. |
+| `Usage` in `.cache/usage.json`, `QUOTA` in memory | Upstash Redis: one counter per day, and the last monthly quota Qloo reported |
+| `LIMITER`, 9 a second per process | Upstash Redis: one limit of 9 a second for all instances |
+| Featured shows warmed at startup | `scripts/warm.py` (Q15), run after each scoring change |
 
-- **Background runs.** `POST /analyses` answers 202 and the run goes on in the same function, inside the 300 s default. Check on the first deploy that Vercel keeps the instance alive until the run ends; if it doesn't, the run moves to Vercel Queues. The run writes the analysis to Postgres after every step, because a poll can land on another instance.
-- **Featured shows.** There's no startup on Vercel, so a script warms them once after each scoring change and writes them to Postgres.
-- **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, the engine keeps the disk cache in `.cache/` and analyses in memory.
+- **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, `store.py` uses `.cache/` and memory, as today. Tests use the local store.
+- **Background runs.** `POST /analyses` answers 202 and the run goes on in the same function. A fresh run takes 8 to 16 s, well inside the 300 s default. Check on the first deploy that Vercel keeps the instance alive until the run ends; if it doesn't, the run moves to Vercel Queues.
 - **Env vars** on the engine project: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, plus the ones in `.env.example`. `ECHO_CACHE_DIR` is for local runs only.
 - Set a spend limit on the Vercel team before the first deploy.
-
-### Railway
-
-The engine runs as it is: one always-on process with a persistent volume for `.cache/`, deployed from GitHub, about $5 a month on the Hobby plan, and it doesn't sleep during judging. Fly.io works the same way. Nothing in the engine changes; the cost is a second platform next to Vercel.
 
 ## API
 
@@ -172,4 +186,4 @@ The analysis, when done:
 | 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 
-Analyses are saved as JSON next to the Qloo cache: in `.cache/` today, or in Postgres in the Vercel option ([Hosting options](#hosting-options)). Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.
+Analyses are saved as JSON next to the Qloo cache: in Postgres on Vercel, in `.cache/` locally ([Hosting](#hosting)). Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.
