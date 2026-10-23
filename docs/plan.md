@@ -72,7 +72,7 @@ Each message is the one the real engine sends. Outside mock mode the engine igno
 | Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | done |
 | Q14 | Deploy: the Vercel project, Neon and Upstash, env vars, spend limit; check background runs | 0.5 | done |
 | Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | done |
-| Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | must |
+| Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | done |
 | Q17 | Evidence that differs per guest: on the investor judge's show, 9 of 20 guests share one reach value and the same two "new podcasts", and shared tastes are mostly one tag | 0.5 | done |
 
 **Q11, the #5 review** ([comments](https://github.com/eleninspl/echo-qloo/pull/5)):
@@ -83,7 +83,7 @@ Each message is the one the real engine sends. Outside mock mode the engine igno
 - A saved analysis that doesn't validate is skipped and logged, not a crash at startup.
 - `optional()` catches only `NotImplementedError`; any other LLM error fails the step with `llm_error`.
 - Duplicate names keep the higher affinity, as qloo.md says.
-- Past guests: checked on the investor judge's show, where every match was a real guest, so the rule stays. Recheck on the featured shows (Q16).
+- Past guests: checked on the investor judge's show, where every match was a real guest, so the rule stays. Rechecked on 8 shows in Q16: 36 of 38 matches were real guests (qloo.md, Probe history).
 - Smaller: the usage count is written once per run, not per call; one helper instead of `nothing`, `none` and `no_author`.
 
 Every Q task is done when its tests pass against the fake Qloo and the local store, ruff is clean, and it works once against the real server.
