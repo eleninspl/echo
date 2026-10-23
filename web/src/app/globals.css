@@ -61,7 +61,11 @@ body {
   background: var(--stock);
   color: var(--ink);
   font-family: var(--font-archivo), system-ui, sans-serif;
+  overflow-wrap: break-word;
 }
+
+/* Display text breaks inside a word only as a last resort: the bill and the venue line size names to fit
+   their longest word (lib/fit.ts). */
 
 /* Vermilion is kept for sweet spots, so selection takes the field's blue. */
 ::selection {

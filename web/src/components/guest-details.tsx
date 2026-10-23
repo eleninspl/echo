@@ -97,12 +97,12 @@ function EpisodePlan({ episode }: { episode: Episode }) {
         <p className="mt-3 max-w-prose">{episode.summary}</p>
       </div>
       <ol className="flex flex-col border-t border-rule">
-        {episode.segments.map((segment) => (
-          <li key={segment.title} className="border-b border-rule py-3">
+        {episode.segments.map((segment, index) => (
+          <li key={`${segment.title}-${index}`} className="border-b border-rule py-3">
             <p className="font-semibold">{segment.title}</p>
             <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5 text-ink-soft marker:text-rule">
-              {segment.points.map((point) => (
-                <li key={point}>{point}</li>
+              {segment.points.map((point, index) => (
+                <li key={`${point}-${index}`}>{point}</li>
               ))}
             </ul>
           </li>
@@ -112,8 +112,8 @@ function EpisodePlan({ episode }: { episode: Episode }) {
         <div>
           <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">Questions to ask</p>
           <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5">
-            {episode.questions.map((question) => (
-              <li key={question}>{question}</li>
+            {episode.questions.map((question, index) => (
+              <li key={`${question}-${index}`}>{question}</li>
             ))}
           </ol>
         </div>
@@ -150,15 +150,15 @@ function Compare({ showMap, guestMap, adds }: { showMap: MapRow[]; guestMap: Map
             </th>
             <td className="py-2 pr-3 text-ink-soft">
               <ul>
-                {(ours.get(row.category) ?? []).slice(0, row.items.length).map((item) => (
-                  <li key={item.name}>{item.name}</li>
+                {(ours.get(row.category) ?? []).slice(0, row.items.length).map((item, index) => (
+                  <li key={`${item.name}-${index}`}>{item.name}</li>
                 ))}
               </ul>
             </td>
             <td className="py-2">
               <ul>
-                {row.items.map((item) => (
-                  <li key={item.name}>
+                {row.items.map((item, index) => (
+                  <li key={`${item.name}-${index}`}>
                     {item.name}
                     {added.has(`${row.category}/${item.name}`) && (
                       <span className="ml-1.5 text-xs font-bold tracking-wide text-link uppercase">New</span>

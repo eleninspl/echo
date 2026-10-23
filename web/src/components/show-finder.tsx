@@ -88,8 +88,6 @@ export function ShowFinder() {
         {search.state === "found" && `${search.shows.length} shows found for ${search.query}.`}
       </p>
 
-      {startError && <StartProblem problem={describe(startError)} />}
-
       {search.state === "found" && search.shows.length > 0 && (
         <div>
           <h2 className="mb-3 font-semibold">Which one is yours?</h2>
@@ -122,6 +120,9 @@ export function ShowFinder() {
           </ul>
         </div>
       )}
+
+      {/* Below the list, next to the show the host just picked. */}
+      {startError && <StartProblem problem={describe(startError)} />}
 
       {search.state === "found" && search.shows.length === 0 && (
         <StartProblem

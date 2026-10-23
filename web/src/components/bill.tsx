@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import type { Guest } from "@/lib/echo";
+import { fitLongestWord } from "@/lib/fit";
 
 import { Ring } from "./logo";
 
@@ -27,17 +28,20 @@ function headline(sweet: Guest[]): string {
 }
 
 // The guests set as a lineup: billing size is the Echo score, so sweet spots headline.
-// With no sweet spot, the three closest headline instead.
-export function Bill({ guests }: { guests: Guest[] }) {
+// With no sweet spot, the three closest headline instead. `printIn` plays the print-in, for when the
+// page watched the run finish; an analysis opened already done shows at once.
+export function Bill({ guests, printIn }: { guests: Guest[]; printIn: boolean }) {
   if (!guests.length) return null;
   const sweet = guests.filter((guest) => guest.label === "sweet_spot");
   const headliners = sweet.length ? sweet : guests.slice(0, 3);
   const top = guests.slice(0, 10).filter((guest) => !headliners.includes(guest));
   const further = guests.slice(10).filter((guest) => !headliners.includes(guest));
+  // Each tier's size, scaled down per name only when its longest word wouldn't fit the line; `beside`
+  // is the ring and its gap, in em.
   const tiers = [
-    { guests: headliners, className: "text-[clamp(2.5rem,7vw,5.5rem)] font-black gap-x-8", ring: "size-[0.32em]" },
-    { guests: top, className: "text-[clamp(1.625rem,3.6vw,2.75rem)] font-extrabold gap-x-5", ring: "size-[0.36em]" },
-    { guests: further, className: "text-[1.375rem] font-bold gap-x-4", ring: "size-[0.4em]" },
+    { guests: headliners, size: "clamp(2.5rem,7vw,5.5rem)", className: "font-black gap-x-8", ring: "size-[0.32em]", beside: 0.5 },
+    { guests: top, size: "clamp(1.625rem,3.6vw,2.75rem)", className: "font-extrabold gap-x-5", ring: "size-[0.36em]", beside: 0.54 },
+    { guests: further, size: "1.375rem", className: "font-bold gap-x-4", ring: "size-[0.4em]", beside: 0.58 },
   ];
   let order = 0;
 
@@ -46,7 +50,7 @@ export function Bill({ guests }: { guests: Guest[] }) {
       <h2 id="bill" className="max-w-3xl text-xl font-semibold text-balance">
         {headline(sweet)}
       </h2>
-      <div className="flex flex-col gap-6 border-t-2 border-on-field pt-6">
+      <div className="@container flex flex-col gap-6 border-t-2 border-on-field pt-6">
         {tiers.map(
           (tier, index) =>
             tier.guests.length > 0 && (
@@ -55,12 +59,17 @@ export function Bill({ guests }: { guests: Guest[] }) {
                 className={`flex flex-wrap items-baseline gap-y-1 font-display leading-[0.95] tracking-tight uppercase ${tier.className}`}
               >
                 {tier.guests.map((guest) => (
-                  <li key={guest.ref} className="print" style={{ "--order": order++ } as CSSProperties}>
+                  <li
+                    key={guest.ref}
+                    className={printIn ? "print" : ""}
+                    style={{ "--order": order++, ...fitLongestWord(guest.name, tier.size, tier.beside) } as CSSProperties}
+                  >
                     <a href={`#guest-${guest.ref}`} className="group inline-flex flex-col">
-                      <span className="inline-flex items-baseline gap-[0.18em] group-hover:underline">
+                      {/* The ring sits on the first line when a name wraps. */}
+                      <span className="inline-flex items-start gap-[0.18em] group-hover:underline">
                         <Ring
                           sweet={guest.label === "sweet_spot"}
-                          className={`${tier.ring} self-center ${guest.label === "sweet_spot" ? "text-on-field" : "text-on-field-soft"}`}
+                          className={`${tier.ring} mt-[0.3em] self-start ${guest.label === "sweet_spot" ? "text-on-field" : "text-on-field-soft"}`}
                         />
                         {guest.name}
                         {guest.label === "sweet_spot" && <span className="sr-only"> (sweet spot)</span>}
