@@ -17,6 +17,7 @@ import { GuestTable } from "./guest-table";
 import { Invite } from "./invite";
 import { Ring } from "./logo";
 import { Problem } from "./problem";
+import { QlooCalls } from "./qloo-calls";
 import { ShowCover } from "./show-cover";
 
 export function AnalysisView({ id }: { id: string }) {
@@ -63,6 +64,7 @@ export function AnalysisView({ id }: { id: string }) {
           <Invite analysis={analysis} picked={picked} />
           <AudienceMap rows={analysis.audience_map} />
           <LeftOut analysis={analysis} />
+          <QlooCalls calls={analysis.qloo_calls} />
         </>
       )}
     </>
