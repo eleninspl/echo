@@ -80,11 +80,8 @@ class Engine:
         self.counters = counters
         self.daily_cap = daily_cap
         self.example = load_example()
-        self.featured_ids: list[str] = []
         if mock and isinstance(analyses, LocalStore):
-            featured = Analysis.model_validate(self.example["analysis"])
-            analyses.remember(featured)
-            self.featured_ids.append(featured.id)
+            analyses.remember(Analysis.model_validate(self.example["analysis"]))
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[QlooClient]:
@@ -135,12 +132,17 @@ class Engine:
         except pipeline.ShowNotFound:
             raise EchoError(404, "not_found", "There's no show with that ID.") from None
 
-    async def start(self, show_id: str, filters: Filters, tasks: BackgroundTasks | None = None) -> Analysis:
-        if not self.mock and (existing := await self.analyses.find(request_key(show_id, filters))):
+    async def start(
+        self, show_id: str, filters: Filters, tasks: BackgroundTasks | None = None, reuse: bool = True
+    ) -> Analysis:
+        """Runs in `tasks` when given, else before returning. With `reuse`, the same show and filters return the
+        earlier running or finished analysis."""
+        reuse = reuse and not self.mock
+        if reuse and (existing := await self.analyses.find(request_key(show_id, filters))):
             return existing
         await self.check_cap()
         show = await self.show(show_id)
-        if not self.mock and (existing := await self.analyses.find(request_key(show.id, filters))):
+        if reuse and (existing := await self.analyses.find(request_key(show.id, filters))):
             return existing
         analysis = Analysis(
             id=f"an_{uuid4().hex[:12]}",
@@ -197,16 +199,6 @@ class Engine:
         async with self.client() as client:
             return await pipeline.guest_maps(client, analysis, guest)
 
-    async def warm(self, show_ids: list[str]) -> None:
-        for show_id in show_ids:
-            try:
-                analysis = await self.start(show_id, Filters())
-            except EchoError as error:
-                log.warning("featured show %s not warmed: %s", show_id, error.message)
-                continue
-            if analysis.status == "done":
-                self.featured_ids.append(analysis.id)
-
 
 def fail(analysis: Analysis, code: str, message: str) -> None:
     analysis.status = "failed"
@@ -222,7 +214,6 @@ def create_app(
     step_delay: float = 0.6,
     client_factory: ClientFactory = QlooClient.from_settings,
     store: Path | AnalysisStore | None = None,
-    featured: list[str] | None = None,
     daily_cap: int | None = None,
     counters: Counters | None = None,
 ) -> FastAPI:
@@ -251,14 +242,10 @@ def create_app(
         counters,
         settings.daily_qloo_calls if daily_cap is None else daily_cap,
     )
-    warm_up = [] if mock else (settings.featured if featured is None else featured)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        task = asyncio.create_task(engine.warm(warm_up)) if warm_up else None
         yield
-        if task:
-            task.cancel()
         await analyses.close()
         await engine.counters.close()
 
@@ -308,8 +295,11 @@ def create_app(
 
     @app.get("/featured")
     async def featured_shows() -> FeaturedList:
-        found = [await engine.analyses.get(i) for i in engine.featured_ids]
-        items = [a for a in found if a is not None]
+        """Written by scripts/warm.py, so nothing here calls Qloo."""
+        if engine.mock:
+            items = [Analysis.model_validate(engine.example["analysis"])]
+        else:
+            items = await engine.analyses.featured()
         return FeaturedList(featured=[Featured(show=a.show, analysis_id=a.id) for a in items])
 
     @app.post("/analyses", status_code=202)

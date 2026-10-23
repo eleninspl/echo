@@ -75,6 +75,14 @@ class AnalysisStore(Protocol):
         """The newest running or finished analysis for this request key."""
         ...
 
+    async def set_featured(self, analysis_ids: list[str]) -> None:
+        """Replaces the featured analyses, in order."""
+        ...
+
+    async def featured(self) -> list[Analysis]:
+        """The featured analyses, in order. One that is gone is left out."""
+        ...
+
     async def close(self) -> None: ...
 
 
@@ -134,13 +142,20 @@ class DiskCache:
         tmp.replace(self._file(key))
 
 
+FEATURED_FILE = "featured.txt"
+
+
 class LocalStore:
-    """Analyses in memory, and as JSON files in `directory` when there is one, so they survive a restart."""
+    """Analyses in memory, and as JSON files in `directory` when there is one, so they survive a restart. The
+    featured analyses' IDs are in `featured.txt` there, one a line."""
 
     def __init__(self, directory: Path | None) -> None:
         self.directory = directory
         self.analyses: dict[str, tuple[Analysis, float]] = {}
+        self.featured_ids: list[str] = []
         if directory and directory.exists():
+            if (directory / FEATURED_FILE).exists():
+                self.featured_ids = (directory / FEATURED_FILE).read_text().split()
             for file in sorted(directory.glob("*.json")):
                 try:
                     analysis = Analysis.model_validate_json(file.read_text())
@@ -170,6 +185,16 @@ class LocalStore:
             if reusable(current := checked(analysis, saved_at)):
                 return current
         return None
+
+    async def set_featured(self, analysis_ids: list[str]) -> None:
+        self.featured_ids = list(analysis_ids)
+        if self.directory:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            (self.directory / FEATURED_FILE).write_text("".join(f"{i}\n" for i in analysis_ids))
+
+    async def featured(self) -> list[Analysis]:
+        found = [await self.get(i) for i in self.featured_ids]
+        return [analysis for analysis in found if analysis is not None]
 
     async def close(self) -> None:
         pass
@@ -245,6 +270,10 @@ create table if not exists cache (
     body bytea not null,
     expires_at timestamptz not null
 );
+create table if not exists featured (
+    position integer primary key,
+    analysis_id text not null
+);
 """
 
 
@@ -283,6 +312,12 @@ class Postgres:
         async with pool.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(sql, args)
             return await cursor.fetchall() if cursor.description else []
+
+    async def transaction(self, statements: list[tuple[str, tuple]]) -> None:
+        pool = await self.pool()
+        async with pool.connection() as conn, conn.transaction():
+            for sql, args in statements:
+                await conn.execute(sql, args)
 
     async def close(self) -> None:
         if self._pool is not None:
@@ -343,6 +378,17 @@ class PostgresStore:
             if reusable(analysis := self._row(row)):
                 return analysis
         return None
+
+    async def set_featured(self, analysis_ids: list[str]) -> None:
+        insert = "insert into featured (position, analysis_id) values (%s, %s)"
+        rows = [(insert, (position, analysis_id)) for position, analysis_id in enumerate(analysis_ids)]
+        await self.db.transaction([("delete from featured", ()), *rows])
+
+    async def featured(self) -> list[Analysis]:
+        rows = await self.db.execute(
+            "select a.body, a.saved_at from featured f join analyses a on a.id = f.analysis_id order by f.position"
+        )
+        return [self._row(row) for row in rows]
 
     async def close(self) -> None:
         await self.db.close()

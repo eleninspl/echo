@@ -10,6 +10,7 @@ from echo_engine import apple, llm
 from echo_engine.app import create_app
 from echo_engine.models import Filters
 from echo_engine.qloo_client import QlooClient
+from scripts import warm
 from tests.fake_qloo import SHOW_ID, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler
 
 
@@ -33,7 +34,7 @@ def engine(tmp_path, monkeypatch) -> TestClient:
 
     monkeypatch.setattr(apple, "author", author)
     monkeypatch.setattr(apple, "episode_titles", titles)
-    return TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+    return TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses"))
 
 
 def state(client: TestClient):
@@ -154,7 +155,7 @@ def test_guest_details_without_the_llm(engine):
 
 def test_analyses_survive_a_restart(tmp_path, monkeypatch, engine):
     analysis = run(engine)
-    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses"))
     assert again.get(f"/analyses/{analysis['id']}").json()["status"] == "done"
 
 
@@ -218,6 +219,36 @@ def test_an_llm_failure_is_an_llm_error_and_can_be_retried(engine, monkeypatch):
 def test_a_bad_saved_analysis_is_skipped(tmp_path, engine):
     analysis = run(engine)
     (tmp_path / "analyses" / "an_broken.json").write_text('{"id": "an_broken"}')
-    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses"))
     assert again.get(f"/analyses/{analysis['id']}").json()["status"] == "done"
     assert again.get("/analyses/an_broken").status_code == 404
+
+
+def test_warm_runs_the_featured_shows_fresh_and_featured_reads_them(engine):
+    earlier = run(engine)
+    assert asyncio.run(warm.warm(state(engine), [SHOW_ID, "example"]))
+    featured = engine.get("/featured").json()["featured"]
+    assert [item["show"]["id"] for item in featured] == [SHOW_ID, SHOW_ID]
+    ids = [item["analysis_id"] for item in featured]
+    assert len(set(ids)) == 2
+    assert earlier["id"] not in ids
+    assert all(engine.get(f"/analyses/{i}").json()["status"] == "done" for i in ids)
+
+
+def test_featured_is_unchanged_unless_every_show_finishes(engine):
+    assert asyncio.run(warm.warm(state(engine), [SHOW_ID]))
+    before = engine.get("/featured").json()
+    assert not asyncio.run(warm.warm(state(engine), [SHOW_ID, THIN_SHOW_ID]))
+    assert not asyncio.run(warm.warm(state(engine), ["99999999-9999-4999-8999-999999999999"]))
+    assert engine.get("/featured").json() == before
+
+
+def test_featured_needs_no_qloo_call(tmp_path, engine):
+    asyncio.run(warm.warm(state(engine), [SHOW_ID]))
+
+    def no_qloo(**kwargs) -> QlooClient:
+        raise AssertionError("/featured called Qloo")
+
+    again = TestClient(create_app(mock=False, client_factory=no_qloo, store=tmp_path / "analyses"))
+    featured = again.get("/featured").json()["featured"]
+    assert again.get(f"/analyses/{featured[0]['analysis_id']}").json()["status"] == "done"
