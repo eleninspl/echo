@@ -83,7 +83,7 @@ Each message is the one the real engine sends. Outside mock mode the engine igno
 - A saved analysis that doesn't validate is skipped and logged, not a crash at startup.
 - `optional()` catches only `NotImplementedError`; any other LLM error fails the step with `llm_error`.
 - Duplicate names keep the higher affinity, as qloo.md says.
-- Past guests: checked on the investor judge's show, where every match was a real guest, so the rule stays. Rechecked on 8 shows in Q16: 36 of 38 matches were real guests (qloo.md, Probe history).
+- Past guests: checked on the investor judge's show, where every match was a real guest, so the rule stays. Rechecked on 8 shows in Q16: 32 of 34 matches were real guests, and trailer titles are now skipped (qloo.md, Probe history).
 - Smaller: the usage count is written once per run, not per call; one helper instead of `nothing`, `none` and `no_author`.
 
 Every Q task is done when its tests pass against the fake Qloo and the local store, ruff is clean, and it works once against the real server.

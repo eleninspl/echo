@@ -64,7 +64,7 @@ Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached. 
 2. Minors: `properties.date_of_birth` less than 18 years ago. Read for this check only, never shown or kept.
 3. Not a public figure: no `urn:tag:occupation:person` tag and no `imdb_id`, `wikidata`, `musicbrainz_artist_id`, `spotify_artist_id`, `library_of_congress_authority_id` or `goodreads_author_id`. Social handles don't count.
 4. Hosts: a candidate's full name in the title or Apple's author line, or the names after "with" in the title ("with Ann & Bo Surname" means Ann Surname and Bo Surname; a list of single names, like "with Ann, Bo & Cy", matches first or last names). Plus the LLM host check (L1) when it's built, for author lines that are a company. Qloo's own description never names the hosts.
-5. Past guests: a candidate whose full name appears in one of the last 200 episode titles on Apple.
+5. Past guests: a candidate whose full name appears in one of the last 200 episode titles on Apple. Titles that start with "Introducing", "Trailer", "Preview", "Sneak peek" or "Coming soon" (any case) are skipped: trailers and cross-promotions name people who weren't guests.
 6. Duplicates: the same normalised name, keep the higher affinity.
 7. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
 
@@ -140,4 +140,4 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
   - Every run finished. `POST /analyses` answered 202 in 0.3 to 0.5 s, and the runs were done in 4.8 to 9.9 s with 44 to 67 calls (32 to 64 fresh), faster than locally. A poll takes about 0.3 s. Guest details took 3.6 s fresh and 0.4 s cached.
   - 1 to 4 sweet spots per show, as before.
   - Hosts: caught on every show, 3 of 4 on the judge's second show; the fourth isn't among its candidates.
-  - Past guests: 36 of 38 matches were real guests. The other two: a name mentioned in a news episode's title, and a trailer for another show ("INTRODUCING: … with <name>"). Both are left out wrongly. Skipping trailer titles would fix the second; the first needs the LLM check (L7).
+  - Past guests: 32 of 34 matches were real guests. The other two: a name mentioned in a news episode's title, and a trailer for another show ("INTRODUCING: … with <name>"). Both are left out wrongly. Trailer titles are skipped since (rule 5); the news mention needs the LLM check (L7).
