@@ -42,7 +42,7 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 | Reach | The union of every guest's top podcasts from the love back call (without the show), in chunks of 50: the top 10, or more (up to all 50) while the union needs no more chunks than the top 10's. On a one-world show the guests' fans share their top podcasts and differ only further down, so this costs no extra call. Lens: `filter.type=urn:entity:podcast&signal.interests.entities=<show>&filter.results.entities=<chunk>&take=50` | 1 to 3 |
 | New listeners | `filter.type=urn:demographics&signal.interests.entities=<show>,<all guest IDs>`. One block per entity. `query.age` per bucket, -1 to 1. Drop `query.gender`. | 1 |
 | Shared tastes | `filter.type=urn:tag&signal.interests.entities=<show or guest>&filter.tag.types=<allow-list>&take=50`, once per top 10 guest and twice for the show: with the allow-list, and with `urn:tag:theme:qloo` alone | 12 |
-| Guest details | The audience map call with the guest as signal, `take=20`. "Adds" is what's in the guest's lists and not in the show's 20. | 6, on click |
+| Guest details | The audience map call with the guest as signal, `take=20`. The show itself is left out of the guest's map. "Adds" is what's in the guest's lists and not in the show's 20. | 6, on click |
 | Hosts and past guests | Not Qloo: Apple `itunes.apple.com/lookup?id=<itunes id>&entity=podcast` for the author line, and `&entity=podcastEpisode&limit=200` for recent episode titles. The iTunes ID is `properties.external.itunes.id` on the show. Cached 7 days. | 0 |
 
 Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached. Q17 added one call (the show's themes).
@@ -63,7 +63,7 @@ Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached. 
 1. Died: `properties.date_of_death` is set.
 2. Minors: `properties.date_of_birth` less than 18 years ago. Read for this check only, never shown or kept.
 3. Not a public figure: no `urn:tag:occupation:person` tag and no `imdb_id`, `wikidata`, `musicbrainz_artist_id`, `spotify_artist_id`, `library_of_congress_authority_id` or `goodreads_author_id`. Social handles don't count.
-4. Hosts: a candidate's full name in the title or Apple's author line, or the names after "with" in the title ("with Ann & Bo Surname" means Ann Surname and Bo Surname; a list of single names, like "with Ann, Bo & Cy", matches first or last names). Plus the LLM host check (L1) when it's built, for author lines that are a company. Qloo's own description never names the hosts.
+4. Hosts: a candidate's full name in the title or Apple's author line, or the names after "with" in the title ("with Ann & Bo Surname" means Ann Surname and Bo Surname; a list of single names, like "with Ann, Bo & Cy", matches first or last names). Or a candidate's full name in Qloo's description of the show (`short_description`), which often names the hosts when the author line is a network and the title names nobody; it names hosts, not guests. Plus the LLM host check (L1) when it's built, for the rest.
 5. Past guests: a candidate whose full name appears in one of the last 200 episode titles on Apple. Titles that start with "Introducing", "Trailer", "Preview", "Sneak peek" or "Coming soon" (any case) are skipped: trailers and cross-promotions name people who weren't guests.
 6. Duplicates: the same normalised name, keep the higher affinity.
 7. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
@@ -141,3 +141,4 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
   - 1 to 4 sweet spots per show, as before.
   - Hosts: caught on every show, 3 of 4 on the judge's second show; the fourth isn't among its candidates.
   - Past guests: 32 of 34 matches were real guests. The other two: a name mentioned in a news episode's title, and a trailer for another show ("INTRODUCING: … with <name>"). Both are left out wrongly. Trailer titles are skipped since (rule 5); the news mention needs the LLM check (L7).
+- **24 Oct, a host missed on a sports talk show** (found on production by the web session; no Qloo calls to check): Apple's author line was the network and the title named nobody, so neither rule caught a host. Qloo's description of the show named both hosts. On 16 shows (the Q16 eight and the shortlist), the description named only hosts: four already caught by the other rules and this one. Rule 4 now uses it, with full names only.
