@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import logging
 
 import pytest
 from fastapi.testclient import TestClient
@@ -191,3 +192,7 @@ def test_search_finds_the_failing_shows_by_title(mock):
     assert titles("unknown_country") == ["Fails: unknown_country"]
     assert len(titles("llm_error")) == 2
     assert titles("example") == [show["title"] for show in load_example()["shows"]]
+
+
+def test_httpx_does_not_log_every_request():
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
