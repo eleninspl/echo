@@ -66,7 +66,7 @@ Update this section whenever something changes.
 - **23 Oct:** Eleni merged PR #4, hosting the engine on Vercel with Neon Postgres and Upstash Redis. Leonidas reopened the decision the same day: hosting and the LLM provider are both open points in `docs/plan.md`, with Eleni's Vercel plan kept there as one option.
 - **23 Oct:** Eleni reviewed and merged #5, and takes Q from here. Hosting stays Vercel. Q11 to Q16 in `docs/plan.md` cover the #5 review fixes and the move to Postgres and Redis (PR #6). Who takes L and the web app, and the LLM provider, are still open.
 - **23 Oct:** Q11 done: the #5 review fixes (PR #7). A real run on the investor judge's show works; its evidence repeats across guests (Q17, should).
-- **23 Oct:** Q12 done: `engine/echo_engine/store.py` keeps analyses and the Qloo and Apple caches in `.cache/` locally, or in Postgres when `DATABASE_URL` is set. Checked once with the real Qloo on a local Postgres.
+- **23 Oct:** Q12 done (PR #8): `engine/echo_engine/store.py` keeps analyses and the Qloo and Apple caches in `.cache/` locally, or in Postgres when `DATABASE_URL` is set. Checked once with the real Qloo on a local Postgres.
 - **Next:** Q13 (Redis). Agree who takes L and the web app by 24 Oct.
 
 ## Keeping this file current
