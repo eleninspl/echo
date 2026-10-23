@@ -61,7 +61,8 @@ Update this section whenever something changes.
 - **21 Oct:** a long proposal for features and the contract, merged into the engine branch on 22 Oct.
 - **22 Oct:** the top 3 present live on air on 5 Nov. The investor judge's shows are in Qloo and scorable; their hosts come back as candidates.
 - **22 Oct (call):** v1 is the engine and the web app only. The proposal was cut to three short docs: no path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side and an LLM side, one person each. The chat in the web app is the agent.
-- **Next:** agree the three open points in `docs/plan.md`, then build.
+- **23 Oct:** PR #3 (`v1/setup`) holds everything: the three docs, the engine with a FastAPI skeleton of the 9 routes and a mock mode, and the Next.js app in `web/`. It contains #1 and #2. `ANTHROPIC_API_KEY` isn't set in `.env` yet.
+- **Next:** merge #3, agree the three open points in `docs/plan.md`, then build Q and L in parallel.
 
 ## Keeping this file current
 
