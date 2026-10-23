@@ -24,6 +24,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["echo_engine"]
 
+# The Vercel project's root directory is engine/; the function is this app.
+[tool.vercel]
+entrypoint = "echo_engine.app:app"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
