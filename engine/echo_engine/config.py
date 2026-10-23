@@ -18,6 +18,13 @@ class Settings:
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
         self.cache_dir = Path(os.environ.get("ECHO_CACHE_DIR", REPO_ROOT / ".cache"))
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
+        self.mock = os.environ.get("ECHO_MOCK", "").strip() == "1"
+        self.web_origins = [
+            origin.strip()
+            for origin in os.environ.get("ECHO_WEB_ORIGINS", "http://localhost:3000").split(",")
+            if origin.strip()
+        ]
+        self.llm_model = os.environ.get("ECHO_LLM_MODEL", "claude-sonnet-5-5").strip()
 
 
 @lru_cache

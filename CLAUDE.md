@@ -18,15 +18,17 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 ## Stack
 
-- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Railway. It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`).
-- Web app: Next.js, TypeScript. No code yet.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Railway. It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`). Which file each half owns is in `docs/plan.md`.
+- Web app: Next.js 16, TypeScript, Tailwind, in `web/`, hosted on Vercel. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
 - No bot in v1 (open in `docs/plan.md`).
 
 ## Setup
 
 Set keys with `scripts/set-env.sh KEY`, or `pbpaste | scripts/set-env.sh KEY`. Never print, log or commit values from `.env`.
 
-Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`.
+Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`. Run it with `uv run uvicorn echo_engine.app:app --reload` (port 8000), or with `ECHO_MOCK=1` in front to serve the invented example data instead of Qloo and the LLM.
+
+Web: `cd web && npm install && npm run dev` (port 3000). Copy `web/.env.example` to `web/.env.local`. Check with `npm run lint` and `npm run build`.
 
 TypeScript probes, for checking the API only (not product code): `npm run typecheck`, `npm run probe [show names...]` and `npm run map-api [show name]` (about 55 calls, cached). Both write local reports to `.cache/`, never committed. Rerun `map-api` after Qloo changes something and update `docs/qloo.md`.
 

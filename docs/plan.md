@@ -24,7 +24,18 @@ Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Ne
 
 ## Engine tasks
 
-One person each. **Q** talks to Qloo and does the maths. **L** talks to the LLM. They meet in Python: Q's pipeline builds the analysis dict (the shape under API below) and L's functions take it and add text. Until the other half is ready, each works against the example in this page.
+One person each. **Q** talks to Qloo and does the maths. **L** talks to the LLM. They meet in Python, in `engine/echo_engine/`:
+
+| File | Owner | What's in it |
+| --- | --- | --- |
+| `models.py` | both | The API shapes below as Pydantic models. Change them together. |
+| `app.py` | Q | The routes, background runs and mock mode. Done as a skeleton. |
+| `pipeline.py` | Q | `search_shows`, `get_show`, `run_analysis`, `guest_maps`. Stubs. `run_analysis` calls L1 and L2. |
+| `llm.py` | L | `find_hosts`, `write_ideas`, `write_episode`, `chat`, `write_drafts`, `write_briefing`, `past_guest_names`. Stubs. |
+| `qloo_client.py`, `params.py` | Q | The Qloo client. |
+| `fixtures/example.json` | both | Invented example data for mock mode and tests. |
+
+With `ECHO_MOCK=1` every route answers from the example, so the web app and the LLM prompts can be built before the pipeline works. Without it, a stub returns 501 `not_implemented` until it's built.
 
 | # | Q: Qloo side | Days | |
 | --- | --- | --- | --- |
@@ -114,11 +125,11 @@ The analysis, when done:
     }
   ],
   "left_out": [{ "name": "Host Person", "why": "host" }],
-  "qloo_calls": [{ "path": "/v2/insights", "params": { "filter.type": "urn:entity:person", "take": "50" }, "results": 50, "ms": 412, "cached": false }]
+  "qloo_calls": [{ "path": "/v2/insights", "params": { "filter.type": "urn:entity:person", "take": "50" }, "status": 200, "duration_ms": 412, "cached": false, "at": "2026-10-23T10:00:01+00:00" }]
 }
 ```
 
-- Steps while running: `map`, `candidates`, `clean`, `score`, `evidence`, `ideas`.
+- While running: the same shape, with `steps` (`map`, `candidates`, `clean`, `score`, `evidence`, `ideas`) turning `done` and the lists still empty.
 - `guests`: up to 20, best first, all on the chart. The top 10 have `evidence` and `idea`; the rest have null.
 - `scores` are percentiles from 0 to 1 ([qloo.md](qloo.md#scoring)). `fit` is fame-adjusted.
 - `episode_about.used` is null when Qloo couldn't use the entity; the web app says so.
@@ -130,6 +141,7 @@ The analysis, when done:
 | 400 | `bad_request`, `unknown_country` |
 | 404 | `not_found` |
 | 429 | `daily_cap`: the daily Qloo-call cap (`ECHO_DAILY_QLOO_CALLS`) is reached. Featured and earlier analyses still open. |
+| 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 
 Analyses are saved as JSON on the Railway volume next to the Qloo cache, so they survive restarts. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.

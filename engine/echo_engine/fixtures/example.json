@@ -1,0 +1,963 @@
+{
+  "note": "Invented data for mock mode and tests. Not Qloo data.",
+  "shows": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "title": "Example Show",
+      "description": "A weekly interview show about food and travel.",
+      "image_url": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "title": "Example Comedy Hour",
+      "description": "Two comedians talk to a guest every week.",
+      "image_url": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "title": "Example Sports Talk",
+      "description": "Football, interviews and arguments.",
+      "image_url": null
+    }
+  ],
+  "analysis": {
+    "id": "an_example",
+    "status": "done",
+    "show": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "title": "Example Show",
+      "description": "A weekly interview show about food and travel.",
+      "image_url": null
+    },
+    "filters": {
+      "fame": "any",
+      "age": null,
+      "country": null,
+      "episode_about": null
+    },
+    "steps": [
+      {
+        "key": "map",
+        "label": "Mapping your audience",
+        "done": true
+      },
+      {
+        "key": "candidates",
+        "label": "Finding guests",
+        "done": true
+      },
+      {
+        "key": "clean",
+        "label": "Removing hosts and past guests",
+        "done": true
+      },
+      {
+        "key": "score",
+        "label": "Scoring love back and reach",
+        "done": true
+      },
+      {
+        "key": "evidence",
+        "label": "Collecting the evidence",
+        "done": true
+      },
+      {
+        "key": "ideas",
+        "label": "Writing episode ideas",
+        "done": true
+      }
+    ],
+    "audience_map": [
+      {
+        "category": "music",
+        "items": [
+          {
+            "name": "Example Band",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Singer",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Orchestra",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example DJ",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      },
+      {
+        "category": "tv",
+        "items": [
+          {
+            "name": "Example Series",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Sitcom",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Documentary",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example Quiz Show",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      },
+      {
+        "category": "film",
+        "items": [
+          {
+            "name": "Example Film",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Comedy",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Thriller",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example Animation",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      },
+      {
+        "category": "books",
+        "items": [
+          {
+            "name": "Example Novel",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Memoir",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Cookbook",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example Essays",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      },
+      {
+        "category": "brands",
+        "items": [
+          {
+            "name": "Example Coffee",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Outdoor Brand",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Sneakers",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example Airline",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      },
+      {
+        "category": "podcasts",
+        "items": [
+          {
+            "name": "Example Podcast A",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Podcast B",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Podcast C",
+            "image_url": null,
+            "affinity": 0.89
+          },
+          {
+            "name": "Example Podcast D",
+            "image_url": null,
+            "affinity": 0.85
+          }
+        ]
+      }
+    ],
+    "guests": [
+      {
+        "ref": "g1",
+        "name": "Guest L",
+        "description": "Sketch comedian",
+        "image_url": null,
+        "links": {},
+        "label": "sweet_spot",
+        "scores": {
+          "fit": 0.58,
+          "love_back": 0.77,
+          "reach": null,
+          "echo": 0.626
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Example tag",
+            "Road trips",
+            "Kitchen stories"
+          ],
+          "new_podcasts": [
+            "Example Podcast B",
+            "Example Podcast C"
+          ],
+          "ages": [
+            "25_to_29",
+            "30_to_34"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest L's fans both over-index on example tag.",
+          "title": "Example episode with Guest L",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g2",
+        "name": "Guest A",
+        "description": "Stand-up comedian and actor",
+        "image_url": null,
+        "links": {
+          "imdb": "https://www.imdb.com/name/nm0000000/"
+        },
+        "label": "sweet_spot",
+        "scores": {
+          "fit": 0.85,
+          "love_back": 0.54,
+          "reach": 0.46,
+          "echo": 0.616
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Satire",
+            "Example tag"
+          ],
+          "new_podcasts": [
+            "Example Podcast C",
+            "Example Podcast D"
+          ],
+          "ages": [
+            "24_and_younger"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest A's fans both over-index on satire.",
+          "title": "Example episode with Guest A",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g3",
+        "name": "Guest B",
+        "description": "Chef and travel writer",
+        "image_url": null,
+        "links": {},
+        "label": "sweet_spot",
+        "scores": {
+          "fit": 0.69,
+          "love_back": 0.62,
+          "reach": 0.38,
+          "echo": 0.569
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Late-night comedy"
+          ],
+          "new_podcasts": [
+            "Example Podcast D",
+            "Example Podcast E"
+          ],
+          "ages": []
+        },
+        "idea": {
+          "reason": "Your listeners and Guest B's fans both over-index on late-night comedy.",
+          "title": "Example episode with Guest B",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g4",
+        "name": "Guest C",
+        "description": "Singer-songwriter",
+        "image_url": null,
+        "links": {},
+        "label": "sweet_spot",
+        "scores": {
+          "fit": 0.62,
+          "love_back": 0.38,
+          "reach": 0.69,
+          "echo": 0.569
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Indie folk",
+            "Example tag",
+            "Small venues"
+          ],
+          "new_podcasts": [
+            "Example Podcast E",
+            "Example Podcast F"
+          ],
+          "ages": [
+            "35_to_44"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest C's fans both over-index on indie folk.",
+          "title": "Example episode with Guest C",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g5",
+        "name": "Guest D",
+        "description": "Former footballer and broadcaster",
+        "image_url": null,
+        "links": {},
+        "label": "safe",
+        "scores": {
+          "fit": 0.92,
+          "love_back": 0.85,
+          "reach": 0.15,
+          "echo": 0.532
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Example tag",
+            "Road trips",
+            "Kitchen stories"
+          ],
+          "new_podcasts": [
+            "Example Podcast F",
+            "Example Podcast G"
+          ],
+          "ages": [
+            "25_to_29",
+            "30_to_34"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest D's fans both over-index on example tag.",
+          "title": "Example episode with Guest D",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g6",
+        "name": "Guest E",
+        "description": "Film director",
+        "image_url": null,
+        "links": {
+          "imdb": "https://www.imdb.com/name/nm0000000/"
+        },
+        "label": "far",
+        "scores": {
+          "fit": 0.54,
+          "love_back": 0.31,
+          "reach": 0.77,
+          "echo": 0.532
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Satire",
+            "Example tag"
+          ],
+          "new_podcasts": [
+            "Example Podcast G",
+            "Example Podcast H"
+          ],
+          "ages": [
+            "24_and_younger"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest E's fans both over-index on satire.",
+          "title": "Example episode with Guest E",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g7",
+        "name": "Guest I",
+        "description": "Radio host",
+        "image_url": null,
+        "links": {},
+        "label": "safe",
+        "scores": {
+          "fit": 0.77,
+          "love_back": 0.69,
+          "reach": 0.23,
+          "echo": 0.527
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Late-night comedy"
+          ],
+          "new_podcasts": [
+            "Example Podcast H",
+            "Example Podcast I"
+          ],
+          "ages": []
+        },
+        "idea": {
+          "reason": "Your listeners and Guest I's fans both over-index on late-night comedy.",
+          "title": "Example episode with Guest I",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g8",
+        "name": "Guest F",
+        "description": "Novelist",
+        "image_url": null,
+        "links": {},
+        "label": "balanced",
+        "scores": {
+          "fit": 0.46,
+          "love_back": 0.46,
+          "reach": 0.54,
+          "echo": 0.51
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Indie folk",
+            "Example tag",
+            "Small venues"
+          ],
+          "new_podcasts": [
+            "Example Podcast I",
+            "Example Podcast J"
+          ],
+          "ages": [
+            "35_to_44"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest F's fans both over-index on indie folk.",
+          "title": "Example episode with Guest F",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g9",
+        "name": "Guest G",
+        "description": "Television presenter",
+        "image_url": null,
+        "links": {},
+        "label": "safe",
+        "scores": {
+          "fit": 1.0,
+          "love_back": 0.92,
+          "reach": 0.08,
+          "echo": 0.485
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Example tag",
+            "Road trips",
+            "Kitchen stories"
+          ],
+          "new_podcasts": [
+            "Example Podcast J",
+            "Example Podcast K"
+          ],
+          "ages": [
+            "25_to_29",
+            "30_to_34"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest G's fans both over-index on example tag.",
+          "title": "Example episode with Guest G",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g10",
+        "name": "Guest H",
+        "description": "Street artist",
+        "image_url": null,
+        "links": {},
+        "label": "far",
+        "scores": {
+          "fit": 0.38,
+          "love_back": 0.23,
+          "reach": 1.0,
+          "echo": 0.478
+        },
+        "evidence": {
+          "shared_tastes": [
+            "Satire",
+            "Example tag"
+          ],
+          "new_podcasts": [
+            "Example Podcast K",
+            "Example Podcast L"
+          ],
+          "ages": [
+            "24_and_younger"
+          ]
+        },
+        "idea": {
+          "reason": "Your listeners and Guest H's fans both over-index on satire.",
+          "title": "Example episode with Guest H",
+          "pitch": "Two sentences on what the episode would be. Invented for the mock."
+        }
+      },
+      {
+        "ref": "g11",
+        "name": "Guest J",
+        "description": "Climber and author",
+        "image_url": null,
+        "links": {},
+        "label": "long_shot",
+        "scores": {
+          "fit": 0.23,
+          "love_back": 0.62,
+          "reach": 0.62,
+          "echo": 0.477
+        },
+        "evidence": null,
+        "idea": null
+      },
+      {
+        "ref": "g12",
+        "name": "Guest K",
+        "description": "Fashion designer",
+        "image_url": null,
+        "links": {},
+        "label": "far",
+        "scores": {
+          "fit": 0.31,
+          "love_back": 0.15,
+          "reach": 0.92,
+          "echo": 0.392
+        },
+        "evidence": null,
+        "idea": null
+      },
+      {
+        "ref": "g13",
+        "name": "Guest N",
+        "description": "Food scientist",
+        "image_url": null,
+        "links": {},
+        "label": "long_shot",
+        "scores": {
+          "fit": 0.08,
+          "love_back": 1.0,
+          "reach": 0.31,
+          "echo": 0.349
+        },
+        "evidence": null,
+        "idea": null
+      },
+      {
+        "ref": "g14",
+        "name": "Guest M",
+        "description": "Podcast producer",
+        "image_url": null,
+        "links": {},
+        "label": "far",
+        "scores": {
+          "fit": 0.15,
+          "love_back": 0.08,
+          "reach": 0.85,
+          "echo": 0.272
+        },
+        "evidence": null,
+        "idea": null
+      }
+    ],
+    "left_out": [
+      {
+        "name": "Host Person",
+        "why": "host"
+      },
+      {
+        "name": "Guest Z",
+        "why": "past_guest"
+      }
+    ],
+    "qloo_calls": [
+      {
+        "path": "/search",
+        "params": {
+          "query": "example show",
+          "types": "urn:entity:podcast",
+          "take": "5"
+        },
+        "status": 200,
+        "duration_ms": 180,
+        "cached": false,
+        "at": "2026-10-23T10:00:00+00:00"
+      },
+      {
+        "path": "/v2/insights",
+        "params": {
+          "filter.type": "urn:entity:artist",
+          "signal.interests.entities": "00000000-0000-0000-0000-000000000001",
+          "take": "10"
+        },
+        "status": 200,
+        "duration_ms": 640,
+        "cached": false,
+        "at": "2026-10-23T10:00:01+00:00"
+      },
+      {
+        "path": "/v2/insights",
+        "params": {
+          "filter.type": "urn:entity:person",
+          "signal.interests.entities": "00000000-0000-0000-0000-000000000001",
+          "take": "50"
+        },
+        "status": 200,
+        "duration_ms": 520,
+        "cached": false,
+        "at": "2026-10-23T10:00:01+00:00"
+      },
+      {
+        "path": "/v2/insights",
+        "params": {
+          "filter.type": "urn:entity:person",
+          "signal.interests.entities": "00000000-0000-0000-0000-000000000001",
+          "filter.popularity.max": "0.7",
+          "take": "50"
+        },
+        "status": 200,
+        "duration_ms": 0,
+        "cached": true,
+        "at": "2026-10-23T10:00:02+00:00"
+      },
+      {
+        "path": "/v2/insights",
+        "params": {
+          "filter.type": "urn:entity:podcast",
+          "signal.interests.entities": "00000000-0000-0000-0000-0000000000a1",
+          "take": "50"
+        },
+        "status": 200,
+        "duration_ms": 410,
+        "cached": false,
+        "at": "2026-10-23T10:00:03+00:00"
+      },
+      {
+        "path": "/v2/insights",
+        "params": {
+          "filter.type": "urn:demographics",
+          "signal.interests.entities": "00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-0000000000a1"
+        },
+        "status": 200,
+        "duration_ms": 380,
+        "cached": false,
+        "at": "2026-10-23T10:00:05+00:00"
+      }
+    ],
+    "error": null
+  },
+  "guest_details": {
+    "audience_map": [
+      {
+        "category": "music",
+        "items": [
+          {
+            "name": "Example Band",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Rapper",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Choir",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "tv",
+        "items": [
+          {
+            "name": "Example Series",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Cooking Show",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Drama",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "film",
+        "items": [
+          {
+            "name": "Example Western",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Comedy",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Musical",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "books",
+        "items": [
+          {
+            "name": "Example Poetry",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Novel",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Travel Guide",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "brands",
+        "items": [
+          {
+            "name": "Example Tea",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Bicycle",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Coffee",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "podcasts",
+        "items": [
+          {
+            "name": "Example Podcast E",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Podcast F",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Podcast B",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      }
+    ],
+    "adds": [
+      {
+        "category": "music",
+        "items": [
+          {
+            "name": "Example Rapper",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Choir",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "tv",
+        "items": [
+          {
+            "name": "Example Cooking Show",
+            "image_url": null,
+            "affinity": 0.93
+          },
+          {
+            "name": "Example Drama",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "film",
+        "items": [
+          {
+            "name": "Example Western",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Musical",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "books",
+        "items": [
+          {
+            "name": "Example Poetry",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Travel Guide",
+            "image_url": null,
+            "affinity": 0.89
+          }
+        ]
+      },
+      {
+        "category": "brands",
+        "items": [
+          {
+            "name": "Example Tea",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Bicycle",
+            "image_url": null,
+            "affinity": 0.93
+          }
+        ]
+      },
+      {
+        "category": "podcasts",
+        "items": [
+          {
+            "name": "Example Podcast E",
+            "image_url": null,
+            "affinity": 0.97
+          },
+          {
+            "name": "Example Podcast F",
+            "image_url": null,
+            "affinity": 0.93
+          }
+        ]
+      }
+    ],
+    "episode": {
+      "title": "Example episode title",
+      "summary": "A paragraph on what the episode is about and why both audiences would care. Invented for the mock.",
+      "segments": [
+        {
+          "title": "Opening",
+          "points": [
+            "How the guest got started",
+            "A story both audiences know"
+          ]
+        },
+        {
+          "title": "The shared taste",
+          "points": [
+            "Why both audiences over-index on road trips",
+            "A favourite place"
+          ]
+        },
+        {
+          "title": "What's next",
+          "points": [
+            "The guest's new project",
+            "A quick-fire round"
+          ]
+        }
+      ],
+      "questions": [
+        "What surprised you most this year?",
+        "Which trip changed how you cook?",
+        "What would you tell our listeners to try first?"
+      ]
+    }
+  },
+  "chat": {
+    "reply": "Mock mode: running again for listeners aged 25 to 29.",
+    "action": "rerun",
+    "filters": {
+      "fame": "any",
+      "age": "25_to_29",
+      "country": null,
+      "episode_about": null
+    }
+  },
+  "draft": {
+    "subject": "An invitation to {show}",
+    "body": "Hi {name},\n\nI host {show}. Our listeners and your fans have a lot in common, and I'd love to have you on.\n\nInvented for the mock.\n\n{host}"
+  },
+  "briefing": "# {name}\n\n## Who they are\n\nInvented for the mock.\n\n## What their audience over-indexes on\n\n- Example Band\n- Example Western\n\n## Where your audiences meet\n\n- Road trips\n\n## Questions to ask\n\n1. What surprised you most this year?\n"
+}
