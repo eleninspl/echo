@@ -175,7 +175,7 @@ A Vercel function keeps nothing between requests and several instances can run a
 
 ### Deploying the engine
 
-Set up 23 Oct. The Vercel project is `echo-qloo` (team "eleni's projects", Pro, spend limit set), Root Directory `engine`, production URL `https://echo-qloo.vercel.app`. `engine/pyproject.toml` points Vercel at `echo_engine.app:app` (`[tool.vercel]`), `engine/.python-version` pins Python 3.12, and `engine/vercel.json` runs the function in `iad1` for up to 300 s, without `tests/` and `scripts/`. Dependencies install from `pyproject.toml` and `uv.lock`. Every push to `main` deploys to production.
+Set up 23 Oct. The Vercel project is `echo-qloo` (team "eleni's projects", Pro; a $5 on-demand budget with alerts at 50, 75 and 100%, and no pause, so the demo never goes dark during judging), Root Directory `engine`, production URL `https://echo-qloo.vercel.app`. `engine/pyproject.toml` points Vercel at `echo_engine.app:app` (`[tool.vercel]`), `engine/.python-version` pins Python 3.12, and `engine/vercel.json` runs the function in `iad1` for up to 300 s, without `tests/` and `scripts/`. Dependencies install from `pyproject.toml` and `uv.lock`. Every push to `main` deploys to production.
 
 Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, so Leonidas can be invited to them without a Vercel seat. Their variables are set on Vercel by hand.
 
