@@ -4,7 +4,7 @@ What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo
 
 ## v1
 
-Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Next.js). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
+Two pieces: the **engine** (Python, FastAPI, on Vercel) and the **web app** (Next.js). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
 
 1. **Find the show.** Qloo search, up to 5 podcasts with image and description; the host picks one. A show Qloo doesn't have, or one with too little data, gets "Echo can't analyse this show yet" and the featured shows.
 2. **Audience map** across music, film, TV, books, brands and podcasts.
@@ -47,7 +47,7 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | Q6 | Evidence for the top 10, with the tag allow-list and name screen | 0.5 | must |
 | Q7 | Filters: fame, age, country, episode about | 0.5 | must |
 | Q8 | Guest details: the guest's audience map and what it adds | 0.25 | must |
-| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start, Railway | 0.75 | must |
+| Q9 | Routes, background runs and polling, daily cap, featured shows warmed, Vercel with Postgres and Redis ([Hosting](#hosting)) | 1 | must |
 | Q10 | Drop past guests: match L7's names to Qloo people | 0.25 | should |
 
 | # | L: LLM side | Days | |
@@ -60,14 +60,14 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | L6 | Briefing | 0.25 | must |
 | L7 | Past guests: names from the show's recent episode titles (Apple lookup by the iTunes ID Qloo gives) | 0.25 | should |
 
-Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Model `claude-sonnet-5-5`.
+Q is about 5 days, L about 3, so L also starts the web app on day 1. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Model `claude-sonnet-5-5`.
 
 ## Dates
 
 | Date | Q | L |
 | --- | --- | --- |
 | 23 Oct | Q1 to Q4 | L1, L2, web app on the example |
-| 24 Oct | Q5 to Q7 | L3, L4 |
+| 24 Oct | Q5 to Q7, first Vercel deploy to check background runs | L3, L4 |
 | 25 Oct | Q8, Q9, deploy | L5, L6, web app on the live engine |
 | 26 Oct | Q10, featured shows, the investor judge's show end to end | L7, fixes |
 | 27 Oct | **Freeze** | |
@@ -78,6 +78,22 @@ Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every pr
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
 2. **Who takes Q and who takes L.** The author of the Python Qloo client gets the quickest start on Q.
 3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot; its title goes in an env var, never the repo.
+
+## Hosting
+
+Both pieces run on Vercel (Pro plan), as two projects from this repo: `engine/` and `web/`. A Vercel function keeps nothing between requests and several instances can run at once, so what one Railway process and its volume would have held goes to two Marketplace stores, both in `iad1` next to the engine:
+
+| What | Where |
+| --- | --- |
+| Analyses, featured analyses | Neon Postgres, as JSON |
+| Qloo cache | Neon Postgres, gzipped, with an expiry. Check its size on the first deploy. |
+| Qloo throttle (under 10 a second across all instances), daily cap | Upstash Redis |
+
+- **Background runs.** `POST /analyses` answers 202 and the run goes on in the same function, inside the 300 s default. Check on the first deploy that Vercel keeps the instance alive until the run ends; if it doesn't, the run moves to Vercel Queues. The run writes the analysis to Postgres after every step, because a poll can land on another instance.
+- **Featured shows.** There's no startup on Vercel, so a script warms them once after each scoring change and writes them to Postgres.
+- **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, the engine keeps the disk cache in `.cache/` and analyses in memory.
+- **Env vars** on the engine project: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, plus the ones in `.env.example`. `ECHO_CACHE_DIR` is for local runs only.
+- Set a spend limit on the Vercel team before the first deploy.
 
 ## API
 
@@ -144,4 +160,4 @@ The analysis, when done:
 | 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 
-Analyses are saved as JSON on the Railway volume next to the Qloo cache, so they survive restarts. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.
+Analyses are saved as JSON in Postgres next to the Qloo cache ([Hosting](#hosting)), so they survive restarts and every instance sees them. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.

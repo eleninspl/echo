@@ -18,7 +18,7 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 ## Stack
 
-- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Railway. It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`). Which file each half owns is in `docs/plan.md`.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`). Which file each half owns is in `docs/plan.md`.
 - Web app: Next.js 16, TypeScript, Tailwind, in `web/`, hosted on Vercel. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
 - No bot in v1 (open in `docs/plan.md`).
 
@@ -62,7 +62,8 @@ Update this section whenever something changes.
 - **22 Oct:** the top 3 present live on air on 5 Nov. The investor judge's shows are in Qloo and scorable; their hosts come back as candidates.
 - **22 Oct (call):** v1 is the engine and the web app only. The proposal was cut to three short docs: no path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side and an LLM side, one person each. The chat in the web app is the agent.
 - **23 Oct:** PR #3 (`v1/setup`) holds everything: the three docs, the engine with a FastAPI skeleton of the 9 routes and a mock mode, and the Next.js app in `web/`. It contains #1 and #2. `ANTHROPIC_API_KEY` isn't set in `.env` yet.
-- **Next:** merge #3, agree the three open points in `docs/plan.md`, then build Q and L in parallel.
+- **23 Oct:** #3 merged. Eleni: everything as in `docs/plan.md`, except the engine is hosted on Vercel instead of Railway.
+- **Next:** agree the three open points in `docs/plan.md`, build Q and L in parallel, and add Neon and Upstash to the Vercel project from the Marketplace.
 
 ## Keeping this file current
 
