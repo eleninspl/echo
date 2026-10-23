@@ -3,7 +3,7 @@ from datetime import date
 
 from echo_engine import scoring
 from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure, normalize
-from echo_engine.pipeline import LoveBack, new_podcasts, reach_width, shared_tastes
+from echo_engine.pipeline import LoveBack, new_podcasts, past_guest_ids, reach_width, shared_tastes
 from echo_engine.screen import clean_entity, clean_name, clean_tag_name
 
 
@@ -108,3 +108,15 @@ def test_shared_tastes_put_tags_most_guests_share_last():
     tags = [{"tag_id": t, "name": t.title()} for t in ("common", "rare", "elsewhere", "later")]
     show_ranks = {"common": 0, "rare": 5, "later": 9}
     assert shared_tastes(show_ranks, tags, {"common"}) == ["Rare", "Later", "Common"]
+
+
+def test_past_guests_skip_trailers_and_cross_promotions():
+    pool = [{"entity_id": f"p{i}", "name": name} for i, name in enumerate(["Ann Example", "Bo Sample", "Cy Person"])]
+    titles = [
+        "INTRODUCING: Another Show with Ann Example",
+        "Trailer - Bo Sample's new series",
+        "Preview of Season 2, with Cy Person",
+        "Cy Person Returns",
+        "Introductions: a talk about Bo Sample",
+    ]
+    assert past_guest_ids(titles, pool) == {"p1", "p2"}

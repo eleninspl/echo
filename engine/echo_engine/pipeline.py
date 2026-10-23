@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+import re
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -58,6 +59,8 @@ AGE_DELTA = 0.2
 SHARED_SHOWN = 5
 NEW_PODCASTS_SHOWN = 3
 EPISODE_TITLES = 200
+# Trailers and cross-promotions name people who weren't guests ("INTRODUCING: Another Show with Ann Example").
+PROMO_TITLE = re.compile(r"^\W*(introducing|trailer|preview|sneak peek|coming soon)\b", re.IGNORECASE)
 AGE_ORDER = list(get_args(AgeBucket))
 LINKS = {
     "imdb": ("imdb_id", "https://www.imdb.com/name/{}/"),
@@ -337,7 +340,7 @@ async def author_of(itunes_id: str | None) -> str | None:
 
 
 def past_guest_ids(episode_titles: list[str], pool: list[dict]) -> set[str]:
-    titles = [f" {normalize(title)} " for title in episode_titles]
+    titles = [f" {normalize(title)} " for title in episode_titles if not PROMO_TITLE.match(title)]
     found = set()
     for person in pool:
         name = normalize(person["name"])
