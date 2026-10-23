@@ -6,7 +6,22 @@ Ask an AI agent who to invite on a podcast, or what to talk about, and it sugges
 
 Stop echoing in the same room. Find the guest, and the story, that carries your voice somewhere new.
 
-> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026). Work in progress.
+> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026). Work in progress: v1 has no OpenClaw bot yet, and the chat in the web app is the agent.
+
+## Try it
+
+**[echo-web-mu-taupe.vercel.app](https://echo-web-mu-taupe.vercel.app)**: type a podcast's name, pick it, and Echo maps its audience and ranks 20 guests. The writing steps (episode ideas, the full episode, chat, invitation drafts and the briefing) aren't built yet and say so.
+
+## How it works
+
+```
+browser ──> web app (Next.js, Vercel) ──> engine (FastAPI, Vercel) ──> Qloo Insights API
+                                             │   ├─ Neon Postgres: analyses and a private cache of Qloo answers
+                                             │   └─ Upstash Redis: the shared Qloo throttle and daily cap
+                                             └─> Apple's podcast lookup: hosts and past guests
+```
+
+An analysis runs in the background: `POST /analyses` answers at once, and the web app polls until each step is saved. The engine's API is in [docs/plan.md](docs/plan.md#api), and its interactive reference at [/docs](https://echo-qloo.vercel.app/docs).
 
 ## How Echo scores a guest
 
@@ -25,13 +40,13 @@ Python 3.12+ with [uv](https://docs.astral.sh/uv/), and Node 20+.
 ```bash
 scripts/set-env.sh QLOO_API_KEY        # type the key, it stays hidden
 
-cd engine && uv sync && uv run pytest
+cd engine && uv sync && uv run pytest && uv run ruff check .
 ECHO_MOCK=1 uv run uvicorn echo_engine.app:app --reload   # example data, no Qloo calls
 
-cd ../web && cp .env.example .env.local && npm install && npm run dev
+cd ../web && cp .env.example .env.local && npm install && npm run dev   # http://localhost:3000
 ```
 
-Drop `ECHO_MOCK=1` to run against Qloo and the LLM.
+Drop `ECHO_MOCK=1` to run against Qloo. Locally the engine keeps everything in `.cache/`; it uses Postgres and Redis only when their variables are set. Deploying is in [docs/plan.md](docs/plan.md#deploying-the-engine).
 
 ## Privacy
 

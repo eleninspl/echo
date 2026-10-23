@@ -68,4 +68,4 @@ Judges, by role: an angel investor who hosts a podcast, Qloo's CTO, an OpenAI bo
 - **Small shows are missing from Qloo.** v1 says so and offers the featured shows. The demo uses shows we've checked.
 - **Audience, not topic.** Qloo follows who listens, not what a show is about: a music interview show can point to journalists its listeners follow. That is the point, but the app has to say it, or a host reads it as a wrong answer.
 - **Hosts come back as guests.** The investor judge shows up in the top 50 of their own shows, so host detection has to work on those shows.
-- **Quota.** 50,000 Qloo calls a month for build and judging (about 49,000 left on 22 Oct, resets around 20 Nov). An analysis costs about 58. Featured shows are precomputed and there's a daily cap.
+- **Quota.** 50,000 Qloo calls a month for build and judging (about 47,000 left on 23 Oct, resets around 20 Nov). A fresh analysis costs 44 to 67 calls and takes 5 to 10 s on Vercel. Featured shows are precomputed and there's a daily cap.

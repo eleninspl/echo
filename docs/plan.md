@@ -98,7 +98,7 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 | L6 | Briefing | 0.25 | must |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see qloo.md, "Pipeline runs"); Q11 to Q16 are about 2.25 more. L is about 3 days, plus the web app. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 4 under To agree).
+Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 under To agree). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 4 under To agree).
 
 ## Web app tasks
 
@@ -139,21 +139,21 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 
 ## Dates
 
-| Date | Q (Eleni) | L and the web app (not assigned) |
-| --- | --- | --- |
-| 23 Oct | Q1 to Q10 (done); this plan | L1, L2, web app on the example |
-| 24 Oct | Q11, Q12 | L3, L4 |
-| 25 Oct | Q13, Q14: first deploy | L5, L6, web app on the live engine |
-| 26 Oct | Q15, Q16, featured shows | Fixes |
-| 27 Oct | **Freeze** | |
-| 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit | |
+| Date | What |
+| --- | --- |
+| 23 Oct | Done: Q1 to Q17, the web app (W1 to W11, W13), both deployed |
+| 24 to 26 Oct | L, once someone has it and the provider is chosen; featured shows; W12, the production check; fixes |
+| 27 Oct | **Freeze** |
+| 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit |
 
 ## To agree
 
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
-2. **Who takes L and the web app**, by 24 Oct. Q is Eleni's. If no one takes L, Eleni starts it after Q14, and v1 can't have all of L and the web app by the freeze: decide what to cut first.
-3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots.
+2. **Who builds L**, by 24 Oct. Q and the web app are done. L is about 3 days, so it has to start by 24 Oct to make the freeze. If it can't all fit, a proposed order by what the demo shows most: L2 ideas, L5 drafts, L3 the full episode, L6 briefing, L4 chat (the costliest), then L1 (Apple's author line already catches most hosts).
+3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots. A shortlist of 13 checked shows is with Eleni; music is the weakest genre.
 4. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
+5. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
+6. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
 
 ## Hosting
 
