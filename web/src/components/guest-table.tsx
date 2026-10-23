@@ -1,5 +1,11 @@
-import type { Guest, Label } from "@/lib/echo";
+"use client";
+
+import { useState } from "react";
+
+import type { Guest, Label, MapRow } from "@/lib/echo";
 import { AGES, LABELS, labelMeans, score } from "@/lib/format";
+
+import { GuestDetails } from "./guest-details";
 
 const TAG: Record<Label, string> = {
   sweet_spot: "bg-vermilion text-tag-ink border-vermilion",
@@ -11,7 +17,7 @@ const TAG: Record<Label, string> = {
 
 const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
 
-export function GuestTable({ guests }: { guests: Guest[] }) {
+export function GuestTable({ id, guests, showMap }: { id: string; guests: Guest[]; showMap: MapRow[] }) {
   return (
     <section aria-labelledby="guests">
       <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
@@ -25,7 +31,7 @@ export function GuestTable({ guests }: { guests: Guest[] }) {
         </p>
         <ol className="mt-8 border-t-2 border-ink">
           {guests.map((guest, index) => (
-            <GuestRow key={guest.ref} guest={guest} rank={index + 1} />
+            <GuestRow key={guest.ref} id={id} guest={guest} rank={index + 1} showMap={showMap} />
           ))}
         </ol>
       </div>
@@ -33,8 +39,14 @@ export function GuestTable({ guests }: { guests: Guest[] }) {
   );
 }
 
-function GuestRow({ guest, rank }: { guest: Guest; rank: number }) {
+type RowProps = { id: string; guest: Guest; rank: number; showMap: MapRow[] };
+
+function GuestRow({ id, guest, rank, showMap }: RowProps) {
   const { scores, idea, evidence } = guest;
+  // Details load on the first open and stay mounted after, so closing and reopening doesn't fetch again.
+  const [open, setOpen] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const detailsId = `details-${guest.ref}`;
   return (
     <li
       id={`guest-${guest.ref}`}
@@ -56,6 +68,22 @@ function GuestRow({ guest, rank }: { guest: Guest; rank: number }) {
           <span className="text-sm text-ink-soft">{labelMeans(guest.label, scores.reach === null)}</span>
         </p>
         <Links links={guest.links} />
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={detailsId}
+          onClick={() => {
+            setOpen(!open);
+            setOpened(true);
+          }}
+          className="mt-2 inline-flex items-center gap-2 border-2 border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-stock"
+        >
+          {open ? "Hide the details" : "The full episode and their fans"}
+          <span className="sr-only">, {guest.name}</span>
+          <svg aria-hidden viewBox="0 0 12 12" className={`size-3 transition-transform ${open ? "rotate-180" : ""}`}>
+            <path d="M2 4.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+        </button>
       </div>
       <dl className="col-start-2 flex flex-col gap-3 md:col-span-3 md:col-start-auto">
         <Meter name="Fit" value={scores.fit} />
@@ -73,6 +101,9 @@ function GuestRow({ guest, rank }: { guest: Guest; rank: number }) {
           <p className="text-sm text-ink-soft">Echo writes the episode idea and evidence for the top 10.</p>
         )}
         {evidence && <Evidence evidence={evidence} />}
+      </div>
+      <div id={detailsId} hidden={!open} className="col-span-2 border-t border-rule pt-6 md:col-span-11 md:col-start-2">
+        {opened && <GuestDetails id={id} guestRef={guest.ref} showMap={showMap} />}
       </div>
     </li>
   );
