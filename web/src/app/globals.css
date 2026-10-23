@@ -1,26 +1,157 @@
 @import "tailwindcss";
 
+/*
+ * Two spot inks on poster stock. The field is the printed blue band at the top of every page;
+ * vermilion marks sweet spots only. Dark keeps the same roles on night stock.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --stock: #f4f3ef;
+  --ink: #0b0e17;
+  --ink-soft: #4b505e;
+  --rule: rgb(11 14 23 / 0.14);
+  --field: #3d7bff;
+  --on-field: #05070d;
+  --on-field-soft: #08132f;
+  --field-rule: rgb(5 7 13 / 0.2);
+  --link: #1f4fd1;
+  --vermilion: #f2482b;
+  --tag-safe: #3d7bff;
+  --tag-ink: #05070d;
+  --well: #ffffff;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --stock: #090c14;
+    --ink: #ecebe6;
+    --ink-soft: #a3a7b3;
+    --rule: rgb(236 235 230 / 0.14);
+    --field: #1c3fa8;
+    --on-field: #f4f3ef;
+    --on-field-soft: #c9d3f2;
+    --field-rule: rgb(244 243 239 / 0.2);
+    --link: #8db0ff;
+    --vermilion: #ff6a4d;
+    --tag-safe: #5a8fff;
+    --well: #11151f;
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-stock: var(--stock);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-rule: var(--rule);
+  --color-field: var(--field);
+  --color-on-field: var(--on-field);
+  --color-on-field-soft: var(--on-field-soft);
+  --color-field-rule: var(--field-rule);
+  --color-link: var(--link);
+  --color-vermilion: var(--vermilion);
+  --color-tag-safe: var(--tag-safe);
+  --color-tag-ink: var(--tag-ink);
+  --color-well: var(--well);
+  --font-sans: var(--font-archivo);
+  --font-display: var(--font-big-shoulders);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--stock);
+  color: var(--ink);
+  font-family: var(--font-archivo), system-ui, sans-serif;
+}
+
+/* Vermilion is kept for sweet spots, so selection takes the field's blue. */
+::selection {
+  background: var(--field);
+  color: var(--on-field);
+}
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+}
+
+.bg-field :focus-visible {
+  outline-color: var(--on-field);
+}
+
+input {
+  caret-color: var(--link);
+}
+
+html {
+  scrollbar-color: var(--rule) var(--stock);
+}
+
+a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+/*
+ * The 12-column grid printed as hairlines in the gutters. Goes on a page container with the
+ * standard side padding (px-4 sm:px-8) and gap-x-8 columns, so the lines fall between columns.
+ */
+.grid-lines {
+  position: relative;
+  isolation: isolate;
+  --grid-line: var(--rule);
+}
+
+.bg-field .grid-lines {
+  --grid-line: var(--field-rule);
+}
+
+@media (min-width: 768px) {
+  .grid-lines::before {
+    content: "";
+    position: absolute;
+    inset: 0 2rem;
+    z-index: -1;
+    pointer-events: none;
+    background-image: linear-gradient(to right, var(--grid-line) 1px, transparent 1px);
+    background-size: calc((100% + 2rem) / 12) 100%;
+    background-position: -1rem 0;
+  }
+}
+
+/* The bill prints tier by tier when a run finishes. */
+@keyframes print {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.print {
+  animation: print 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--order, 0) * 45ms);
+}
+
+/* The logo's ring, sounding beside the step that's running. */
+@keyframes ping {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.ping {
+  animation: ping 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .print,
+  .ping {
+    animation: none;
+  }
 }

@@ -90,6 +90,7 @@ export type DraftRequest = {
 };
 
 export type Health = { ok: boolean; mock: boolean; qloo_calls_today: number; qloo_calls_left: number | null };
+export type Featured = { show: Show; analysis_id: string };
 
 export class EchoError extends Error {
   constructor(
@@ -103,13 +104,23 @@ export class EchoError extends Error {
 
 const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL ?? "http://localhost:8000";
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${ENGINE_URL}${path}`, {
-    method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-  });
+// Code for a request that never got an answer: the engine is down or the network dropped.
+export const OFFLINE = "offline";
+
+async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${ENGINE_URL}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new EchoError(0, OFFLINE, "Check your connection, then try again.");
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const error = data as EchoErrorBody | null;
@@ -120,11 +131,13 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 
 export const echo = {
   health: () => call<Health>("/health"),
-  shows: (q: string) => call<{ shows: Show[] }>(`/shows?q=${encodeURIComponent(q)}`),
-  featured: () => call<{ featured: { show: Show; analysis_id: string }[] }>("/featured"),
+  shows: (q: string, signal?: AbortSignal) =>
+    call<{ shows: Show[] }>(`/shows?q=${encodeURIComponent(q)}`, undefined, signal),
+  featured: () => call<{ featured: Featured[] }>("/featured"),
   startAnalysis: (show_id: string, filters?: Partial<Filters>) =>
     call<{ id: string; status: Status }>("/analyses", { show_id, filters }),
-  analysis: (id: string) => call<Analysis>(`/analyses/${id}`),
+  analysis: (id: string, signal?: AbortSignal) =>
+    call<Analysis>(`/analyses/${encodeURIComponent(id)}`, undefined, signal),
   guest: (id: string, ref: string) => call<GuestDetails>(`/analyses/${id}/guests/${ref}`),
   chat: (analysis_id: string, messages: Message[]) => call<ChatReply>("/chat", { analysis_id, messages }),
   drafts: (request: DraftRequest) => call<{ drafts: Draft[] }>("/drafts", request),

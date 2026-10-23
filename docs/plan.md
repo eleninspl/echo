@@ -83,6 +83,36 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 
 Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see qloo.md, "Pipeline runs"); Q11 to Q16 are about 2.25 more. L is about 3 days, plus the web app. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 4 under To agree).
 
+## Web app tasks
+
+**W**, in `web/`: the whole v1 flow above, built against mock mode first (`ECHO_MOCK=1`), then on the live engine. The app talks to the engine only, from the browser, through `web/src/lib/echo.ts`. Two routes: `/` (find the show, featured shows) and `/analyses/[id]` (everything else, so a featured show or a rerun is just another ID).
+
+| # | W: web app | Days | |
+| --- | --- | --- | --- |
+| W1 | Design direction, tokens for light and dark, type, logo, layout shell | 0.5 | done |
+| W2 | Data layer: the typed client, polling once a second while running, a host-facing message for every error code below | 0.25 | done |
+| W3 | Find the show: search on submit (2 to 100 characters), pick from up to 5, "Echo can't analyse this show yet" with the featured shows; featured shows open instantly | 0.5 | done |
+| W4 | Analysis page: the steps while running without layout shift, the audience map, the failed states | 0.5 | done |
+| W5 | Guests: the ranked list with label, the three scores, reason, episode title, pitch and evidence; "No guest clears all three yet" when there's no sweet spot; who was left out and why | 0.5 | done |
+| W6 | The fit, love back and reach chart (qloo.md, Scoring): reach across, fit up, love back as dot size, label as colour, the sweet-spot zone; a dot and its row select each other | 0.5 | must |
+| W7 | Guest details: the full episode idea, the guest's audience map next to the show's, and what the guest adds | 0.5 | must |
+| W8 | Chat: the last 20 messages; `rerun` polls the new analysis and keeps the old one on screen until it's done; `rewrite` swaps one idea in place; the active filters shown, and a note when `episode_about.used` is null | 0.75 | must |
+| W9 | Invite: pick 1 to 5 guests, optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | must |
+| W10 | Briefing for one guest: rendered, with copy and print | 0.25 | must |
+| W11 | What Qloo saw: every Qloo call of the analysis, with path, params, status, time and whether it was cached | 0.25 | must |
+| W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | must |
+| W13 | Walkthrough as a judge: phone width, keyboard, screen reader, slow engine, every error below | 0.5 | should |
+
+W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
+
+**Errors.** The engine's `message` is already written for the host, so the app shows it as it comes and adds one next step:
+
+- `show_unusable`, `daily_cap`: the featured shows, which still open.
+- `filters_too_narrow`, `unknown_country`: back to the analysis before the change.
+- `qloo_error`, `llm_error`, `engine_error`, the engine not answering: try again.
+- `not_implemented`: only the part that called it says "not built yet"; the rest keeps working.
+- `not_found`: back to the start. `bad_request`: the message next to the field.
+
 ## Dates
 
 | Date | Q (Eleni) | L and the web app (not assigned) |
