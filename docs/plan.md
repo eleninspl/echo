@@ -4,7 +4,7 @@ What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo
 
 ## v1
 
-Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Next.js). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
+Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js). Where each is hosted isn't decided (point 4 under To agree). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
 
 1. **Find the show.** Qloo search, up to 5 podcasts with image and description; the host picks one. A show Qloo doesn't have, or one with too little data, gets "Echo can't analyse this show yet" and the featured shows.
 2. **Audience map** across music, film, TV, books, brands and podcasts.
@@ -20,7 +20,7 @@ Two pieces: the **engine** (Python, FastAPI, on Railway) and the **web app** (Ne
 
 3 or 4 featured shows, precomputed, open instantly from the landing page.
 
-**Not in v1:** shows Qloo doesn't have, Apple, Spotify or RSS links, the Telegram/OpenClaw bot, logins, sessions, SSE, sending or approving, checking a named guest, grow toward interests, cities or another show, topic tags, the plain-AI comparison (make it offline for the pitch if there's time), an after-episode summary.
+**Not in v1:** shows Qloo doesn't have, pasting Apple, Spotify or RSS links, the Telegram/OpenClaw bot, logins, sessions, SSE, sending or approving, checking a named guest, grow toward interests, cities or another show, topic tags, the plain-AI comparison (make it offline for the pitch if there's time), an after-episode summary.
 
 ## Engine tasks
 
@@ -39,16 +39,16 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 
 | # | Q: Qloo side | Days | |
 | --- | --- | --- | --- |
-| Q1 | Client ready: throttle, cache, quota count, a call log per analysis, `params.py` allows the signals below | 0.25 | must |
-| Q2 | `GET /shows` | 0.25 | must |
-| Q3 | Audience map | 0.5 | must |
-| Q4 | Candidates, usability check and clean-up (calls L1 for hosts) | 0.5 | must |
-| Q5 | Fit, love back, reach, Echo score, labels, order: pure functions, tested on invented data | 1 | must |
-| Q6 | Evidence for the top 10, with the tag allow-list and name screen | 0.5 | must |
-| Q7 | Filters: fame, age, country, episode about | 0.5 | must |
-| Q8 | Guest details: the guest's audience map and what it adds | 0.25 | must |
-| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start, Railway | 0.75 | must |
-| Q10 | Drop past guests: match L7's names to Qloo people | 0.25 | should |
+| Q1 | Client ready: throttle, cache, quota count, a call log per analysis, `params.py` allows the signals below | 0.25 | done |
+| Q2 | `GET /shows` | 0.25 | done |
+| Q3 | Audience map | 0.5 | done |
+| Q4 | Candidates, usability check and clean-up: hosts from Apple's author line and the title, plus L1 when built | 0.5 | done |
+| Q5 | Fit, love back, reach, Echo score, labels, order: pure functions, tested on invented data | 1 | done |
+| Q6 | Evidence for the top 10, with the tag allow-list and name screen | 0.5 | done |
+| Q7 | Filters: fame, age, country, episode about | 0.5 | done |
+| Q8 | Guest details: the guest's audience map and what it adds | 0.25 | done |
+| Q9 | Routes, background runs and polling, daily cap, featured shows warmed at start (`ECHO_FEATURED`), deploy | 0.75 | done except the deploy (host not decided) |
+| Q10 | Drop past guests: candidates whose full name is in one of the last 200 episode titles on Apple | 0.25 | done |
 
 | # | L: LLM side | Days | |
 | --- | --- | --- | --- |
@@ -58,9 +58,9 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | L4 | Chat: three tools (run again with filters, rewrite one idea, just answer) | 1 | must |
 | L5 | Drafts for 1 to 5 guests, and revise | 0.5 | must |
 | L6 | Briefing | 0.25 | must |
-| L7 | Past guests: names from the show's recent episode titles (Apple lookup by the iTunes ID Qloo gives) | 0.25 | should |
+| L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Model `claude-sonnet-5-5`.
+Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Q status on 23 Oct: everything but the deploy is built and checked on 7 real shows (see qloo.md, "Pipeline runs"). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 5 under To agree).
 
 ## Dates
 
@@ -69,7 +69,7 @@ Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every pr
 | 23 Oct | Q1 to Q4 | L1, L2, web app on the example |
 | 24 Oct | Q5 to Q7 | L3, L4 |
 | 25 Oct | Q8, Q9, deploy | L5, L6, web app on the live engine |
-| 26 Oct | Q10, featured shows, the investor judge's show end to end | L7, fixes |
+| 26 Oct | Featured shows, the investor judge's show end to end | Fixes |
 | 27 Oct | **Freeze** | |
 | 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit | |
 
@@ -78,6 +78,8 @@ Q is about 4.75 days, L about 3, so L also starts the web app on day 1. Every pr
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
 2. **Who takes Q and who takes L.** The author of the Python Qloo client gets the quickest start on Q.
 3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot; its title goes in an env var, never the repo.
+4. **Engine hosting.** Not decided. Railway (or Fly.io) runs the engine as it is: an always-on process with a persistent disk for the Qloo cache and saved analyses, about $5 a month, no sleeping during judging. Vercel puts everything on one platform, but its functions keep no disk or memory between requests, so the cache and analyses would move to Redis or Blob and runs would change from background-and-poll: about half a day to a day of work.
+5. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
 
 ## API
 
@@ -90,7 +92,7 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }` |
 | POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
-| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } }` |
+| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }` |
 | POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
 | POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note? }`, or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
 | POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }` |
@@ -114,6 +116,7 @@ The analysis, when done:
   "guests": [
     {
       "ref": "g1",
+      "id": "00000000-0000-0000-0000-0000000000a1",
       "name": "Guest A",
       "description": "Stand-up comedian and actor",
       "image_url": "https://example.com/a.jpg",
@@ -134,14 +137,15 @@ The analysis, when done:
 - `scores` are percentiles from 0 to 1 ([qloo.md](qloo.md#scoring)). `fit` is fame-adjusted.
 - `episode_about.used` is null when Qloo couldn't use the entity; the web app says so.
 - `left_out.why` is `host` or `past_guest`. People who have died are dropped silently.
-- Failed: `"status": "failed"` with `"error": { "error": "show_unusable", "message": "Echo can't analyse this show yet." }`, or `qloo_error`.
+- `id` on a guest is the Qloo entity ID. `idea` and `episode` stay null until the LLM side writes them.
+- Failed: `"status": "failed"` with `"error": { "error": "<code>", "message": "<text for the host>" }`. Codes: `show_unusable` (too few people, or love back can't be scored), `unknown_country`, `filters_too_narrow` (no guests match), `qloo_error`, `engine_error`.
 
 | Status | `error` |
 | --- | --- |
-| 400 | `bad_request`, `unknown_country` |
+| 400 | `bad_request` |
 | 404 | `not_found` |
 | 429 | `daily_cap`: the daily Qloo-call cap (`ECHO_DAILY_QLOO_CALLS`) is reached. Featured and earlier analyses still open. |
 | 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 
-Analyses are saved as JSON on the Railway volume next to the Qloo cache, so they survive restarts. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.
+Analyses are saved as JSON next to the Qloo cache in `.cache/`, so they survive restarts if the host keeps that disk. Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.

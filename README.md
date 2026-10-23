@@ -24,7 +24,6 @@ Python 3.12+ with [uv](https://docs.astral.sh/uv/), and Node 20+.
 
 ```bash
 scripts/set-env.sh QLOO_API_KEY        # type the key, it stays hidden
-scripts/set-env.sh ANTHROPIC_API_KEY
 
 cd engine && uv sync && uv run pytest
 ECHO_MOCK=1 uv run uvicorn echo_engine.app:app --reload   # example data, no Qloo calls
