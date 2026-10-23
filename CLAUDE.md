@@ -26,7 +26,7 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 Set keys with `scripts/set-env.sh KEY`, or `pbpaste | scripts/set-env.sh KEY`. Never print, log or commit values from `.env`.
 
-Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`. Run it with `uv run uvicorn echo_engine.app:app --reload` (port 8000), or with `ECHO_MOCK=1` in front to serve the invented example data instead of Qloo and the LLM.
+Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`. The Postgres store tests run only with `TEST_DATABASE_URL` set to a throwaway UTF8 database (they drop its tables). Run it with `uv run uvicorn echo_engine.app:app --reload` (port 8000), or with `ECHO_MOCK=1` in front to serve the invented example data instead of Qloo and the LLM.
 
 Web: `cd web && npm install && npm run dev` (port 3000). Copy `web/.env.example` to `web/.env.local`. Check with `npm run lint` and `npm run build`.
 
@@ -66,7 +66,8 @@ Update this section whenever something changes.
 - **23 Oct:** Eleni merged PR #4, hosting the engine on Vercel with Neon Postgres and Upstash Redis. Leonidas reopened the decision the same day: hosting and the LLM provider are both open points in `docs/plan.md`, with Eleni's Vercel plan kept there as one option.
 - **23 Oct:** Eleni reviewed and merged #5, and takes Q from here. Hosting stays Vercel. Q11 to Q16 in `docs/plan.md` cover the #5 review fixes and the move to Postgres and Redis (PR #6). Who takes L and the web app, and the LLM provider, are still open.
 - **23 Oct:** Q11 done: the #5 review fixes (PR #7). A real run on the investor judge's show works; its evidence repeats across guests (Q17, should).
-- **Next:** Q12. Agree who takes L and the web app by 24 Oct.
+- **23 Oct:** Q12 done (PR #8): `engine/echo_engine/store.py` keeps analyses and the Qloo and Apple caches in `.cache/` locally, or in Postgres when `DATABASE_URL` is set. Checked once with the real Qloo on a local Postgres.
+- **Next:** Q13 (Redis). Agree who takes L and the web app by 24 Oct.
 
 ## Keeping this file current
 

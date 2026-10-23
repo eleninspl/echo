@@ -18,6 +18,7 @@ class Settings:
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
         self.cache_dir = Path(os.environ.get("ECHO_CACHE_DIR", REPO_ROOT / ".cache"))
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
+        self.database_url = os.environ.get("DATABASE_URL", "").strip()
         self.mock = os.environ.get("ECHO_MOCK", "").strip() == "1"
         self.web_origins = [
             origin.strip()

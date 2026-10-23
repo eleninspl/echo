@@ -11,13 +11,13 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from .config import get_settings
 from .params import check_insights_params
+from .store import Cache, response_cache
 
 Params = dict[str, Any]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -97,40 +97,12 @@ def cache_key(path: str, params: dict[str, str]) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-class DiskCache:
-    """One JSON file per request under .cache/qloo/, expired after `ttl_seconds`."""
-
-    def __init__(self, directory: Path, ttl_seconds: float) -> None:
-        self.directory = directory
-        self.ttl_seconds = ttl_seconds
-        directory.mkdir(parents=True, exist_ok=True)
-
-    def _file(self, key: str) -> Path:
-        return self.directory / f"{key}.json"
-
-    def get(self, key: str) -> Any | None:
-        file = self._file(key)
-        try:
-            entry = json.loads(file.read_text())
-        except (FileNotFoundError, json.JSONDecodeError):
-            return None
-        if time.time() - entry["saved_at"] > self.ttl_seconds:
-            return None
-        return entry["response"]
-
-    def set(self, key: str, path: str, params: dict[str, str], response: Any) -> None:
-        entry = {"saved_at": time.time(), "path": path, "params": params, "response": response}
-        tmp = self._file(key).with_suffix(".tmp")
-        tmp.write_text(json.dumps(entry))
-        tmp.replace(self._file(key))
-
-
 class QlooClient:
     def __init__(
         self,
         api_key: str | None = None,
         base_url: str | None = None,
-        cache: DiskCache | None = None,
+        cache: Cache | None = None,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
         max_concurrency: int = 6,
@@ -163,7 +135,7 @@ class QlooClient:
     @classmethod
     def from_settings(cls, **kwargs: Any) -> QlooClient:
         settings = get_settings()
-        cache = DiskCache(settings.cache_dir / "qloo", settings.cache_ttl_days * 86400)
+        cache = response_cache("qloo", settings.cache_ttl_days * 86400)
         return cls(cache=cache, **kwargs)
 
     async def __aenter__(self) -> QlooClient:
@@ -183,7 +155,7 @@ class QlooClient:
     async def get(self, path: str, params: Params) -> Any:
         query = normalize_params(params)
         key = cache_key(path, query)
-        if self.cache and (hit := self.cache.get(key)) is not None:
+        if self.cache and (hit := await self.cache.get(key)) is not None:
             self._record(CallRecord(path, query, 200, 0, cached=True))
             return hit
         if self._before_fetch:
@@ -199,7 +171,7 @@ class QlooClient:
             raise QlooError(response.status_code, path, response.text)
         data = response.json()
         if self.cache:
-            self.cache.set(key, path, query, data)
+            await self.cache.set(key, path, query, data)
         return data
 
     async def _get_with_retries(self, path: str, query: dict[str, str]) -> httpx.Response:
