@@ -19,9 +19,15 @@ import { Invite } from "./invite";
 import { Ring } from "./logo";
 import { Problem } from "./problem";
 import { QlooCalls } from "./qloo-calls";
+import { ScoreSection } from "./score-chart";
 import { ShowCover } from "./show-cover";
 
 const PREFIX = "/analyses/";
+
+// A dot on the chart goes to its row, which the :target style marks.
+function showGuest(guestRef: string) {
+  window.location.hash = `guest-${guestRef}`;
+}
 
 export function AnalysisView({ id }: { id: string }) {
   // A run the chat starts takes over the URL with history.pushState, so the analysis shown follows the
@@ -31,6 +37,7 @@ export function AnalysisView({ id }: { id: string }) {
   const { analysis, error, retry, update } = useAnalysis(shown);
   const [picks, setPicks] = useState<{ id: string; refs: string[] }>({ id: "", refs: [] });
   const picked = analysis && picks.id === analysis.id ? picks.refs : [];
+  const [highlighted, setHighlighted] = useState<string | null>(null);
 
   const rerun = useCallback((next: Analysis) => {
     window.history.pushState(null, "", `${PREFIX}${encodeURIComponent(next.id)}`);
@@ -74,6 +81,7 @@ export function AnalysisView({ id }: { id: string }) {
       </Field>
       {analysis.status === "done" && (
         <>
+          <ScoreSection guests={analysis.guests} highlighted={highlighted} onSelect={showGuest} />
           <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
           <GuestTable
             key={`guests-${analysis.id}`}
@@ -82,6 +90,7 @@ export function AnalysisView({ id }: { id: string }) {
             showMap={analysis.audience_map}
             picked={picked}
             onPick={(refs) => setPicks({ id: analysis.id, refs })}
+            onHighlight={setHighlighted}
           />
           <Invite key={`invite-${analysis.id}`} analysis={analysis} picked={picked} />
           <AudienceMap rows={analysis.audience_map} />
