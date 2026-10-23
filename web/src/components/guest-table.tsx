@@ -18,6 +18,8 @@ const TAG: Record<Label, string> = {
 
 // A picked row takes the well tint, bled past the text edge on both sides so the rules stay aligned.
 const PICKED = "bg-well shadow-[-0.75rem_0_0_var(--well),0.75rem_0_0_var(--well)]";
+// The row a chart dot went to gets the same tint and an ink rule, the reserved mark for the selected guest.
+const TARGET = "target:bg-well target:shadow-[-0.75rem_0_0_var(--well),0.75rem_0_0_var(--well),inset_0_2px_0_var(--ink)]";
 
 const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
 
@@ -27,9 +29,11 @@ type TableProps = {
   showMap: MapRow[];
   picked: string[];
   onPick: (picked: string[]) => void;
+  // The row under the pointer or focus, so the chart can ring its dot.
+  onHighlight: (guestRef: string | null) => void;
 };
 
-export function GuestTable({ id, guests, showMap, picked, onPick }: TableProps) {
+export function GuestTable({ id, guests, showMap, picked, onPick, onHighlight }: TableProps) {
   const toggle = (ref: string) =>
     onPick(picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref]);
   const names = picked.map((ref) => guests.find((guest) => guest.ref === ref)?.name).filter(Boolean);
@@ -55,6 +59,7 @@ export function GuestTable({ id, guests, showMap, picked, onPick }: TableProps) 
               picked={picked.includes(guest.ref)}
               full={picked.length >= MAX_PICKS}
               onToggle={() => toggle(guest.ref)}
+              onHighlight={onHighlight}
             />
           ))}
         </ol>
@@ -81,9 +86,10 @@ type RowProps = {
   picked: boolean;
   full: boolean;
   onToggle: () => void;
+  onHighlight: (guestRef: string | null) => void;
 };
 
-function GuestRow({ id, guest, rank, showMap, picked, full, onToggle }: RowProps) {
+function GuestRow({ id, guest, rank, showMap, picked, full, onToggle, onHighlight }: RowProps) {
   const { scores, idea, evidence } = guest;
   // Details load on the first open and stay mounted after, so closing and reopening doesn't fetch again.
   const [open, setOpen] = useState(false);
@@ -92,7 +98,11 @@ function GuestRow({ id, guest, rank, showMap, picked, full, onToggle }: RowProps
   return (
     <li
       id={`guest-${guest.ref}`}
-      className={`grid scroll-mt-6 grid-cols-[2.5rem_1fr] gap-x-4 gap-y-5 border-b border-rule py-6 md:grid-cols-12 md:gap-x-8 ${picked ? PICKED : ""}`}
+      onPointerEnter={() => onHighlight(guest.ref)}
+      onPointerLeave={() => onHighlight(null)}
+      onFocus={() => onHighlight(guest.ref)}
+      onBlur={() => onHighlight(null)}
+      className={`grid scroll-mt-6 grid-cols-[2.5rem_1fr] gap-x-4 gap-y-5 border-b border-rule py-6 md:grid-cols-12 md:gap-x-8 ${picked ? PICKED : ""} ${TARGET}`}
     >
       <p className="font-display text-3xl leading-none font-extrabold tabular-nums md:col-span-1" aria-hidden>
         {rank}
