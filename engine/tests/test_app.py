@@ -1,7 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from echo_engine import app as app_module
+from echo_engine import config
 from echo_engine.app import create_app, load_example
+from echo_engine.config import Settings
 from echo_engine.models import Analysis, ChatDecision, GuestDetails, ShowList
 
 SHOW_ID = "00000000-0000-0000-0000-000000000001"
@@ -78,3 +81,23 @@ def test_drafts_and_revise_rules(mock):
 def test_briefing(mock):
     markdown = mock.post("/briefings", json={"analysis_id": "an_example", "guest_ref": "g1"}).json()["markdown"]
     assert markdown.startswith("# ")
+
+
+def test_a_deployed_engine_says_which_variables_it_lacks(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "load_dotenv", lambda *args, **kwargs: None)
+    names = ("QLOO_API_KEY", "DATABASE_URL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL")
+    for name in (*names, "KV_REST_API_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(app_module, "get_settings", Settings)
+    monkeypatch.setenv("ECHO_CACHE_DIR", str(tmp_path))
+    create_app(mock=False)  # locally, the files in .cache/ will do
+
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("QLOO_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example")
+    with pytest.raises(RuntimeError, match="Set UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN on the Vercel"):
+        create_app(mock=False)
+    assert TestClient(create_app(mock=True)).get("/featured").status_code == 200
+    monkeypatch.setenv("KV_REST_API_URL", "https://kv.example.com")
+    monkeypatch.setenv("KV_REST_API_TOKEN", "kv-token")
+    create_app(mock=False)

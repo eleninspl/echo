@@ -118,8 +118,29 @@ A Vercel function keeps nothing between requests and several instances can run a
 - **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, `store.py` uses `.cache/` and memory, as today. Tests use the local store; the Postgres tests run when `TEST_DATABASE_URL` points at a throwaway UTF8 database. Neon's pooler doesn't keep prepared statements, so psycopg never prepares them.
 - **Redis** is Upstash's REST API over HTTPS (`httpx`, no new dependency), so there's no connection to lose when Vercel freezes an instance. Each fresh Qloo call is 3 requests and 5 commands (about 250,000 commands if all 50,000 monthly calls were used). Every key expires. If Upstash fails, the throttle and the cap fail the request (`engine_error` in a run), never retried as Qloo's errors; saving the quota is best effort. Redis tests run on a fake Upstash, and on the real one when `TEST_UPSTASH_REDIS_REST_URL` and `TEST_UPSTASH_REDIS_REST_TOKEN` are set; they use their own keys, so the production database will do.
 - **Background runs.** `POST /analyses` answers 202 and the run goes on in the same function. A fresh run takes 8 to 16 s, well inside the 300 s default. Check on the first deploy that Vercel keeps the instance alive until the run ends; if it doesn't, the run moves to Vercel Queues. A run that hasn't saved for 3 minutes reads as failed (`engine_error`) and isn't reused, so a stopped run never polls forever.
-- **Env vars** on the engine project: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which the Marketplace integration may set instead), plus the ones in `.env.example`. `ECHO_CACHE_DIR` is for local runs only.
-- Set a spend limit on the Vercel team before the first deploy.
+
+### Deploying the engine
+
+The engine is its own Vercel project with Root Directory `engine`. `engine/pyproject.toml` points Vercel at `echo_engine.app:app` (`[tool.vercel]`), `engine/.python-version` pins Python 3.12, and `engine/vercel.json` runs the function in `iad1` for up to 300 s, without `tests/` and `scripts/`. Dependencies install from `pyproject.toml` and `uv.lock`. On Vercel the engine won't start without `QLOO_API_KEY`, `DATABASE_URL` and the Upstash variables, since an instance has no disk to fall back to; with `ECHO_MOCK=1` it needs none of them and serves the example.
+
+| Variable | Value | Set by |
+| --- | --- | --- |
+| `QLOO_API_KEY` | The hackathon key, marked Sensitive | Hand |
+| `DATABASE_URL` | Neon's pooled URL | The Neon integration |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Or `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which the engine also reads | The Upstash integration |
+| `ECHO_WEB_ORIGINS` | The web app's URL, comma-separated if more than one. CORS takes exact origins, so a preview URL works only if it's listed. | Hand |
+| `ECHO_DAILY_QLOO_CALLS` | Optional, 3000 by default | Hand |
+| `ANTHROPIC_API_KEY`, `ECHO_LLM_MODEL` | When L is built and the provider chosen | Hand |
+
+Not on Vercel: `ECHO_MOCK` (unless the deploy should serve the example), `ECHO_CACHE_DIR` and `ECHO_FEATURED`.
+
+First deploy, in order:
+
+1. Spend limit on the team. Then a new project from this repo, Root Directory `engine`.
+2. Neon Postgres and Upstash Redis from the Marketplace, both in `iad1` (Washington, D.C., `us-east-1`), connected to the engine project. Each sets its variables.
+3. `QLOO_API_KEY` and `ECHO_WEB_ORIGINS` by hand, then deploy. `/health` answers with `"mock": false`.
+4. Featured shows: run `scripts/warm.py` locally with the production `DATABASE_URL` and Upstash variables in the shell (they override `.env`). It writes to the same Postgres, so `/featured` lists them at once.
+5. Check that a background run survives (Background runs, above), then Q16.
 
 ## API
 

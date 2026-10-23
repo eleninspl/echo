@@ -39,6 +39,17 @@ class Settings:
         self.llm_model = os.environ.get("ECHO_LLM_MODEL", "").strip()
         self.daily_qloo_calls = int(os.environ.get("ECHO_DAILY_QLOO_CALLS", "3000"))
         self.featured = [show.strip() for show in os.environ.get("ECHO_FEATURED", "").split(",") if show.strip()]
+        self.on_vercel = os.environ.get("VERCEL") == "1"
+
+    def missing_on_vercel(self) -> list[str]:
+        """What a deployed engine can't run without: an instance there has no disk to fall back to."""
+        needed = {
+            "QLOO_API_KEY": self.qloo_api_key,
+            "DATABASE_URL": self.database_url,
+            "UPSTASH_REDIS_REST_URL": self.upstash_url,
+            "UPSTASH_REDIS_REST_TOKEN": self.upstash_token,
+        }
+        return [name for name, value in needed.items() if not value]
 
 
 @lru_cache

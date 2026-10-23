@@ -221,6 +221,8 @@ def create_app(
     folder, today's count goes next to it; otherwise `counters` are Redis when the Upstash variables are set."""
     settings = get_settings()
     mock = settings.mock if mock is None else mock
+    if settings.on_vercel and not mock and (missing := settings.missing_on_vercel()):
+        raise RuntimeError(f"Set {', '.join(missing)} on the Vercel project, or ECHO_MOCK=1 for the example data")
     if mock:
         analyses: AnalysisStore = LocalStore(None)
     elif isinstance(store, Path):
