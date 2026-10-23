@@ -1,13 +1,23 @@
+import asyncio
+import inspect
+
 import pytest
 from fastapi.testclient import TestClient
 
 from echo_engine import app as app_module
-from echo_engine import config
+from echo_engine import config, pipeline
 from echo_engine.app import create_app, load_example
 from echo_engine.config import Settings
-from echo_engine.models import Analysis, ChatDecision, GuestDetails, ShowList
+from echo_engine.models import Analysis, ChatDecision, Filters, GuestDetails, Show, ShowList
 
 SHOW_ID = "00000000-0000-0000-0000-000000000001"
+STEP_KEYS = [key for key, _ in pipeline.STEPS]
+FAILURES = load_example()["mock_failures"]
+RUN_FAILURES = [f for f in FAILURES if f.get("at") in STEP_KEYS]
+
+
+def failing(at: str) -> dict:
+    return next(f for f in FAILURES if f.get("at") == at)
 
 
 @pytest.fixture
@@ -101,3 +111,83 @@ def test_a_deployed_engine_says_which_variables_it_lacks(monkeypatch, tmp_path):
     monkeypatch.setenv("KV_REST_API_URL", "https://kv.example.com")
     monkeypatch.setenv("KV_REST_API_TOKEN", "kv-token")
     create_app(mock=False)
+
+
+def test_mock_failures_cover_every_failure_with_the_real_message():
+    assert {f["error"] for f in FAILURES if "error" in f} == {
+        "show_unusable",
+        "filters_too_narrow",
+        "unknown_country",
+        "daily_cap",
+        "qloo_error",
+        "llm_error",
+        "engine_error",
+    }
+    source = inspect.getsource(pipeline) + inspect.getsource(app_module)
+
+    async def llm_message(what: str) -> str:
+        async def broken() -> None:
+            raise RuntimeError("the model timed out")
+
+        with pytest.raises(pipeline.AnalysisFailed) as failed:
+            await pipeline.llm_step(broken(), None, what)
+        return failed.value.message
+
+    llm_messages = {asyncio.run(llm_message(what)) for what in ("the episode ideas", "the episode idea")}
+    for failure in FAILURES:
+        Show.model_validate(failure["show"])
+        if "error" in failure:
+            assert failure["at"] in [*STEP_KEYS, "start", "guest_details"]
+            assert failure["message"] in llm_messages or f'"{failure["message"]}"' in source, failure["message"]
+
+
+@pytest.mark.parametrize("failure", RUN_FAILURES, ids=lambda f: f["error"])
+def test_a_failing_example_show_fails_its_run_at_its_step(mock, failure):
+    started = mock.post("/analyses", json={"show_id": failure["show"]["id"]})
+    assert started.status_code == 202
+    analysis = mock.get(f"/analyses/{started.json()['id']}").json()
+    assert analysis["status"] == "failed"
+    assert analysis["error"] == {"error": failure["error"], "message": failure["message"]}
+    assert [step["key"] for step in analysis["steps"] if step["done"]] == STEP_KEYS[: STEP_KEYS.index(failure["at"])]
+    assert analysis["guests"] == []
+
+
+def test_the_daily_cap_on_start_is_a_429(mock):
+    failure = failing("start")
+    response = mock.post("/analyses", json={"show_id": failure["show"]["id"]})
+    assert response.status_code == 429
+    assert response.json() == {"error": "daily_cap", "message": failure["message"]}
+
+
+def test_guest_details_on_the_failing_show_are_a_502_llm_error(mock):
+    failure = failing("guest_details")
+    started = mock.post("/analyses", json={"show_id": failure["show"]["id"]}).json()["id"]
+    assert mock.get(f"/analyses/{started}").json()["status"] == "done"
+    response = mock.get(f"/analyses/{started}/guests/g1")
+    assert response.status_code == 502
+    assert response.json() == {"error": "llm_error", "message": failure["message"]}
+
+
+def test_the_slow_example_show_runs_for_its_seconds(monkeypatch):
+    slow = next(f for f in FAILURES if "seconds" in f)
+    engine = create_app(mock=True, step_delay=0).state.engine
+    waits: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr(app_module.asyncio, "sleep", sleep)
+    analysis = asyncio.run(engine.start(slow["show"]["id"], Filters()))
+    assert analysis.status == "done"
+    assert len(waits) == len(STEP_KEYS)
+    assert abs(sum(waits) - slow["seconds"]) < 1e-9
+
+
+def test_search_finds_the_failing_shows_by_title(mock):
+    def titles(q: str) -> list[str]:
+        return [show["title"] for show in mock.get("/shows", params={"q": q}).json()["shows"]]
+
+    assert len(titles("fails")) == 5
+    assert titles("unknown_country") == ["Fails: unknown_country"]
+    assert len(titles("llm_error")) == 2
+    assert titles("example") == [show["title"] for show in load_example()["shows"]]
