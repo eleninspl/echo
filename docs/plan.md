@@ -114,8 +114,8 @@ Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see ql
 | W6 | The fit, love back and reach chart (qloo.md, Scoring): reach across, fit up, love back as dot size, label as colour, the sweet-spot zone; a dot and its row select each other | 0.5 | must |
 | W7 | Guest details: the full episode idea, the guest's audience map next to the show's, and what the guest adds | 0.5 | done |
 | W8 | Chat: the last 20 messages; `rerun` polls the new analysis and keeps the old one on screen until it's done; `rewrite` swaps one idea in place; the active filters shown, and a note when `episode_about.used` is null | 0.75 | must |
-| W9 | Invite: pick 1 to 5 guests, optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | must |
-| W10 | Briefing for one guest: rendered, with copy and print | 0.25 | must |
+| W9 | Invite: pick 1 to 5 guests, optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | done |
+| W10 | Briefing for one guest: rendered, with copy and print | 0.25 | done |
 | W11 | What Qloo saw: every Qloo call of the analysis, with path, params, status, time and whether it was cached | 0.25 | must |
 | W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | must |
 | W13 | Walkthrough as a judge: phone width, keyboard, screen reader, slow engine, every error below | 0.5 | should |

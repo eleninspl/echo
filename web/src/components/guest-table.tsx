@@ -6,6 +6,7 @@ import type { Guest, Label, MapRow } from "@/lib/echo";
 import { AGES, LABELS, labelMeans, score } from "@/lib/format";
 
 import { GuestDetails } from "./guest-details";
+import { MAX_PICKS } from "./invite";
 
 const TAG: Record<Label, string> = {
   sweet_spot: "bg-vermilion text-tag-ink border-vermilion",
@@ -15,9 +16,23 @@ const TAG: Record<Label, string> = {
   balanced: "border-ink",
 };
 
+// A picked row takes the well tint, bled past the text edge on both sides so the rules stay aligned.
+const PICKED = "bg-well shadow-[-0.75rem_0_0_var(--well),0.75rem_0_0_var(--well)]";
+
 const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
 
-export function GuestTable({ id, guests, showMap }: { id: string; guests: Guest[]; showMap: MapRow[] }) {
+type TableProps = {
+  id: string;
+  guests: Guest[];
+  showMap: MapRow[];
+  picked: string[];
+  onPick: (picked: string[]) => void;
+};
+
+export function GuestTable({ id, guests, showMap, picked, onPick }: TableProps) {
+  const toggle = (ref: string) =>
+    onPick(picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref]);
+  const names = picked.map((ref) => guests.find((guest) => guest.ref === ref)?.name).filter(Boolean);
   return (
     <section aria-labelledby="guests">
       <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
@@ -31,17 +46,44 @@ export function GuestTable({ id, guests, showMap }: { id: string; guests: Guest[
         </p>
         <ol className="mt-8 border-t-2 border-ink">
           {guests.map((guest, index) => (
-            <GuestRow key={guest.ref} id={id} guest={guest} rank={index + 1} showMap={showMap} />
+            <GuestRow
+              key={guest.ref}
+              id={id}
+              guest={guest}
+              rank={index + 1}
+              showMap={showMap}
+              picked={picked.includes(guest.ref)}
+              full={picked.length >= MAX_PICKS}
+              onToggle={() => toggle(guest.ref)}
+            />
           ))}
         </ol>
+        {picked.length > 0 && (
+          <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex flex-wrap items-center justify-between gap-3 bg-ink px-4 py-3 text-stock sm:mx-0">
+            <p className="text-sm">
+              <span className="font-semibold">{picked.length} to invite:</span> {names.join(", ")}
+            </p>
+            <a href="#invite" className="bg-stock px-3 py-1.5 text-sm font-semibold text-ink hover:opacity-90">
+              Write the invitations
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-type RowProps = { id: string; guest: Guest; rank: number; showMap: MapRow[] };
+type RowProps = {
+  id: string;
+  guest: Guest;
+  rank: number;
+  showMap: MapRow[];
+  picked: boolean;
+  full: boolean;
+  onToggle: () => void;
+};
 
-function GuestRow({ id, guest, rank, showMap }: RowProps) {
+function GuestRow({ id, guest, rank, showMap, picked, full, onToggle }: RowProps) {
   const { scores, idea, evidence } = guest;
   // Details load on the first open and stay mounted after, so closing and reopening doesn't fetch again.
   const [open, setOpen] = useState(false);
@@ -50,7 +92,7 @@ function GuestRow({ id, guest, rank, showMap }: RowProps) {
   return (
     <li
       id={`guest-${guest.ref}`}
-      className="grid scroll-mt-6 grid-cols-[2.5rem_1fr] gap-x-4 gap-y-5 border-b border-rule py-6 target:bg-well md:grid-cols-12 md:gap-x-8"
+      className={`grid scroll-mt-6 grid-cols-[2.5rem_1fr] gap-x-4 gap-y-5 border-b border-rule py-6 md:grid-cols-12 md:gap-x-8 ${picked ? PICKED : ""}`}
     >
       <p className="font-display text-3xl leading-none font-extrabold tabular-nums md:col-span-1" aria-hidden>
         {rank}
@@ -68,6 +110,17 @@ function GuestRow({ id, guest, rank, showMap }: RowProps) {
           <span className="text-sm text-ink-soft">{labelMeans(guest.label, scores.reach === null)}</span>
         </p>
         <Links links={guest.links} />
+        <label className={`mt-2 inline-flex items-center gap-2 text-sm font-semibold ${full && !picked ? "text-ink-soft" : ""}`}>
+          <input
+            type="checkbox"
+            checked={picked}
+            disabled={full && !picked}
+            onChange={onToggle}
+            className="size-4 accent-[var(--ink)]"
+          />
+          Invite {guest.name}
+          {full && !picked && <span className="font-normal">(up to {MAX_PICKS})</span>}
+        </label>
         <button
           type="button"
           aria-expanded={open}
@@ -76,7 +129,7 @@ function GuestRow({ id, guest, rank, showMap }: RowProps) {
             setOpen(!open);
             setOpened(true);
           }}
-          className="mt-2 inline-flex items-center gap-2 border-2 border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-stock"
+          className="inline-flex items-center gap-2 border-2 border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-stock"
         >
           {open ? "Hide the details" : "The full episode and their fans"}
           <span className="sr-only">, {guest.name}</span>
@@ -103,7 +156,7 @@ function GuestRow({ id, guest, rank, showMap }: RowProps) {
         {evidence && <Evidence evidence={evidence} />}
       </div>
       <div id={detailsId} hidden={!open} className="col-span-2 border-t border-rule pt-6 md:col-span-11 md:col-start-2">
-        {opened && <GuestDetails id={id} guestRef={guest.ref} showMap={showMap} />}
+        {opened && <GuestDetails id={id} guestRef={guest.ref} guestName={guest.name} showMap={showMap} />}
       </div>
     </li>
   );
