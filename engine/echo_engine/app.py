@@ -301,6 +301,11 @@ def create_app(
     async def not_implemented(_: Request, error: NotImplementedError) -> JSONResponse:
         return JSONResponse({"error": "not_implemented", "message": str(error) or "Not built yet."}, 501)
 
+    @app.get("/")
+    async def root() -> dict[str, str]:
+        """What this is, for anyone who opens the engine's URL. No Qloo call."""
+        return {"service": "Echo engine", "health": "/health", "docs": "/docs"}
+
     @app.get("/health")
     async def health() -> Health:
         return Health(

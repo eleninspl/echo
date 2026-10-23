@@ -40,6 +40,11 @@ def test_health(mock):
     assert mock.get("/health").json()["mock"] is True
 
 
+def test_root_says_what_the_engine_is(mock):
+    assert mock.get("/").json() == {"service": "Echo engine", "health": "/health", "docs": "/docs"}
+    assert mock.get("/docs").status_code == 200
+
+
 def test_shows_and_short_query(mock):
     assert len(mock.get("/shows", params={"q": "example"}).json()["shows"]) == 3
     response = mock.get("/shows", params={"q": "e"})
