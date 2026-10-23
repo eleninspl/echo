@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import math
+from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -25,7 +27,7 @@ from .models import (
     Show,
 )
 from .qloo_client import QlooClient, QlooError
-from .screen import TAG_TYPES, clean_entity, clean_name, clean_tag_name
+from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_name, clean_tag_name
 
 log = logging.getLogger("echo.pipeline")
 
@@ -47,6 +49,7 @@ EXPLAINED = 10
 MAX_REFILLS = 5
 MIN_LIVING = 10
 MIN_SCORED = 5
+# Each guest's top podcasts for reach and new podcasts: at least this many, more when they fit (reach_width).
 REACH_PODCASTS = 10
 CHUNK = 50
 FAME_CAP = {"any": None, "less_famous": 0.7, "rising": 0.4}
@@ -87,7 +90,7 @@ class AnalysisFailed(Exception):
 class LoveBack:
     love: float | None
     rank: int | None
-    podcasts: list[str]
+    podcasts: list[str]  # the guest's podcast list without the show, best first
     names: dict[str, str] = field(default_factory=dict)
 
 
@@ -264,10 +267,10 @@ async def love_back(client: QlooClient, guest_id: str, show_id: str) -> LoveBack
     podcasts = entities_of(data)
     ids = [p["entity_id"] for p in podcasts]
     names = {p["entity_id"]: p["name"] for p in podcasts if clean_entity(p)}
-    top = [i for i in ids if i != show_id][:REACH_PODCASTS]
+    others = [i for i in ids if i != show_id]
     if show_id in ids:
         index = ids.index(show_id)
-        return LoveBack(affinity(podcasts[index]), index + 1, top, names)
+        return LoveBack(affinity(podcasts[index]), index + 1, others, names)
     lens = await client.insights(
         {
             "filter.type": PODCAST,
@@ -277,7 +280,7 @@ async def love_back(client: QlooClient, guest_id: str, show_id: str) -> LoveBack
         }
     )
     score = next((affinity(e) for e in entities_of(lens) if e["entity_id"] == show_id), None)
-    return LoveBack(score, None, top, names)
+    return LoveBack(score, None, others, names)
 
 
 async def lens(client: QlooClient, base: dict[str, Any], ids: Sequence[str]) -> dict[str, float]:
@@ -392,13 +395,13 @@ def guest_of(item: Scored, ref: str) -> Guest:
     )
 
 
-async def tags_of(client: QlooClient, entity_id: str) -> list[dict]:
+async def tags_of(client: QlooClient, entity_id: str, types: Sequence[str] = TAG_TYPES) -> list[dict]:
     try:
         data = await client.insights(
             {
                 "filter.type": "urn:tag",
                 "signal.interests.entities": entity_id,
-                "filter.tag.types": ",".join(TAG_TYPES),
+                "filter.tag.types": ",".join(types),
                 "take": LIST_TAKE,
             }
         )
@@ -407,18 +410,29 @@ async def tags_of(client: QlooClient, entity_id: str) -> list[dict]:
             return []
         raise
     tags = (data.get("results") or {}).get("tags") or []
-    return [t for t in tags if t.get("subtype") in TAG_TYPES and clean_tag_name(t.get("name", ""))]
+    return [t for t in tags if t.get("subtype") in types and clean_tag_name(t.get("name", ""))]
 
 
-def shared_tastes(show_tags: list[dict], guest_tags: list[dict]) -> list[str]:
-    show_rank = {tag["tag_id"]: rank for rank, tag in enumerate(show_tags)}
+async def show_tag_ranks(client: QlooClient, show_id: str) -> dict[str, int]:
+    """Each tag's best rank in the show's list of all allowed types and in its list of themes. A person's list is
+    often all themes while a show's has few, so without the second list they would barely meet."""
+    lists = await asyncio.gather(tags_of(client, show_id), tags_of(client, show_id, [THEME_TAGS]))
+    ranks: dict[str, int] = {}
+    for tags in lists:
+        for rank, tag in enumerate(tags):
+            ranks[tag["tag_id"]] = min(rank, ranks.get(tag["tag_id"], rank))
+    return ranks
+
+
+def shared_tastes(show_ranks: dict[str, int], guest_tags: list[dict], common: set[str]) -> list[str]:
+    """Tags in both lists, by the sum of their ranks. `common` tags, which most of the top guests share, go last."""
     both = sorted(
-        (show_rank[tag["tag_id"]] + rank, tag["name"].strip())
+        (tag["tag_id"] in common, show_ranks[tag["tag_id"]] + rank, tag["name"].strip())
         for rank, tag in enumerate(guest_tags)
-        if tag["tag_id"] in show_rank
+        if tag["tag_id"] in show_ranks
     )
     names: list[str] = []
-    for _, name in both:
+    for _, _, name in both:
         if name.lower() not in {n.lower() for n in names}:
             names.append(name)
     return names[:SHARED_SHOWN]
@@ -438,9 +452,24 @@ def over_index(guest_age: dict[str, float], show_age: dict[str, float]) -> list[
     return sorted((b for _, b in top), key=AGE_ORDER.index)
 
 
-def new_podcasts(love: LoveBack, reach_scores: dict[str, float]) -> list[str]:
-    scored = sorted((reach_scores[p], p) for p in love.podcasts if p in reach_scores)
-    names = [love.names.get(p, "") for _, p in scored]
+def reach_width(lists: Sequence[Sequence[str]]) -> int:
+    """How many of each guest's podcasts reach and new podcasts use: REACH_PODCASTS, or more while the reach lens
+    needs no more calls. On a show whose guests' fans share their top podcasts, the guests differ further down."""
+
+    def calls(width: int) -> int:
+        return math.ceil(len({p for podcasts in lists for p in podcasts[:width]}) / CHUNK)
+
+    longest = max((len(podcasts) for podcasts in lists), default=0)
+    width = REACH_PODCASTS
+    while width < longest and calls(width + 1) <= calls(REACH_PODCASTS):
+        width += 1
+    return width
+
+
+def new_podcasts(love: LoveBack, width: int, reach_scores: dict[str, float], shared_by: Counter[str]) -> list[str]:
+    """The guest's podcasts that fewest other guests have, then the ones the show's audience over-indexes on least."""
+    scored = sorted((shared_by[p], reach_scores[p], p) for p in love.podcasts[:width] if p in reach_scores)
+    names = [love.names.get(p, "") for _, _, p in scored]
     return [name for name in names if clean_name(name)][:NEW_PODCASTS_SHOWN]
 
 
@@ -547,7 +576,8 @@ async def fill_guests(
 
     ids = [s.person["entity_id"] for s in scored]
     needs_fit_lens = bool(filters.age or filters.country or c3)
-    podcast_ids = [p for s in scored for p in s.love.podcasts]
+    width = reach_width([s.love.podcasts for s in scored])
+    podcast_ids = [p for s in scored for p in s.love.podcasts[:width]]
     fit_lens = {"filter.type": PERSON, "signal.interests.entities": show.id}
     anchor_lens = {"filter.type": PERSON, "signal.interests.entities": anchor["entity_id"]} if anchor and c3 else None
     fit_scores, reach_scores, anchor_scores = await asyncio.gather(
@@ -557,23 +587,26 @@ async def fill_guests(
     )
     for item in scored:
         item.fit_raw = fit_scores.get(item.person["entity_id"], affinity(item.person) or 0.0)
-        item.reach_raw = scoring.reach_raw([reach_scores.get(p) for p in item.love.podcasts])
+        item.reach_raw = scoring.reach_raw([reach_scores.get(p) for p in item.love.podcasts[:width]])
         item.anchor_raw = anchor_scores.get(item.person["entity_id"]) if anchor_lens else None
     ranked = score(scored)
     analysis.guests = [guest_of(item, f"g{i + 1}") for i, item in enumerate(ranked)]
     await done("score")
 
     top = ranked[:EXPLAINED]
-    show_tags, guest_tags, ages = await asyncio.gather(
-        tags_of(client, show.id),
+    show_ranks, guest_tags, ages = await asyncio.gather(
+        show_tag_ranks(client, show.id),
         asyncio.gather(*(tags_of(client, item.person["entity_id"]) for item in top)),
         age_profiles(client, [show.id] + [item.person["entity_id"] for item in top]),
     )
     show_age = ages.get(show.id, {})
+    tag_guests = Counter(tag_id for tags in guest_tags for tag_id in {tag["tag_id"] for tag in tags})
+    common = {tag_id for tag_id, n in tag_guests.items() if n > len(top) / 2}
+    shared_by = Counter(p for s in scored for p in set(s.love.podcasts[:width]))
     for guest, item, tags in zip(analysis.guests, top, guest_tags, strict=False):
         guest.evidence = Evidence(
-            shared_tastes=shared_tastes(show_tags, tags),
-            new_podcasts=new_podcasts(item.love, reach_scores),
+            shared_tastes=shared_tastes(show_ranks, tags, common),
+            new_podcasts=new_podcasts(item.love, width, reach_scores, shared_by),
             ages=over_index(ages.get(item.person["entity_id"], {}), show_age),
         )
     await done("evidence")

@@ -1,7 +1,9 @@
+from collections import Counter
 from datetime import date
 
 from echo_engine import scoring
 from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure, normalize
+from echo_engine.pipeline import LoveBack, new_podcasts, reach_width, shared_tastes
 from echo_engine.screen import clean_entity, clean_name, clean_tag_name
 
 
@@ -83,3 +85,26 @@ def test_anchor_tilts_the_echo_score():
     plain = scoring.echo_score(0.5, 0.5, 0.5)
     assert scoring.echo_score(0.5, 0.5, 0.5, 1.0) > plain > scoring.echo_score(0.5, 0.5, 0.5, 0.0)
     assert abs(scoring.echo_score(0.5, 0.5, 0.5, 0.5) - plain) < 1e-9
+
+
+def test_reach_width_grows_only_while_the_lens_needs_no_more_calls():
+    alike = [[f"p{i}" for i in range(50)] for _ in range(20)]
+    assert reach_width(alike) == 50  # one world: the same 50 podcasts fit one call at any width
+    apart = [[f"g{g}p{i}" for i in range(50)] for g in range(20)]
+    assert reach_width(apart) == 10  # 200 podcasts already need 4 calls; 11 each would need 5
+    shifted = [[f"p{g + i}" for i in range(50)] for g in range(20)]
+    assert reach_width(shifted) == 31  # p0 to p49 fill one call
+    assert reach_width([["p1", "p2"]]) == 10
+
+
+def test_new_podcasts_prefer_what_few_other_guests_have():
+    love = LoveBack(0.5, None, ["a", "b", "c", "d", "e"], {p: p.upper() for p in "abcde"})
+    scores = {"a": 0.1, "b": 0.2, "c": 0.9, "d": 0.8, "e": 0.05}
+    shared_by = Counter({"a": 9, "b": 9, "c": 1, "d": 1, "e": 1})
+    assert new_podcasts(love, 4, scores, shared_by) == ["D", "C", "A"]  # e is beyond the width
+
+
+def test_shared_tastes_put_tags_most_guests_share_last():
+    tags = [{"tag_id": t, "name": t.title()} for t in ("common", "rare", "elsewhere", "later")]
+    show_ranks = {"common": 0, "rare": 5, "later": 9}
+    assert shared_tastes(show_ranks, tags, {"common"}) == ["Rare", "Later", "Common"]

@@ -5,11 +5,12 @@ def terms(text: str) -> frozenset[str]:
     return frozenset(text.split())
 
 
+THEME_TAGS = "urn:tag:theme:qloo"
 TAG_TYPES = (
     "urn:tag:keyword:media",
     "urn:tag:genre:media",
     "urn:tag:genre:music",
-    "urn:tag:theme:qloo",
+    THEME_TAGS,
 )
 GENRE_TAG_PREFIXES = ("urn:tag:genre", "urn:tag:subgenre")
 

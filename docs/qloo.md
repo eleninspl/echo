@@ -39,13 +39,13 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 | Audience map | `/v2/insights?filter.type=urn:entity:<t>&signal.interests.entities=<show>&take=20` for `t` in `artist, tv_show, movie, book, brand, podcast`. Screened, top 8 shown; all 20 kept for the guest comparison. | 6 |
 | Candidates | The plain C1, and C2: the same with `filter.popularity.max=0.7`. Take from the two alternately by affinity, skipping duplicates, until 20. C1 and C2 affinities compare directly. | 2 |
 | Love back | Per guest: `filter.type=urn:entity:podcast&signal.interests.entities=<guest>&take=50`. If the show is in it, its `query.affinity` is love back and its position is the rank. If not, a lens: the same with `filter.results.entities=<show>`. The show is outside the top 50 for about 72% of guests. | about 34 |
-| Reach | The union of every guest's top 10 podcasts from the love back call (without the show), in chunks of 50: `filter.type=urn:entity:podcast&signal.interests.entities=<show>&filter.results.entities=<chunk>&take=50` | 1 to 3 |
+| Reach | The union of every guest's top podcasts from the love back call (without the show), in chunks of 50: the top 10, or more (up to all 50) while the union needs no more chunks than the top 10's. On a one-world show the guests' fans share their top podcasts and differ only further down, so this costs no extra call. Lens: `filter.type=urn:entity:podcast&signal.interests.entities=<show>&filter.results.entities=<chunk>&take=50` | 1 to 3 |
 | New listeners | `filter.type=urn:demographics&signal.interests.entities=<show>,<all guest IDs>`. One block per entity. `query.age` per bucket, -1 to 1. Drop `query.gender`. | 1 |
-| Shared tastes | `filter.type=urn:tag&signal.interests.entities=<show or guest>&filter.tag.types=<allow-list>&take=50`, once for the show and once per top 10 guest | 11 |
+| Shared tastes | `filter.type=urn:tag&signal.interests.entities=<show or guest>&filter.tag.types=<allow-list>&take=50`, once per top 10 guest and twice for the show: with the allow-list, and with `urn:tag:theme:qloo` alone | 12 |
 | Guest details | The audience map call with the guest as signal, `take=20`. "Adds" is what's in the guest's lists and not in the show's 20. | 6, on click |
 | Hosts and past guests | Not Qloo: Apple `itunes.apple.com/lookup?id=<itunes id>&entity=podcast` for the author line, and `&entity=podcastEpisode&limit=200` for recent episode titles. The iTunes ID is `properties.external.itunes.id` on the show. Cached 7 days. | 0 |
 
-Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached.
+Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached. Q17 added one call (the show's themes).
 
 ### Filters
 
@@ -70,8 +70,8 @@ Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached.
 
 ### Evidence for the top 10
 
-- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo`. The style and plot types are left out: their tags are vague moods that say nothing on a card. Then a word screen (`engine/echo_engine/screen.py`, generic words written by hand) drops tags about religion, sexuality, gender, ethnicity, health, disability, addiction, politics and money trouble, because the allowed types still contain them.
-- **New podcasts:** the guest's top 10 podcasts with the lowest show affinity from the reach call, top 3, screened.
+- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks, with tags that more than half of the top 10 guests have going last. A person's list is often all themes while a show's has few (on the investor judge's show, 8 of the top 10 guests had only themes and the show 2), so the show's tags are its allow-list call plus its themes call, each tag at its better rank. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo`. The style and plot types are left out: their tags are vague moods that say nothing on a card. Then a word screen (`engine/echo_engine/screen.py`, generic words written by hand) drops tags about religion, sexuality, gender, ethnicity, health, disability, addiction, politics and money trouble, because the allowed types still contain them.
+- **New podcasts:** from the guest's top podcasts used for reach, those the fewest other guests have, then the lowest show affinity from the reach call; top 3, screened.
 - **Screening shown items** (map items and new podcasts): on the name, and on the item's genre and subgenre tags only. Keyword tags on films and TV describe plot points, not the audience, and screening them dropped 18 of 20 films. Political podcasts are often tagged only "News", so a podcast whose genres are only News is dropped too.
 - **Ages:** `delta[b] = guest.age[b] - show.age[b]`. Show the up to 2 buckets with the largest delta above 0.2. With no show block, the guest's own buckets of at least 0.2. Many less famous guests have no block: say so.
 
@@ -81,7 +81,7 @@ Raw affinities are bunched (fit spreads of 0.03 to 0.13 in a show), so every sco
 
 - **Fit:** `fit_raw` = the guest's affinity from C1 or C2, or from the fit lens. **Fame-adjusted:** `fit_adj = fit_raw - (a + b · popularity)`, with `a` and `b` from least squares over the 20 (skip when n < 8). Raw fit tracks fame at 0.56 to 0.87; adjusted, the top 5 stop drifting to the most famous. The score, labels and chart use `fit_adj`.
 - **Love back:** `love_raw` from the love back call.
-- **Reach:** `reach_raw = 1 - mean(show affinity of the guest's top 10 podcasts)`, over the podcasts that came back with an affinity. Null if fewer than 5 did. It never saturates and doesn't reward fame. It correlates with love back at -0.73 to -0.97: the trade-off is real.
+- **Reach:** `reach_raw = 1 - mean(show affinity of the guest's top podcasts)` (10 or more, as in the reach call above), over the podcasts that came back with an affinity. Null if fewer than 5 did. It never saturates and doesn't reward fame. It correlates with love back at -0.73 to -0.97: the trade-off is real.
 - **Echo score:** `echo = ((fit_adj_pct + 0.05) · (love_pct + 0.05) · (reach_pct + 0.05)) ^ (1/3) / 1.05`. A null reach uses 0.5 here. The 0.05 stops one zero wiping a guest out; the geometric mean ranks a balanced guest above a lopsided one.
 - **Order:** echo, then `love_raw`, then lower popularity, then `entity_id`.
 
@@ -127,8 +127,12 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
   - Hosts: caught from Apple's author line or the title on every show. Author lines that name a network or a company need the title or the LLM check. Some hosts aren't in Qloo's lists at all.
   - Past guests: 1 to 6 per show caught from episode titles.
   - Searching one show's name returned a different show with the same name first, so the host has to pick.
-  - Reach ties within one-world shows: tech guests' fans share the same top podcasts, so several guests get the same reach and the same "new podcasts". A limit of the formula, not a bug.
-  - Shared tastes are often empty for sports and tech guests, whose tags barely overlap the show's.
+  - Reach ties within one-world shows: tech guests' fans share the same top podcasts, so several guests get the same reach and the same "new podcasts". Fixed in Q17, below.
+  - Shared tastes are often empty for sports and tech guests, whose tags barely overlap the show's. Fixed in Q17, below.
   - Filters: "less famous" changed 9 of 20 guests; age and country change the list; a made-up country gives `unknown_country`. "Atlantis" resolves to a real town with no people, which gives `filters_too_narrow`.
   - The film anchor changes the list, but the results are mixed (on a music show, "episode about Dune" moved a politician up). Check it before using it in the demo.
   - Candidate lists include politicians. Echo doesn't drop them.
+- **23 Oct, Q17, evidence per guest** (the investor judge's show, checked against two comedy shows), 26 fresh calls:
+  - Cause of the repeated reach and new podcasts: the top 20 guests' top 10 podcasts were 18 podcasts in all, 5 of them in every list; 15 of the 45 pairs among the top 10 had the same top 20. On the comedy shows the top 10s overlap about 0.1. The lists differ from about position 20 to 50, all of which the love back call already returns.
+  - Cause of the single shared taste: the guests' tag lists were all themes and the show's mostly music and media genres; the show's own list of themes overlaps each guest's in 15 to 24 tags.
+  - After the fix, on the investor judge's show: 17 reach values in 20 (8 before), 9 different sets of new podcasts in the top 10 (5), and 10 different sets of 5 shared tastes (3, mostly 1 tag). The comedy shows were already distinct and stay so. One call more per analysis.

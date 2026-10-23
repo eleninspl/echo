@@ -104,6 +104,12 @@ def test_full_analysis(engine):
     assert not any("test-key" in str(call) for call in analysis["qloo_calls"])
 
 
+def test_evidence_differs_per_guest(engine):
+    explained = [guest["evidence"] for guest in run(engine)["guests"][:10]]
+    assert len({tuple(e["shared_tastes"]) for e in explained}) > 1
+    assert len({tuple(e["new_podcasts"]) for e in explained}) > 1
+
+
 def test_same_request_is_reused(engine):
     first = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
     second = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
