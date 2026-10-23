@@ -24,7 +24,9 @@ class Settings:
             for origin in os.environ.get("ECHO_WEB_ORIGINS", "http://localhost:3000").split(",")
             if origin.strip()
         ]
-        self.llm_model = os.environ.get("ECHO_LLM_MODEL", "claude-sonnet-5-5").strip()
+        self.llm_model = os.environ.get("ECHO_LLM_MODEL", "").strip()
+        self.daily_qloo_calls = int(os.environ.get("ECHO_DAILY_QLOO_CALLS", "3000"))
+        self.featured = [show.strip() for show in os.environ.get("ECHO_FEATURED", "").split(",") if show.strip()]
 
 
 @lru_cache

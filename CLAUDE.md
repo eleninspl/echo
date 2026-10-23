@@ -18,8 +18,8 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 ## Stack
 
-- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and the Anthropic API (`ANTHROPIC_API_KEY`). Which file each half owns is in `docs/plan.md`.
-- Web app: Next.js 16, TypeScript, Tailwind, in `web/`, hosted on Vercel. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`. **Hosting not decided**: Eleni proposed Vercel with Neon Postgres and Upstash Redis (PR #4), Railway is the other option (`docs/plan.md`, Hosting options). It calls Qloo and an LLM. **The LLM provider and model aren't chosen yet** (open in `docs/plan.md`). Which file each half owns is in `docs/plan.md`.
+- Web app: Next.js 16, TypeScript, Tailwind, in `web/`, on Vercel in both hosting options. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
 - No bot in v1 (open in `docs/plan.md`).
 
 ## Setup
@@ -61,9 +61,10 @@ Update this section whenever something changes.
 - **21 Oct:** a long proposal for features and the contract, merged into the engine branch on 22 Oct.
 - **22 Oct:** the top 3 present live on air on 5 Nov. The investor judge's shows are in Qloo and scorable; their hosts come back as candidates.
 - **22 Oct (call):** v1 is the engine and the web app only. The proposal was cut to three short docs: no path for shows Qloo doesn't have, no bot, no auth. The engine splits into a Qloo side and an LLM side, one person each. The chat in the web app is the agent.
-- **23 Oct:** PR #3 (`v1/setup`) holds everything: the three docs, the engine with a FastAPI skeleton of the 9 routes and a mock mode, and the Next.js app in `web/`. It contains #1 and #2. `ANTHROPIC_API_KEY` isn't set in `.env` yet.
-- **23 Oct:** #3 merged. Eleni: everything as in `docs/plan.md`, except the engine is hosted on Vercel instead of Railway (PR #4).
-- **Next:** agree the three open points in `docs/plan.md`, build Q and L in parallel, and add Neon and Upstash to the Vercel project from the Marketplace.
+- **23 Oct:** PR #3 merged, with #1 and #2 inside it. `main` has everything: the three docs, the engine with a FastAPI skeleton of the 9 routes and a mock mode, and the Next.js app in `web/`. Build on branches off `main`.
+- **23 Oct:** the Qloo side (Q1 to Q10) is built on branch `engine/qloo-side`, checked offline against a fake Qloo and on 7 real shows (findings in `docs/qloo.md`). Only the deploy is left on Q, and where to host isn't decided. Hosts and past guests come from Apple's free lookup by the show's iTunes ID, not from Qloo.
+- **23 Oct:** Eleni merged PR #4, hosting the engine on Vercel with Neon Postgres and Upstash Redis. Leonidas reopened the decision the same day: hosting and the LLM provider are both open points in `docs/plan.md`, with Eleni's Vercel plan kept there as one option.
+- **Next:** agree the open points in `docs/plan.md` (hosting and the LLM among them), deploy the engine, and build the LLM side.
 
 ## Keeping this file current
 

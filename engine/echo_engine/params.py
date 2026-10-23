@@ -40,6 +40,9 @@ _COMMON = {
     "page",
     "sort_by",
     "filter.results.tags",
+    "signal.interests.entities.weight",
+    "signal.demographics.age",
+    "signal.location.query",
 }
 
 _EXTRA = {
@@ -68,9 +71,20 @@ _EXTRA = {
     },
 }
 
-# Valid in Qloo, but Echo never sends them: no demographic inference about anyone, and no
-# filtering of people by personal attributes.
-FORBIDDEN_PREFIXES = ("signal.demographics", "filter.gender", "filter.date_of_birth", "filter.date_of_death")
+ANALYSIS_TYPES = {
+    "urn:tag": {"filter.type", "signal.interests.entities", "filter.tag.types", "filter.parents.types", "take", "page"},
+    "urn:demographics": {"filter.type", "signal.interests.entities"},
+}
+
+# Valid in Qloo, but Echo never sends them: no gender or audience-segment signals, and no
+# filtering of people by personal attributes. An age bucket is allowed as a "grow toward" signal.
+FORBIDDEN_PREFIXES = (
+    "signal.demographics.gender",
+    "signal.demographics.audiences",
+    "filter.gender",
+    "filter.date_of_birth",
+    "filter.date_of_death",
+)
 
 
 class InvalidParamError(ValueError):
@@ -85,9 +99,12 @@ def allowed_params(entity_type: str) -> set[str]:
 
 def check_insights_params(params: dict[str, object]) -> None:
     urn = params.get("filter.type")
-    if not isinstance(urn, str) or not urn.startswith("urn:entity:"):
-        raise InvalidParamError("filter.type must be a urn:entity:* value")
-    allowed = allowed_params(urn.removeprefix("urn:entity:"))
+    if isinstance(urn, str) and urn in ANALYSIS_TYPES:
+        allowed = ANALYSIS_TYPES[urn]
+    elif isinstance(urn, str) and urn.startswith("urn:entity:"):
+        allowed = allowed_params(urn.removeprefix("urn:entity:"))
+    else:
+        raise InvalidParamError("filter.type must be a urn:entity:* value, urn:tag or urn:demographics")
     for name in params:
         if name.startswith(FORBIDDEN_PREFIXES):
             raise InvalidParamError(f"{name} is never sent by Echo (privacy rule)")

@@ -71,6 +71,7 @@ class Idea(BaseModel):
 
 class Guest(BaseModel):
     ref: str
+    id: str
     name: str
     description: str | None = None
     image_url: str | None = None
@@ -157,7 +158,7 @@ class Episode(BaseModel):
 
 class GuestDetails(GuestMaps):
     ref: str
-    episode: Episode
+    episode: Episode | None = None
 
 
 class Message(BaseModel):

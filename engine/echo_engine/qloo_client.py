@@ -21,6 +21,34 @@ from .params import check_insights_params
 
 Params = dict[str, Any]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
+REQUESTS_PER_SECOND = 9
+
+
+class RateLimiter:
+    def __init__(self, per_second: float) -> None:
+        self.interval = 1 / per_second
+        self._next_slot = 0.0
+
+    async def wait(self, sleep: Callable[[float], Awaitable[None]]) -> None:
+        now = time.monotonic()
+        slot = max(now, self._next_slot)
+        self._next_slot = slot + self.interval
+        if slot > now:
+            await sleep(slot - now)
+
+
+@dataclass
+class Quota:
+    month_remaining: int | None = None
+
+    def update(self, response: httpx.Response) -> None:
+        remaining = response.headers.get("x-month-ratelimit-remaining", "")
+        if remaining.isdigit():
+            self.month_remaining = int(remaining)
+
+
+LIMITER = RateLimiter(REQUESTS_PER_SECOND)
+QUOTA = Quota()
 
 
 class QlooError(RuntimeError):
@@ -110,6 +138,7 @@ class QlooClient:
         timeout: float = 20.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         on_call: Callable[[CallRecord], None] | None = None,
+        limiter: RateLimiter | None = LIMITER,
     ) -> None:
         settings = get_settings()
         api_key = api_key if api_key is not None else settings.qloo_api_key
@@ -126,6 +155,7 @@ class QlooClient:
         self._sleep = sleep
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._on_call = on_call
+        self._limiter = limiter
         self.log: list[CallRecord] = []
 
     @classmethod
@@ -172,7 +202,10 @@ class QlooClient:
         attempt = 0
         while True:
             try:
+                if self._limiter:
+                    await self._limiter.wait(self._sleep)
                 response = await self._http.get(path, params=query)
+                QUOTA.update(response)
                 if response.status_code not in RETRY_STATUSES or attempt >= self.max_retries:
                     return response
                 delay = _retry_after(response) or _backoff(attempt)
@@ -196,6 +229,10 @@ class QlooClient:
 
     async def tags(self, params: Params) -> dict:
         return await self.get("/v2/tags", params)
+
+    async def entities(self, ids: list[str]) -> list[dict]:
+        data = await self.get("/entities", {"entity_ids": ids})
+        return data.get("results", [])
 
 
 def _backoff(attempt: int) -> float:

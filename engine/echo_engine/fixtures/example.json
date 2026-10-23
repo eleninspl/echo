@@ -222,6 +222,7 @@
     "guests": [
       {
         "ref": "g1",
+        "id": "00000000-0000-0000-0000-0000000000a1",
         "name": "Guest L",
         "description": "Sketch comedian",
         "image_url": null,
@@ -256,6 +257,7 @@
       },
       {
         "ref": "g2",
+        "id": "00000000-0000-0000-0000-0000000000a2",
         "name": "Guest A",
         "description": "Stand-up comedian and actor",
         "image_url": null,
@@ -290,6 +292,7 @@
       },
       {
         "ref": "g3",
+        "id": "00000000-0000-0000-0000-0000000000a3",
         "name": "Guest B",
         "description": "Chef and travel writer",
         "image_url": null,
@@ -319,6 +322,7 @@
       },
       {
         "ref": "g4",
+        "id": "00000000-0000-0000-0000-0000000000a4",
         "name": "Guest C",
         "description": "Singer-songwriter",
         "image_url": null,
@@ -352,6 +356,7 @@
       },
       {
         "ref": "g5",
+        "id": "00000000-0000-0000-0000-0000000000a5",
         "name": "Guest D",
         "description": "Former footballer and broadcaster",
         "image_url": null,
@@ -386,6 +391,7 @@
       },
       {
         "ref": "g6",
+        "id": "00000000-0000-0000-0000-0000000000a6",
         "name": "Guest E",
         "description": "Film director",
         "image_url": null,
@@ -420,6 +426,7 @@
       },
       {
         "ref": "g7",
+        "id": "00000000-0000-0000-0000-0000000000a7",
         "name": "Guest I",
         "description": "Radio host",
         "image_url": null,
@@ -449,6 +456,7 @@
       },
       {
         "ref": "g8",
+        "id": "00000000-0000-0000-0000-0000000000a8",
         "name": "Guest F",
         "description": "Novelist",
         "image_url": null,
@@ -482,6 +490,7 @@
       },
       {
         "ref": "g9",
+        "id": "00000000-0000-0000-0000-0000000000a9",
         "name": "Guest G",
         "description": "Television presenter",
         "image_url": null,
@@ -516,6 +525,7 @@
       },
       {
         "ref": "g10",
+        "id": "00000000-0000-0000-0000-0000000000aa",
         "name": "Guest H",
         "description": "Street artist",
         "image_url": null,
@@ -548,6 +558,7 @@
       },
       {
         "ref": "g11",
+        "id": "00000000-0000-0000-0000-0000000000ab",
         "name": "Guest J",
         "description": "Climber and author",
         "image_url": null,
@@ -564,6 +575,7 @@
       },
       {
         "ref": "g12",
+        "id": "00000000-0000-0000-0000-0000000000ac",
         "name": "Guest K",
         "description": "Fashion designer",
         "image_url": null,
@@ -580,6 +592,7 @@
       },
       {
         "ref": "g13",
+        "id": "00000000-0000-0000-0000-0000000000ad",
         "name": "Guest N",
         "description": "Food scientist",
         "image_url": null,
@@ -596,6 +609,7 @@
       },
       {
         "ref": "g14",
+        "id": "00000000-0000-0000-0000-0000000000ae",
         "name": "Guest M",
         "description": "Podcast producer",
         "image_url": null,

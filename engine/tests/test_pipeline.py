@@ -1,0 +1,152 @@
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from echo_engine import apple
+from echo_engine.app import create_app
+from echo_engine.qloo_client import QlooClient
+from tests.fake_qloo import SHOW_ID, THIN_SHOW_ID, handler
+
+
+def fake_client(**kwargs) -> QlooClient:
+    return QlooClient(
+        api_key="test-key",
+        base_url="https://hackathon.api.qloo.com",
+        transport=httpx.MockTransport(handler),
+        limiter=None,
+        **kwargs,
+    )
+
+
+@pytest.fixture
+def engine(tmp_path, monkeypatch) -> TestClient:
+    async def author(itunes_id: str) -> str:
+        return "Example Network"
+
+    async def titles(itunes_id: str, limit: int = 50) -> list[str]:
+        return ["Pat Before on invented things", "A solo episode"]
+
+    monkeypatch.setattr(apple, "author", author)
+    monkeypatch.setattr(apple, "episode_titles", titles)
+    return TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+
+
+def run(engine: TestClient, show_id: str = SHOW_ID, **filters) -> dict:
+    started = engine.post("/analyses", json={"show_id": show_id, "filters": filters})
+    assert started.status_code == 202, started.text
+    return engine.get(f"/analyses/{started.json()['id']}").json()
+
+
+def test_search_returns_shows(engine):
+    shows = engine.get("/shows", params={"q": "example"}).json()["shows"]
+    assert shows[0]["title"] == "Example Show with Sam Host"
+    assert shows[0]["image_url"]
+
+
+def test_unknown_show_is_404(engine):
+    response = engine.post("/analyses", json={"show_id": "not-a-uuid"})
+    assert response.status_code == 404
+
+
+def test_full_analysis(engine):
+    analysis = run(engine)
+    assert analysis["status"] == "done", analysis["error"]
+    assert all(step["done"] for step in analysis["steps"])
+    assert [row["category"] for row in analysis["audience_map"]] == [
+        "music",
+        "tv",
+        "film",
+        "books",
+        "brands",
+        "podcasts",
+    ]
+    assert all(len(row["items"]) == 8 for row in analysis["audience_map"])
+
+    guests = analysis["guests"]
+    names = {g["name"] for g in guests}
+    assert len(guests) == 20
+    assert [g["ref"] for g in guests] == [f"g{i}" for i in range(1, 21)]
+    assert not names & {"Person 00", "Sam Host", "Person 02", "Person 03", "Person 07", "Pat Before"}
+    assert sum(1 for g in guests if g["name"] == "Person 04") == 1
+    assert {"name": "Sam Host", "why": "host"} in analysis["left_out"]
+    assert {"name": "Pat Before", "why": "past_guest"} in analysis["left_out"]
+
+    echoes = [g["scores"]["echo"] for g in guests]
+    assert echoes == sorted(echoes, reverse=True)
+    for guest in guests:
+        for key in ("fit", "love_back", "echo"):
+            assert 0 <= guest["scores"][key] <= 1
+        assert guest["label"] in {"sweet_spot", "safe", "far", "long_shot", "balanced"}
+        assert guest["links"]["imdb"].startswith("https://www.imdb.com/name/nm")
+
+    explained = [g for g in guests if g["evidence"]]
+    assert len(explained) == 10 and guests[:10] == explained
+    for guest in explained:
+        assert guest["evidence"]["shared_tastes"]
+        assert "Religion" not in guest["evidence"]["shared_tastes"]
+        assert len(guest["evidence"]["new_podcasts"]) <= 3
+    assert all(g["idea"] is None for g in guests)
+    assert analysis["qloo_calls"]
+    assert not any("test-key" in str(call) for call in analysis["qloo_calls"])
+
+
+def test_same_request_is_reused(engine):
+    first = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
+    second = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
+    assert first == second
+
+
+def test_filters_change_the_lists_and_use_a_fit_lens(engine):
+    analysis = run(engine, fame="less_famous", age="25_to_29", country="Greece")
+    assert analysis["status"] == "done", analysis["error"]
+    params = [call["params"] for call in analysis["qloo_calls"] if call["path"] == "/v2/insights"]
+    lists = [p for p in params if p["filter.type"] == "urn:entity:person" and "filter.results.entities" not in p]
+    assert any(
+        p.get("filter.popularity.max") == "0.7" and p.get("signal.demographics.age") == "25_to_29" for p in lists
+    )
+    assert any(p["filter.type"] == "urn:entity:person" and "filter.results.entities" in p for p in params)
+
+
+def test_episode_about_reports_what_was_used(engine):
+    analysis = run(engine, episode_about={"query": "example film", "type": "movie"})
+    assert analysis["status"] == "done", analysis["error"]
+    assert analysis["filters"]["episode_about"]["used"] == "Example Film"
+
+
+def test_unknown_country_fails_clearly(engine):
+    analysis = run(engine, country="Atlantis")
+    assert analysis["status"] == "failed"
+    assert analysis["error"]["error"] == "unknown_country"
+
+
+def test_filters_that_match_nobody_say_so(engine):
+    analysis = run(engine, country="Nowhere")
+    assert analysis["status"] == "failed"
+    assert analysis["error"]["error"] == "filters_too_narrow"
+
+
+def test_thin_show_is_unusable(engine):
+    analysis = run(engine, THIN_SHOW_ID)
+    assert analysis["status"] == "failed"
+    assert analysis["error"]["error"] == "show_unusable"
+
+
+def test_guest_details_without_the_llm(engine):
+    analysis = run(engine)
+    details = engine.get(f"/analyses/{analysis['id']}/guests/g1").json()
+    assert details["episode"] is None
+    assert details["audience_map"]
+    assert all(row["items"] for row in details["adds"])
+
+
+def test_analyses_survive_a_restart(tmp_path, monkeypatch, engine):
+    analysis = run(engine)
+    again = TestClient(create_app(mock=False, client_factory=fake_client, store=tmp_path / "analyses", featured=[]))
+    assert again.get(f"/analyses/{analysis['id']}").json()["status"] == "done"
+
+
+def test_llm_routes_say_they_are_not_built(engine):
+    analysis = run(engine)
+    response = engine.post("/briefings", json={"analysis_id": analysis["id"], "guest_ref": "g1"})
+    assert response.status_code == 501
+    assert response.json()["error"] == "not_implemented"

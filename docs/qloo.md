@@ -36,15 +36,16 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 | --- | --- | --- |
 | Find the show | `/search?query=<text>&types=urn:entity:podcast&take=5`. Uses `entity_id`, `name`, `popularity`, `properties.image`, `properties.short_description`. | 1 |
 | Usable? | The plain C1 has at least 10 living people, and the love back lens (below) for its top person returns the show with an affinity. Otherwise `show_unusable`. | 1 extra, reused |
-| Audience map | `/v2/insights?filter.type=urn:entity:<t>&signal.interests.entities=<show>&take=10` for `t` in `artist, tv_show, movie, book, brand, podcast` | 6 |
+| Audience map | `/v2/insights?filter.type=urn:entity:<t>&signal.interests.entities=<show>&take=20` for `t` in `artist, tv_show, movie, book, brand, podcast`. Screened, top 8 shown; all 20 kept for the guest comparison. | 6 |
 | Candidates | The plain C1, and C2: the same with `filter.popularity.max=0.7`. Take from the two alternately by affinity, skipping duplicates, until 20. C1 and C2 affinities compare directly. | 2 |
 | Love back | Per guest: `filter.type=urn:entity:podcast&signal.interests.entities=<guest>&take=50`. If the show is in it, its `query.affinity` is love back and its position is the rank. If not, a lens: the same with `filter.results.entities=<show>`. The show is outside the top 50 for about 72% of guests. | about 34 |
 | Reach | The union of every guest's top 10 podcasts from the love back call (without the show), in chunks of 50: `filter.type=urn:entity:podcast&signal.interests.entities=<show>&filter.results.entities=<chunk>&take=50` | 1 to 3 |
 | New listeners | `filter.type=urn:demographics&signal.interests.entities=<show>,<all guest IDs>`. One block per entity. `query.age` per bucket, -1 to 1. Drop `query.gender`. | 1 |
 | Shared tastes | `filter.type=urn:tag&signal.interests.entities=<show or guest>&filter.tag.types=<allow-list>&take=50`, once for the show and once per top 10 guest | 11 |
-| Guest details | The audience map call with the guest as signal, `take=20` | 6, on click |
+| Guest details | The audience map call with the guest as signal, `take=20`. "Adds" is what's in the guest's lists and not in the show's 20. | 6, on click |
+| Hosts and past guests | Not Qloo: Apple `itunes.apple.com/lookup?id=<itunes id>&entity=podcast` for the author line, and `&entity=podcastEpisode&limit=200` for recent episode titles. The iTunes ID is `properties.external.itunes.id` on the show. Cached 7 days. | 0 |
 
-About 58 calls and 12 s for a fresh analysis, 0 when cached.
+Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached.
 
 ### Filters
 
@@ -53,7 +54,7 @@ About 58 calls and 12 s for a fresh analysis, 0 when cached.
 | `fame: less_famous` or `rising` | `filter.popularity.max=0.7` or `0.4` on C1, and no C2 | -1 |
 | `age` | `signal.demographics.age=<bucket>` on C1 and C2. Changes about 20 of 50. | +1 (fit lens) |
 | `country` | `signal.location.query=<English country name>` on C1 and C2. Country names resolve; a region like "Europe" hasn't been tried. | +1 (fit lens) |
-| `episode_about` | `/search?query=<q>&types=urn:entity:<type>&take=1`, then C3: C1 with `signal.interests.entities=<show>,<entity>`. Take from C3 first, up to a third of the 20. If C3 comes back identical to C1 in order, Qloo ignored the entity: report `used: null` and carry on. Books are often unusable, so they aren't offered. | +3 (search, C3, fit lens) |
+| `episode_about` | `/search?query=<q>&types=urn:entity:<type>&take=1`, then C3: C1 with `signal.interests.entities=<show>,<entity>`. Take from C3 first, up to half of the 20. If C3 comes back identical to C1 in order, Qloo ignored the entity: report `used: null` and carry on. An anchor lens (`signal.interests.entities=<entity>&filter.results.entities=<the 20>`) adds a fourth factor to the Echo score with weight 0.35. Books are often unusable, so they aren't offered. | +4 (search, C3, fit lens, anchor lens) |
 
 **Fit lens.** With any signal beyond the show, list affinities no longer mean "the show's audience likes them", so fit is re-read: `filter.type=urn:entity:person&signal.interests.entities=<show>&filter.results.entities=<the 20 IDs>&take=50`.
 
@@ -62,15 +63,16 @@ About 58 calls and 12 s for a fresh analysis, 0 when cached.
 1. Died: `properties.date_of_death` is set.
 2. Minors: `properties.date_of_birth` less than 18 years ago. Read for this check only, never shown or kept.
 3. Not a public figure: no `urn:tag:occupation:person` tag and no `imdb_id`, `wikidata`, `musicbrainz_artist_id`, `spotify_artist_id`, `library_of_congress_authority_id` or `goodreads_author_id`. Social handles don't count.
-4. Hosts: the LLM host check (L1), plus names matching the show's Qloo description.
-5. Past guests (should): names from the show's recent episode titles (L7), matched to Qloo people.
+4. Hosts: a candidate's full name in the title or Apple's author line, or the names after "with" in the title ("with Ann & Bo Surname" means Ann Surname and Bo Surname; a list of single names, like "with Ann, Bo & Cy", matches first or last names). Plus the LLM host check (L1) when it's built, for author lines that are a company. Qloo's own description never names the hosts.
+5. Past guests: a candidate whose full name appears in one of the last 200 episode titles on Apple.
 6. Duplicates: the same normalised name, keep the higher affinity.
 7. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
 
 ### Evidence for the top 10
 
-- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo, urn:tag:plot:qloo, urn:tag:style:qloo`. Then a name screen: a hand-written list of generic words for religion, sexuality, gender, ethnicity, health, disability, addiction, politics and money trouble drops any tag or item that matches, because the allowed types still contain them. The screen runs on everything shown or sent to the LLM.
+- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo`. The style and plot types are left out: their tags are vague moods that say nothing on a card. Then a word screen (`engine/echo_engine/screen.py`, generic words written by hand) drops tags about religion, sexuality, gender, ethnicity, health, disability, addiction, politics and money trouble, because the allowed types still contain them.
 - **New podcasts:** the guest's top 10 podcasts with the lowest show affinity from the reach call, top 3, screened.
+- **Screening shown items** (map items and new podcasts): on the name, and on the item's genre and subgenre tags only. Keyword tags on films and TV describe plot points, not the audience, and screening them dropped 18 of 20 films. Political podcasts are often tagged only "News", so a podcast whose genres are only News is dropped too.
 - **Ages:** `delta[b] = guest.age[b] - show.age[b]`. Show the up to 2 buckets with the largest delta above 0.2. With no show block, the guest's own buckets of at least 0.2. Many less famous guests have no block: say so.
 
 ## Scoring
@@ -120,3 +122,13 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
 
 - **20 Oct, coverage probe and engine spike** (13 shows: comedy, music, sports, interviews): coverage is good for those genres; the top people are plausible guests but very famous without a fame cap; hosts and near-duplicates come back; reach v1 (overlap of top 50 podcast lists) saturates, which led to the reach above.
 - **22 Oct, the investor judge's two shows:** both in Qloo with plenty of data, love back and demographics work, and their hosts come back as candidates, so host detection has to be tested on them.
+- **23 Oct, pipeline runs** on 7 shows (comedy, music, sports, tech, including the investor judge's two):
+  - Every run finished. 1 to 5 sweet spots in 20, depending on the show and filters.
+  - Hosts: caught from Apple's author line or the title on every show. Author lines that name a network or a company need the title or the LLM check. Some hosts aren't in Qloo's lists at all.
+  - Past guests: 1 to 6 per show caught from episode titles.
+  - Searching one show's name returned a different show with the same name first, so the host has to pick.
+  - Reach ties within one-world shows: tech guests' fans share the same top podcasts, so several guests get the same reach and the same "new podcasts". A limit of the formula, not a bug.
+  - Shared tastes are often empty for sports and tech guests, whose tags barely overlap the show's.
+  - Filters: "less famous" changed 9 of 20 guests; age and country change the list; a made-up country gives `unknown_country`. "Atlantis" resolves to a real town with no people, which gives `filters_too_narrow`.
+  - The film anchor changes the list, but the results are mixed (on a music show, "episode about Dune" moved a politician up). Check it before using it in the demo.
+  - Candidate lists include politicians. Echo doesn't drop them.
