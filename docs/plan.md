@@ -54,7 +54,7 @@ With `ECHO_MOCK=1` every route answers from the example, so the web app and the 
 | Q12 | `store.py`: analyses, the Qloo and Apple caches behind one interface, local files or Postgres ([Hosting](#hosting)) | 0.5 | done |
 | Q13 | Qloo throttle, daily cap and quota in Redis, shared by all instances | 0.25 | done |
 | Q14 | Deploy: the Vercel project, Neon and Upstash, env vars, spend limit; check background runs | 0.5 | must |
-| Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | must |
+| Q15 | Featured shows: `scripts/warm.py` writes them to the production store; `/featured` reads them | 0.25 | done |
 | Q16 | End to end on the deployed engine: the 7 test shows and the investor judge's show, calls and time per run | 0.25 | must |
 | Q17 | Evidence that differs per guest: on the investor judge's show, 9 of 20 guests share one reach value and the same two "new podcasts", and shared tastes are mostly one tag | 0.5 | should |
 
@@ -98,7 +98,7 @@ Q1 to Q10 took about 4.75 days and are built and checked on 7 real shows (see ql
 
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
 2. **Who takes L and the web app**, by 24 Oct. Q is Eleni's. If no one takes L, Eleni starts it after Q14, and v1 can't have all of L and the web app by the freeze: decide what to cut first.
-3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot; its title goes in an env var, never the repo.
+3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots.
 4. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
 
 ## Hosting
@@ -113,7 +113,7 @@ A Vercel function keeps nothing between requests and several instances can run a
 | `DiskCache` in `.cache/qloo/` and `.cache/apple/` | Neon Postgres, table `cache`: key, gzipped body, expiry. Measured locally: about 27 KB a call, 1 MB a fresh analysis. Expired rows are deleted on about one write in 100. |
 | `LocalCounters`: today's count in `.cache/usage.json`, the monthly quota in memory | `RedisCounters` in Upstash Redis: one counter per UTC day, taken before each fresh call so instances can't pass the cap together, and the last monthly quota Qloo reported |
 | `RateLimiter`, 9 a second per process, evenly spaced | `RedisLimiter` in Upstash Redis: at most 9 calls in each clock second for all instances. Two full seconds back to back can put up to 18 calls within a second of each other; a 429 is retried. |
-| Featured shows warmed at startup | `scripts/warm.py` (Q15), run after each scoring change |
+| Featured shows warmed at startup | `scripts/warm.py`, run locally with the production variables after each scoring change: fresh analyses into Postgres, and their IDs in table `featured`. `/featured` only reads them. |
 
 - **Locally** nothing changes: without `DATABASE_URL` and the Upstash variables, `store.py` uses `.cache/` and memory, as today. Tests use the local store; the Postgres tests run when `TEST_DATABASE_URL` points at a throwaway UTF8 database. Neon's pooler doesn't keep prepared statements, so psycopg never prepares them.
 - **Redis** is Upstash's REST API over HTTPS (`httpx`, no new dependency), so there's no connection to lose when Vercel freezes an instance. Each fresh Qloo call is 3 requests and 5 commands (about 250,000 commands if all 50,000 monthly calls were used). Every key expires. If Upstash fails, the throttle and the cap fail the request (`engine_error` in a run), never retried as Qloo's errors; saving the quota is best effort. Redis tests run on a fake Upstash, and on the real one when `TEST_UPSTASH_REDIS_REST_URL` and `TEST_UPSTASH_REDIS_REST_TOKEN` are set; they use their own keys, so the production database will do.
@@ -129,7 +129,7 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | --- | --- | --- | --- |
 | GET | `/health` | | `{ ok, qloo_calls_today, qloo_calls_left }` |
 | GET | `/shows` | `q` (2 to 100 chars, on submit, not per keystroke) | `{ shows: [Show] }`, up to 5. Empty: not in Qloo. |
-| GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }` |
+| GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }`, empty until `scripts/warm.py` has run |
 | POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
 | GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }` |

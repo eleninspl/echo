@@ -51,7 +51,7 @@ def analysis(analysis_id: str, status: str = "running", fame: str = "any") -> An
 
 async def fresh_postgres() -> Postgres:
     db = Postgres(DATABASE_URL)
-    await db.execute("drop table if exists analyses, cache")
+    await db.execute("drop table if exists analyses, cache, featured")
     await db.close()
     return Postgres(DATABASE_URL)
 
@@ -115,6 +115,32 @@ def test_a_stopped_run_reads_as_failed_and_is_not_reused(kind, tmp_path):
     asyncio.run(check())
 
 
+@pytest.mark.parametrize("kind", KINDS)
+def test_featured_analyses_keep_their_order_and_are_replaced(kind, tmp_path):
+    async def check() -> None:
+        store = await make_store(kind, tmp_path)
+        assert await store.featured() == []
+        await store.put(analysis("an_1", "done"))
+        await store.put(analysis("an_2", "done", fame="rising"))
+        await store.set_featured(["an_2", "an_gone", "an_1"])
+        assert [a.id for a in await store.featured()] == ["an_2", "an_1"]
+        await store.set_featured(["an_1"])
+        assert [a.id for a in await store.featured()] == ["an_1"]
+        await store.close()
+
+    asyncio.run(check())
+
+
+def test_local_featured_analyses_survive_a_restart(tmp_path):
+    async def check() -> None:
+        store = LocalStore(tmp_path)
+        await store.put(analysis("an_1", "done"))
+        await store.set_featured(["an_1"])
+        assert [a.id for a in await LocalStore(tmp_path).featured()] == ["an_1"]
+
+    asyncio.run(check())
+
+
 def test_local_analyses_survive_a_restart(tmp_path):
     async def check() -> None:
         await LocalStore(tmp_path).put(analysis("an_1", "done"))
@@ -166,7 +192,7 @@ def test_a_full_run_on_postgres_is_saved_and_reused(monkeypatch):
         await original_put(item)
 
     store.put = counting_put  # type: ignore[method-assign]
-    with TestClient(create_app(mock=False, client_factory=fake_client, store=store, featured=[])) as client:
+    with TestClient(create_app(mock=False, client_factory=fake_client, store=store)) as client:
         started = client.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
         assert client.get(f"/analyses/{started}").json()["status"] == "done"
         assert client.post("/analyses", json={"show_id": SHOW_ID}).json()["id"] == started
@@ -313,7 +339,6 @@ def test_two_engines_on_one_redis_share_the_daily_cap_and_the_quota(monkeypatch,
             mock=False,
             client_factory=fake_client,
             store=LocalStore(tmp_path / name),
-            featured=[],
             counters=RedisCounters(fake.client()),
         )
         return TestClient(app)
