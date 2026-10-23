@@ -138,7 +138,8 @@ export const echo = {
     call<{ id: string; status: Status }>("/analyses", { show_id, filters }),
   analysis: (id: string, signal?: AbortSignal) =>
     call<Analysis>(`/analyses/${encodeURIComponent(id)}`, undefined, signal),
-  guest: (id: string, ref: string) => call<GuestDetails>(`/analyses/${id}/guests/${ref}`),
+  guest: (id: string, ref: string, signal?: AbortSignal) =>
+    call<GuestDetails>(`/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}`, undefined, signal),
   chat: (analysis_id: string, messages: Message[]) => call<ChatReply>("/chat", { analysis_id, messages }),
   drafts: (request: DraftRequest) => call<{ drafts: Draft[] }>("/drafts", request),
   briefing: (analysis_id: string, guest_ref: string) =>

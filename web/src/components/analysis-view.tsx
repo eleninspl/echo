@@ -51,7 +51,7 @@ export function AnalysisView({ id }: { id: string }) {
       </Field>
       {analysis.status === "done" && (
         <>
-          <GuestTable guests={analysis.guests} />
+          <GuestTable id={analysis.id} guests={analysis.guests} showMap={analysis.audience_map} />
           <AudienceMap rows={analysis.audience_map} />
           <LeftOut analysis={analysis} />
         </>
