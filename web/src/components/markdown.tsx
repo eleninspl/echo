@@ -20,7 +20,7 @@ export function Markdown({ text }: { text: string }) {
           {items}
         </ol>
       ) : (
-        <ul key={blocks.length} className="list-disc pl-5 marker:text-ink-soft">
+        <ul key={blocks.length} className="list-disc pl-5 marker:text-ink-dim">
           {items}
         </ul>
       ),
@@ -38,9 +38,7 @@ export function Markdown({ text }: { text: string }) {
       flushList();
       const Tag = (["h3", "h4", "h5"] as const)[heading[1].length - 1];
       const style =
-        heading[1].length === 1
-          ? "font-display text-3xl leading-none font-extrabold uppercase"
-          : "mt-2 text-xs font-semibold tracking-wide text-ink-soft uppercase";
+        heading[1].length === 1 ? "font-cond text-2xl leading-none font-semibold" : "silk mt-2 text-ink-dim";
       blocks.push(
         <Tag key={blocks.length} className={style}>
           {inline(heading[2])}

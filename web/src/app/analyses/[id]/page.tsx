@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { AnalysisView, VenueSkeleton } from "@/components/analysis-view";
+import { AnalysisView, GallerySkeleton } from "@/components/analysis-view";
 
 export const metadata: Metadata = { title: "Guests" };
 
 export default function AnalysisPage({ params }: PageProps<"/analyses/[id]">) {
   return (
-    <Suspense fallback={<VenueSkeleton />}>
+    <Suspense fallback={<GallerySkeleton />}>
       <Analysis params={params} />
     </Suspense>
   );
