@@ -28,7 +28,7 @@ class Settings:
         load_dotenv(REPO_ROOT / ".env")
         self.qloo_api_key = os.environ.get("QLOO_API_KEY", "").strip()
         self.qloo_base_url = os.environ.get("QLOO_BASE_URL", HACKATHON_BASE_URL).rstrip("/")
-        self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        self.groq_api_key = os.environ.get("GROQ_API_KEY", "").strip()
         self.cache_dir = Path(os.environ.get("ECHO_CACHE_DIR", REPO_ROOT / ".cache"))
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
         self.database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -41,7 +41,7 @@ class Settings:
             for origin in os.environ.get("ECHO_WEB_ORIGINS", "http://localhost:3000").split(",")
             if origin.strip()
         ]
-        self.llm_model = os.environ.get("ECHO_LLM_MODEL", "").strip()
+        self.llm_model = os.environ.get("ECHO_LLM_MODEL", "").strip() or "openai/gpt-oss-120b"
         self.daily_qloo_calls = int(os.environ.get("ECHO_DAILY_QLOO_CALLS", "3000"))
         self.featured = [show.strip() for show in os.environ.get("ECHO_FEATURED", "").split(",") if show.strip()]
         self.on_vercel = os.environ.get("VERCEL") == "1"
