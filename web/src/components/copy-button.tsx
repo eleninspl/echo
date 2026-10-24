@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { hue } from "./gallery";
+import { hue } from "./hud";
 
 // Copies text and says so; if the browser refuses, says that instead. `of` names what's copied for
 // screen readers, where several copy buttons sit on one page.
@@ -24,8 +24,8 @@ export function CopyButton({ text, label = "Copy", of }: { text: string; label?:
       <button
         type="button"
         onClick={copy}
-        className={`key ${state === "copied" ? "key-lit" : ""}`}
-        style={hue("var(--pvw)")}
+        className={`btn ${state === "copied" ? "btn-solid" : ""}`}
+        style={hue("var(--ink)")}
       >
         {state === "copied" ? "Copied" : label}
         {of && <span className="sr-only">, {of}</span>}

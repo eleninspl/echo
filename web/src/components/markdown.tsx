@@ -38,7 +38,7 @@ export function Markdown({ text }: { text: string }) {
       flushList();
       const Tag = (["h3", "h4", "h5"] as const)[heading[1].length - 1];
       const style =
-        heading[1].length === 1 ? "font-cond text-2xl leading-none font-semibold" : "silk mt-2 text-ink-dim";
+        heading[1].length === 1 ? "font-display text-2xl leading-none font-semibold" : "tag mt-2 text-ink-dim";
       blocks.push(
         <Tag key={blocks.length} className={style}>
           {inline(heading[2])}
@@ -64,7 +64,9 @@ export function Markdown({ text }: { text: string }) {
 }
 
 function inline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/).map((part, index) =>
-    part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : part,
-  );
+  return text
+    .split(/(\*\*[^*]+\*\*)/)
+    .map((part, index) =>
+      part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : part,
+    );
 }

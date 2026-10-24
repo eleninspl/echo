@@ -1,4 +1,4 @@
-import { Lamp, PanelHead, SCORE_HUE } from "./gallery";
+import { Lamp, SCORE_HUE } from "./hud";
 
 const TERMS = [
   { term: "Fit", color: SCORE_HUE.fit, means: "Your listeners over-index on them, beyond their fame" },
@@ -6,166 +6,169 @@ const TERMS = [
   { term: "Reach", color: SCORE_HUE.reach, means: "Their fans are new to you" },
 ];
 
-// The signal path: how Echo scores a guest, drawn. Two audiences overlap; fit runs from your show to
-// the guest, love back runs home, and reach is the part of their audience you don't have yet.
+// How Echo scores a guest, drawn as a targeting display: two audiences overlap; fit runs from your show to
+// the guest, love back runs home, and reach is the part of their audience you don't have yet. Rings sound
+// from the show and a scale turns slowly around it all.
 export function SignalPath() {
+  const ticks = Array.from({ length: 120 }, (_, i) => i);
   return (
-    <section aria-labelledby="signal" className="panel flex flex-col rounded-[4px]">
-      <PanelHead id="signal" title="Signal path · how Echo scores a guest" />
-      <div className="monitor relative m-2 overflow-hidden rounded-[2px]">
-        <p aria-hidden className="silk absolute inset-x-3 top-3 flex justify-between">
-          <span className="text-fit">Your listeners</span>
-          <span className="text-love">Their fans</span>
-        </p>
-        <svg viewBox="0 0 520 330" className="mx-auto block w-full max-w-md md:max-w-none" role="img" aria-labelledby="signal-desc">
-          <desc id="signal-desc">
-            Two overlapping circles: your listeners and the guest&apos;s fans. Fit runs from your show to the guest,
-            love back from the guest to your show, and reach is the part of the guest&apos;s fans outside your
-            listeners.
-          </desc>
-          <defs>
-            <clipPath id="theirs">
-              <circle cx="320" cy="165" r="118" />
-            </clipPath>
-            <mask id="outside-ours">
-              <rect width="520" height="330" fill="#fff" />
-              <circle cx="200" cy="165" r="118" fill="#000" />
-            </mask>
-            <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="7" stroke="var(--reach)" strokeWidth="2" strokeOpacity="0.5" />
-            </pattern>
-            <marker
-              id="tip-fit"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="7"
-              markerHeight="7"
-              orient="auto-start-reverse"
-            >
-              <path d="M0 0L10 5L0 10z" fill="var(--fit)" />
-            </marker>
-            <marker
-              id="tip-love"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="7"
-              markerHeight="7"
-              orient="auto-start-reverse"
-            >
-              <path d="M0 0L10 5L0 10z" fill="var(--love)" />
-            </marker>
-          </defs>
+    <figure className="relative">
+      <svg viewBox="0 0 560 460" className="block w-full" role="img" aria-labelledby="signal-desc">
+        <desc id="signal-desc">
+          Two overlapping circles: your listeners and the guest&apos;s fans. Fit runs from your show to the guest, love
+          back from the guest to your show, and reach is the part of the guest&apos;s fans outside your listeners.
+        </desc>
+        <defs>
+          <clipPath id="theirs">
+            <circle cx="330" cy="230" r="120" />
+          </clipPath>
+          <mask id="outside-ours">
+            <rect width="560" height="460" fill="#fff" />
+            <circle cx="230" cy="230" r="120" fill="#000" />
+          </mask>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--reach)" strokeWidth="1.6" strokeOpacity="0.55" />
+          </pattern>
+          <radialGradient id="ours-fill">
+            <stop offset="0.6" stopColor="var(--fit)" stopOpacity="0.02" />
+            <stop offset="1" stopColor="var(--fit)" stopOpacity="0.14" />
+          </radialGradient>
+          <radialGradient id="theirs-fill">
+            <stop offset="0.6" stopColor="var(--love)" stopOpacity="0.02" />
+            <stop offset="1" stopColor="var(--love)" stopOpacity="0.14" />
+          </radialGradient>
+          <marker id="tip-fit" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="var(--fit)" />
+          </marker>
+          <marker id="tip-love" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="var(--love)" />
+          </marker>
+        </defs>
 
-          {/* Graticule */}
-          {[110, 220, 330, 440].map((x) => (
-            <line key={x} x1={x} x2={x} y1={0} y2={330} stroke="var(--line)" strokeOpacity="0.5" />
-          ))}
-          {[82, 165, 248].map((y) => (
-            <line key={y} x1={0} x2={520} y1={y} y2={y} stroke="var(--line)" strokeOpacity="0.5" />
-          ))}
+        {/* The turning scale around the display. */}
+        <g>
+          {ticks.map((i) => {
+            const a = (i / ticks.length) * Math.PI * 2;
+            const inner = i % 10 === 0 ? 196 : 202;
+            return (
+              <line
+                key={i}
+                x1={280 + Math.cos(a) * inner}
+                y1={230 + Math.sin(a) * inner}
+                x2={280 + Math.cos(a) * 208}
+                y2={230 + Math.sin(a) * 208}
+                stroke={i % 10 === 0 ? "var(--steel-hi)" : "var(--steel)"}
+              />
+            );
+          })}
+        </g>
+        <circle cx="280" cy="230" r="214" fill="none" stroke="var(--steel)" strokeDasharray="2 6" />
+        <line x1="40" x2="520" y1="230" y2="230" stroke="var(--steel)" strokeDasharray="2 4" />
+        <line x1="280" x2="280" y1="10" y2="450" stroke="var(--steel)" strokeDasharray="2 4" />
 
+        <circle cx="230" cy="230" r="120" fill="url(#ours-fill)" stroke="var(--fit)" strokeOpacity="0.8" />
+        <circle cx="330" cy="230" r="120" fill="url(#theirs-fill)" stroke="var(--love)" strokeOpacity="0.8" />
+        <g clipPath="url(#theirs)" mask="url(#outside-ours)">
+          <rect width="560" height="460" fill="url(#hatch)" />
+        </g>
+
+        {[0, 1, 2].map((i) => (
           <circle
-            cx="200"
-            cy="165"
-            r="118"
-            fill="var(--fit)"
-            fillOpacity="0.07"
-            stroke="var(--fit)"
-            strokeOpacity="0.7"
-          />
-          <circle
-            cx="320"
-            cy="165"
-            r="118"
-            fill="var(--love)"
-            fillOpacity="0.07"
-            stroke="var(--love)"
-            strokeOpacity="0.7"
-          />
-          <g clipPath="url(#theirs)" mask="url(#outside-ours)">
-            <rect width="520" height="330" fill="url(#hatch)" />
-          </g>
-
-          {/* Echo rings sounding from the show. */}
-          {[0, 1, 2].map((i) => (
-            <circle
-              key={i}
-              className="ring"
-              cx="175"
-              cy="165"
-              r="10"
-              fill="none"
-              stroke="var(--fit)"
-              vectorEffect="non-scaling-stroke"
-              style={{ animationDelay: `${i * 0.9}s` }}
-            />
-          ))}
-
-          {/* The arcs leave and land on the nodes' inner edges, so the labels beside the nodes stay clear. */}
-          <path
-            className="flow"
-            d="M 186 155 C 225 84, 300 84, 334 154"
+            key={i}
+            className="ring"
+            cx="205"
+            cy="230"
+            r="11"
             fill="none"
             stroke="var(--fit)"
-            strokeWidth="2.5"
-            markerEnd="url(#tip-fit)"
+            vectorEffect="non-scaling-stroke"
+            style={{ animationDelay: `${i * 0.93}s` }}
           />
-          <path
-            className="flow"
-            d="M 334 176 C 300 246, 225 246, 188 177"
-            fill="none"
-            stroke="var(--love)"
-            strokeWidth="2.5"
-            markerEnd="url(#tip-love)"
-          />
+        ))}
 
-          <circle cx="175" cy="165" r="9" fill="var(--fit)" />
-          <circle cx="345" cy="165" r="9" fill="var(--love)" />
+        <path
+          className="flow"
+          d="M 216 219 C 252 150, 320 150, 352 218"
+          fill="none"
+          stroke="var(--fit)"
+          strokeWidth="2.5"
+          markerEnd="url(#tip-fit)"
+        />
+        <path
+          className="flow"
+          d="M 352 242 C 320 310, 252 310, 218 243"
+          fill="none"
+          stroke="var(--love)"
+          strokeWidth="2.5"
+          markerEnd="url(#tip-love)"
+        />
 
-          <g className="signal-label font-cond">
-            <text x="160" y="171" textAnchor="end" fill="var(--ink)">
-              YOUR SHOW
-            </text>
-            <text x="360" y="171" fill="var(--ink)">
-              GUEST
-            </text>
-            <text x="260" y="90" textAnchor="middle" fill="var(--fit)">
-              FIT
-            </text>
-            <text x="260" y="262" textAnchor="middle" fill="var(--love)">
-              LOVE BACK
-            </text>
-            <text x="398" y="104" fill="var(--reach)">
-              REACH
-            </text>
-          </g>
-        </svg>
-      </div>
-    </section>
+        {/* The two nodes, each in a reticle. */}
+        <g fill="none" strokeWidth="1.5">
+          <path d="M191 220v-6h6M213 214h6v6M219 240v6h-6M197 246h-6v-6" stroke="var(--fit)" />
+          <path d="M351 220v-6h6M373 214h6v6M379 240v6h-6M357 246h-6v-6" stroke="var(--love)" />
+        </g>
+        <circle cx="205" cy="230" r="7" fill="var(--fit)" />
+        <circle cx="365" cy="230" r="7" fill="var(--love)" />
+
+        <g className="font-display" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.08em" }}>
+          <text x="183" y="236" textAnchor="end" fill="var(--ink)">
+            YOUR SHOW
+          </text>
+          <text x="387" y="236" fill="var(--ink)">
+            GUEST
+          </text>
+          <text x="284" y="160" textAnchor="middle" fill="var(--fit)">
+            FIT
+          </text>
+          <text x="284" y="316" textAnchor="middle" fill="var(--love)">
+            LOVE BACK
+          </text>
+        </g>
+        {/* Reach: a leader line from the hatched crescent to its label. */}
+        <path d="M 420 190 L 470 120 H 520" fill="none" stroke="var(--reach)" />
+        <circle cx="420" cy="190" r="3" fill="var(--reach)" />
+        <text
+          x="520"
+          y="112"
+          textAnchor="end"
+          className="font-display"
+          fill="var(--reach)"
+          style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.08em" }}
+        >
+          REACH
+        </text>
+        <text x="40" y="40" className="tag" fill="var(--fit)" style={{ fontSize: 10 }}>
+          Your listeners
+        </text>
+        <text x="520" y="440" textAnchor="end" className="tag" fill="var(--love)" style={{ fontSize: 10 }}>
+          Their fans
+        </text>
+      </svg>
+    </figure>
   );
 }
 
-// The three scores in words, and what on air means: the key to the signal path and the whole gallery.
+// The three scores in words, and what a sweet spot is: the key to the diagram and the whole console.
 export function ScoreKey() {
   return (
-    <section aria-label="How Echo scores a guest" className="panel rounded-[4px]">
-      <dl className="grid grid-cols-1 gap-px p-2 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+    <section aria-label="How Echo scores a guest" className="flex flex-col gap-4">
+      <dl className="grid grid-cols-1 gap-px bg-steel sm:grid-cols-3">
         {TERMS.map(({ term, color, means }) => (
-          <div key={term} className="flex flex-col gap-1 px-2 py-2">
-            <dt className="font-cond text-lg leading-none font-semibold" style={{ color }}>
+          <div key={term} className="flex flex-col gap-1.5 bg-void p-3">
+            <dt className="flex items-center gap-2 font-display text-lg leading-none font-semibold" style={{ color }}>
+              <span aria-hidden className="h-0.5 w-4" style={{ background: color }} />
               {term}
             </dt>
             <dd className="text-sm leading-snug text-ink-soft">{means}</dd>
           </div>
         ))}
       </dl>
-      <p className="flex items-center gap-2.5 border-t border-line px-4 py-3 text-sm text-ink-soft">
-        <Lamp color="var(--tally)" className="h-2.5 w-4" />
+      <p className="flex items-center gap-2.5 text-sm text-ink-soft">
+        <Lamp color="var(--sweet)" className="h-2 w-4" />
         <span>
-          <span className="font-cond font-semibold tracking-wider text-tally uppercase">On air</span> · high on all
-          three. Rare, and Echo says so.
+          <span className="font-display font-semibold tracking-wider text-sweet uppercase">Sweet spot</span>: high on
+          all three. Rare, and Echo says so.
         </span>
       </p>
     </section>

@@ -68,6 +68,7 @@ Update this section whenever something changes.
 - **Not built: L, the LLM side.** Ideas, the full episode, chat, drafts and the briefing answer "not built yet" in production. The provider isn't chosen and nobody has taken L.
 - **23 Oct:** W12, the web app's production check on four real shows, and its fixes (#29, #30): a host found by name in the show's description, and the show left out of a guest's map.
 - **24 Oct:** W14, the web app redesigned as a film-style broadcast-gallery dashboard (dark only, visual first, every number from real data), PR #34, merged 24 Oct.
+- **24 Oct:** W15, the web app redesigned again as a restrained film-style console: four tabs (Guests, Audience, Invite, Qloo), one view of the guests instead of three, a colour per meaning, plain labels, the chat docked on every tab. The analysis page is about a third shorter.
 - **Next:** the open points in `docs/plan.md`, "To agree": who builds L and with which provider, the four featured shows, politicians among the guests, the web app's domain.
 
 ## Keeping this file current

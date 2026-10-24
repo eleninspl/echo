@@ -120,6 +120,7 @@ Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 unde
 | W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | done |
 | W13 | Walkthrough as a judge: phone width, keyboard, screen reader, slow engine, every error below | 0.5 | done |
 | W14 | Redesign as a broadcast-gallery dashboard, dark only and visual first: desk readout, meter bridge, fit-by-reach scope, multiviewer wall, preview monitor, audience spectrum, Qloo call timeline. Every number comes from the analysis or `/health`. Replaces W1's light and dark poster look | 1 | done |
+| W15 | Redesign as a film-style targeting console with four tabs (Guests, Audience, Invite, Qloo) under a header with the show and the sweet-spot count. One view of the guests (the fit-by-reach scope and a ranked list, with the selected guest beside them) in place of W14's wall, bridge and scope. A colour per meaning, plain labels, the chat docked on every tab, the landing redone to match. Replaces W14 | 1 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
