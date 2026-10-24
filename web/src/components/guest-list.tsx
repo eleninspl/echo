@@ -100,7 +100,7 @@ function Row({
         }`}
         style={hue(color)}
       >
-        {/* The selection: a lit edge and brackets in the guest's label hue. */}
+        {/* The selection: an edge in the guest's label hue. */}
         {selected && (
           <span
             aria-hidden

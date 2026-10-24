@@ -33,8 +33,8 @@ export function EngineNote() {
     <dl className="flex items-center gap-x-4 sm:gap-x-6">
       <div className="flex items-center gap-2">
         <dt className="sr-only">Engine</dt>
-        <Lamp color={health.mock ? "var(--reach)" : "var(--sweet)"} />
-        <dd className="tag whitespace-nowrap" style={{ color: health.mock ? "var(--reach)" : "var(--sweet)" }}>
+        <Lamp color={health.mock ? "var(--ink-soft)" : "var(--ink)"} />
+        <dd className="tag whitespace-nowrap" style={{ color: health.mock ? "var(--ink-soft)" : "var(--ink)" }}>
           {health.mock ? "Example" : "Live"}
           <span className="hidden sm:inline">{health.mock ? " data" : " engine"}</span>
         </dd>

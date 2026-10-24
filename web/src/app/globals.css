@@ -311,7 +311,7 @@ a {
   }
 
   /*
- * Controls. An outline control in its hue by default; the solid one, chamfered and lit, is the action.
+ * Controls. An outline control in its hue by default; the solid one, filled with its hue, is the action.
  * --hue defaults to ink.
  */
   .btn {
