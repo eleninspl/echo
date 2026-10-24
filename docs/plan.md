@@ -98,7 +98,7 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 | L6 | Briefing | 0.25 | must |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 under To agree). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The LLM provider and model aren't chosen yet (point 4 under To agree).
+Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 under To agree). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The model is `gpt-oss-120b` on Groq ([The LLM](#the-llm)).
 
 ## Web app tasks
 
@@ -144,7 +144,7 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 | Date | What |
 | --- | --- |
 | 23 Oct | Done: Q1 to Q17, the web app (W1 to W13), both deployed and checked on real shows |
-| 24 to 26 Oct | L, once someone has it and the provider is chosen; featured shows; fixes |
+| 24 to 26 Oct | L, once someone has it; featured shows; fixes |
 | 27 Oct | **Freeze** |
 | 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit |
 
@@ -153,9 +153,18 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
 2. **Who builds L**, by 24 Oct. Q and the web app are done. L is about 3 days, so it has to start by 24 Oct to make the freeze. If it can't all fit, a proposed order by what the demo shows most: L2 ideas, L5 drafts, L3 the full episode, L6 briefing, L4 chat (the costliest), then L1 (Apple's author line already catches most hosts).
 3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots. A shortlist of 13 checked shows is with Eleni; music is the weakest genre.
-4. **LLM provider and model.** Not researched or decided. The L tasks need structured output (ideas, drafts, chat decisions), tool or function calling for the chat, and a cost and speed that suit one call per step. Compare the options before L starts; the prompts stay plain strings in `llm.py` either way.
-5. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
-6. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
+4. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
+5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
+
+## The LLM
+
+Decided 24 Oct (Eleni): a cheap open-weight model. **`openai/gpt-oss-120b` on Groq** (Apache 2.0), called through Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1` with `GROQ_API_KEY`. `ECHO_LLM_MODEL` can name another Groq model.
+
+- **Why.** $0.15 per million input tokens and $0.60 per million output, about 500 tokens a second, JSON-schema structured output with `strict: true`, and tool calling. A run's ideas (L2) are one call of a few thousand tokens each way, well under a cent; a few thousand judge runs cost a few dollars.
+- **What it needs.** Groq's paid Developer plan (pay as you go, 250,000 tokens and 1,000 requests a minute). The free plan's 8,000 tokens a minute is less than one analysis. Set a spend limit in Groq's console.
+- **Limits, from Groq's docs (24 Oct, not yet tried).** Structured output can't be combined with tools or streaming in one call: ideas, the episode, drafts and the briefing use structured output, and the chat (L4) uses tools. gpt-oss makes one tool call at a time. Strict schemas need every property in `required` and `additionalProperties: false`, with optional fields as `["string", "null"]`. It's a reasoning model: set `reasoning_effort` low for the host check and medium for the writing, and measure what L2 adds to the 5 to 10 s run.
+- **Other hosts of the same model**, if Groq fails or is slow: Cerebras (about 3,000 tokens a second, $0.35 and $0.75) or DeepInfra (cheapest, $0.04 and $0.17, much slower). Both speak the same API, so only the URL, key and model ID change.
+- **Not chosen:** `qwen/qwen3.8-27b` on Groq ($0.80 and $4) is the step up if gpt-oss writes weak pitches; closed models (Claude, GPT, Gemini) cost 10 to 100 times more.
 
 ## Hosting
 
@@ -191,7 +200,8 @@ Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, s
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | The `echo` database | The same |
 | `ECHO_WEB_ORIGINS` | The web app's URL. CORS takes exact origins, comma-separated. | Not set: `http://localhost:3000` |
 | `ECHO_DAILY_QLOO_CALLS` | Not set: 3000 | |
-| `ANTHROPIC_API_KEY`, `ECHO_LLM_MODEL` | When L is built and the provider chosen | |
+| `GROQ_API_KEY` | When L is built | |
+| `ECHO_LLM_MODEL` | Not set: `openai/gpt-oss-120b` | |
 
 All of them are Sensitive. Add or change one with `vercel env add NAME production` from `engine/` (linked to the project; `engine/.vercel` is git-ignored), then `vercel redeploy <url> --target production`. Sensitive values can't be pulled back: `vercel env pull` gives placeholders. `ECHO_MOCK`, `ECHO_CACHE_DIR` and `ECHO_FEATURED` aren't used on Vercel.
 

@@ -18,7 +18,7 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 ## Stack
 
-- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and an LLM. **The LLM provider and model aren't chosen yet** (open in `docs/plan.md`). Which file each half owns is in `docs/plan.md`.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and an LLM: open-weight `gpt-oss-120b` on Groq, through Groq's OpenAI-compatible API (`docs/plan.md`, "The LLM"). Which file each half owns is in `docs/plan.md`.
 - Web app: Next.js 16, TypeScript, Tailwind, in `web/`, on Vercel. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
 - No bot in v1 (open in `docs/plan.md`).
 
@@ -65,11 +65,12 @@ Update this section whenever something changes.
 - **23 Oct:** Eleni took Q over and decided the hosting: Vercel for both pieces (#4, #6). Leonidas had left it open in #5, with Railway as the other option. Q11 to Q17 merged (#7 to #13, #17, #24 to #27): the #5 review fixes, `store.py` (Postgres or local files), Redis counters and throttle, featured shows written by `engine/scripts/warm.py`, evidence that differs per guest, the deploy and its checks.
 - **23 Oct:** the web app, W1 to W11 and W13, built against mock mode (#14, #15, #18 to #23). Two Claude sessions worked in parallel, one on the engine and one on the web app; a coordinating session reviewed and merged every PR and keeps this section.
 - **23 Oct, live:** engine `https://echo-qloo.vercel.app`, web `https://echo-web-mu-taupe.vercel.app`. Neon Postgres and Upstash Redis are standalone accounts (`docs/plan.md`, "Deploying the engine"). End to end on 8 real shows: every run finished in 5 to 10 s.
-- **Not built: L, the LLM side.** Ideas, the full episode, chat, drafts and the briefing answer "not built yet" in production. The provider isn't chosen and nobody has taken L.
+- **Not built: L, the LLM side.** Ideas, the full episode, chat, drafts and the briefing answer "not built yet" in production. Nobody has taken L.
 - **23 Oct:** W12, the web app's production check on four real shows, and its fixes (#29, #30): a host found by name in the show's description, and the show left out of a guest's map.
 - **24 Oct:** W14, the web app redesigned as a film-style broadcast-gallery dashboard (dark only, visual first, every number from real data), PR #34, merged 24 Oct.
 - **24 Oct:** W15, the web app redesigned again as a restrained film-style console: four tabs (Guests, Audience, Invite, Qloo), one view of the guests instead of three, a colour per meaning, plain labels, the chat docked on every tab. The analysis page is about a third shorter. PR #37.
-- **Next:** the open points in `docs/plan.md`, "To agree": who builds L and with which provider, the four featured shows, politicians among the guests, the web app's domain.
+- **24 Oct:** the LLM chosen (Eleni): a cheap open-weight model, `gpt-oss-120b` on Groq (#38). Not yet tried on a real show.
+- **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain.
 
 ## Keeping this file current
 
