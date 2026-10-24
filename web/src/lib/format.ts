@@ -49,6 +49,17 @@ export function filterPhrases(filters: Filters): string[] {
   if (fame) phrases.push(fame);
   if (filters.age) phrases.push(`Listeners ${AGES[filters.age].toLowerCase()}`);
   if (filters.country) phrases.push(`In ${filters.country}`);
-  if (filters.episode_about) phrases.push(`An episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
+  if (filters.episode_about)
+    phrases.push(`An episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
   return phrases;
 }
+
+// Age groups short enough to sit under a bar.
+export const SHORT_AGE: Record<AgeBucket, string> = {
+  "24_and_younger": "≤24",
+  "25_to_29": "25–29",
+  "30_to_34": "30–34",
+  "35_to_44": "35–44",
+  "45_to_54": "45–54",
+  "55_and_older": "55+",
+};

@@ -6,7 +6,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { echo, type Analysis, type Featured, type Guest } from "@/lib/echo";
 
-import { LABEL_HUE, Meter, PanelHead, SCORE_HUE } from "./gallery";
+import { LABEL_HUE, Meter, ZoneHead, SCORE_HUE } from "./hud";
 import { ShowCover } from "./show-cover";
 
 // The precomputed shows. Null while loading; empty when there are none or the engine isn't answering.
@@ -35,10 +35,10 @@ export function FeaturedList({ featured }: { featured: Featured[] }) {
         <li key={analysis_id}>
           <Link
             href={`/analyses/${encodeURIComponent(analysis_id)}`}
-            className="group flex items-center gap-3 rounded-[3px] px-2 py-1.5 hover:bg-bezel"
+            className="group flex items-center gap-3 px-2 py-1.5 hover:bg-deck-hi"
           >
             <ShowCover show={show} size={36} />
-            <span className="font-cond text-lg font-semibold group-hover:underline">{show.title}</span>
+            <span className="font-display text-lg font-semibold group-hover:underline">{show.title}</span>
           </Link>
         </li>
       ))}
@@ -60,10 +60,10 @@ export function FeaturedShows() {
   const featured = useFeatured();
   if (!featured?.length) return null;
   return (
-    <section aria-labelledby="featured" className="panel rounded-[4px]">
-      <PanelHead id="featured" title="Or open a show Echo has run">
+    <section aria-labelledby="featured" className="zone">
+      <ZoneHead id="featured" title="Or open a show Echo has run">
         <span>{featured.length} ready</span>
-      </PanelHead>
+      </ZoneHead>
       <ul className={`grid grid-cols-1 gap-2 p-2 ${COLUMNS[Math.min(featured.length, 4)]}`}>
         {featured.map((item, index) => (
           <ShowTile key={item.analysis_id} item={item} index={index} />
@@ -90,21 +90,26 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
   const sweet = analysis?.guests.filter((guest) => guest.label === "sweet_spot").length ?? 0;
 
   return (
-    <li className="power" style={{ "--order": index } as CSSProperties}>
+    <li className="acquire" style={{ "--order": index } as CSSProperties}>
       <Link
         href={`/analyses/${encodeURIComponent(analysis_id)}`}
-        className="group flex flex-col overflow-hidden rounded-[3px] bg-monitor shadow-[0_0_0_1px_var(--line)] transition-shadow hover:shadow-[0_0_0_2px_var(--amber)]"
+        className="group flex flex-col overflow-hidden bg-well shadow-[0_0_0_1px_var(--steel)] transition-shadow hover:shadow-[0_0_0_1px_var(--ink-soft)]"
       >
-        <span className="monitor relative flex aspect-video max-h-52 w-full items-end justify-center overflow-hidden">
+        <span className="screen relative flex aspect-video max-h-52 w-full items-end justify-center overflow-hidden">
           {show.image_url ? (
-            <Image
-              src={show.image_url}
-              alt=""
-              fill
-              unoptimized
-              sizes="(min-width: 1280px) 25vw, 50vw"
-              className="object-cover"
-            />
+            <>
+              <Image
+                src={show.image_url}
+                alt=""
+                fill
+                unoptimized
+                sizes="(min-width: 1280px) 25vw, 50vw"
+                className="scale-125 object-cover opacity-35 blur-2xl"
+              />
+              <span className="absolute top-1/2 left-1/2 aspect-square h-[78%] -translate-x-1/2 -translate-y-1/2 overflow-hidden shadow-[0_10px_30px_rgb(0_0_0/0.6)]">
+                <Image src={show.image_url} alt="" fill unoptimized sizes="12rem" className="object-cover" />
+              </span>
+            </>
           ) : (
             // No artwork: the show's own channel levels are the picture.
             <span aria-hidden className="flex h-full w-full items-end gap-1 px-3 pt-8 pb-3">
@@ -112,19 +117,19 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
             </span>
           )}
           {sweet > 0 && (
-            <span className="absolute top-2 right-2 silk rounded-[2px] bg-tally px-1.5 py-1 text-[0.5625rem] text-on-light">
-              {sweet} on air
+            <span className="tag absolute top-2 right-2 bg-sweet px-1.5 py-1 text-[0.625rem] text-on-hue">
+              {sweet} sweet {sweet === 1 ? "spot" : "spots"}
             </span>
           )}
         </span>
-        <span className="flex flex-col gap-2 border-t border-line bg-panel px-3 pt-2 pb-3">
+        <span className="flex flex-col gap-2 border-t border-steel bg-deck px-3 pt-2 pb-3">
           <span className="flex items-center gap-2">
             {show.image_url ? null : (
-              <span aria-hidden className="font-cond text-lg font-medium text-ink-dim">
+              <span aria-hidden className="font-display text-lg font-medium text-ink-dim">
                 {show.title.trim().charAt(0)}
               </span>
             )}
-            <span className="truncate font-cond text-lg font-semibold group-hover:text-white">{show.title}</span>
+            <span className="truncate font-display text-lg font-semibold group-hover:text-white">{show.title}</span>
           </span>
           {show.image_url && (
             <span aria-hidden className="flex h-8 items-end gap-1">
@@ -140,7 +145,7 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
 // A show's guests as a row of three-meter channels; dim placeholders while the analysis loads.
 function Levels({ guests }: { guests: Guest[] }) {
   if (!guests.length) {
-    return Array.from({ length: 12 }, (_, i) => <span key={i} className="h-full flex-1 rounded-[1px] bg-bezel/60" />);
+    return Array.from({ length: 12 }, (_, i) => <span key={i} className="h-full flex-1 bg-deck-hi/60" />);
   }
   return guests.map((guest, i) => (
     <span key={guest.ref} className="flex h-full flex-1 flex-col gap-0.5">
@@ -163,7 +168,7 @@ function Levels({ guests }: { guests: Guest[] }) {
           className="flex-1"
         />
       </span>
-      <span className="h-0.5 rounded-full" style={{ background: LABEL_HUE[guest.label] }} />
+      <span className="h-0.5" style={{ background: LABEL_HUE[guest.label] }} />
     </span>
   ));
 }
@@ -174,7 +179,7 @@ export function FeaturedFallback() {
   if (!featured?.length) return null;
   return (
     <div className="mt-2">
-      <h3 className="silk mb-2 text-ink-dim">Or open a show Echo has run</h3>
+      <h3 className="tag mb-2 text-ink-dim">Or open a show Echo has run</h3>
       <FeaturedList featured={featured} />
     </div>
   );

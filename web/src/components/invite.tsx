@@ -3,25 +3,27 @@
 import { useState, type FormEvent } from "react";
 
 import { echo, type Analysis, type Draft, type Guest } from "@/lib/echo";
+import { LABELS } from "@/lib/format";
 import { describe, type HostError } from "@/lib/errors";
 
 import { CopyButton } from "./copy-button";
-import { hue, Info, PanelHead } from "./gallery";
+import { Chip, hue, Info, LABEL_HUE, rank, ZoneHead } from "./hud";
 import { Problem } from "./problem";
 
 export const MAX_PICKS = 5;
 
-const input = "well w-full px-3 py-2";
+const input = "field w-full px-3 py-2";
 
-// Drafts for the picked guests, one each, to copy into the host's own email. Echo sends nothing.
+// The Invite tab: pick up to five guests, then a draft for each to copy into the host's own email. Echo
+// sends nothing.
 export function Invite({
   analysis,
   picked,
-  onRemove,
+  onToggle,
 }: {
   analysis: Analysis;
   picked: string[];
-  onRemove: (ref: string) => void;
+  onToggle: (ref: string) => void;
 }) {
   const [hostName, setHostName] = useState("");
   const [note, setNote] = useState("");
@@ -54,97 +56,143 @@ export function Invite({
     setDrafts((current) => current.map((old) => (old.guest_ref === draft.guest_ref ? draft : old)));
   }
 
+  const full = picked.length >= MAX_PICKS;
+
   return (
-    <section id="invite" aria-labelledby="invite-title" className="panel scroll-mt-16 rounded-[4px]">
-      <PanelHead id="invite-title" title="Invitations">
-        <span className={guests.length ? "text-pvw" : ""}>
-          {guests.length} / {MAX_PICKS} picked
-        </span>
-        <Info>
-          Pick up to {MAX_PICKS} guests with Invite and Echo drafts an invitation to each. Echo sends nothing: copy each
-          one into your own email.
-        </Info>
-      </PanelHead>
-
-      {guests.length === 0 ? (
-        <p className="p-4 text-sm text-ink-dim">Select a guest and press Invite. Their invitation is drafted here.</p>
-      ) : (
-        <form onSubmit={write} className="grid gap-4 p-4 md:grid-cols-12 md:gap-x-6">
-          <div className="flex flex-col gap-2 md:col-span-4">
-            <p className="silk text-ink-dim">For</p>
-            <ul className="flex flex-wrap gap-1.5">
-              {guests.map((guest) => (
-                <li key={guest.ref}>
-                  <button
-                    type="button"
-                    onClick={() => onRemove(guest.ref)}
-                    className="flex items-center gap-1.5 rounded-[2px] bg-pvw px-2 py-1 font-cond text-sm font-semibold text-on-light uppercase hover:opacity-85"
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+      <section aria-labelledby="pick-title" className="zone lg:col-span-4">
+        <ZoneHead id="pick-title" title="Pick guests">
+          <span className={picked.length ? "text-ink" : ""}>
+            {picked.length} / {MAX_PICKS}
+          </span>
+        </ZoneHead>
+        <ol className="flex flex-col py-1">
+          {analysis.guests.map((guest, index) => {
+            const on = picked.includes(guest.ref);
+            return (
+              <li key={guest.ref}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={full && !on}
+                  onClick={() => onToggle(guest.ref)}
+                  className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-deck-hi/70 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span
+                    aria-hidden
+                    className={`flex size-4 shrink-0 items-center justify-center border ${on ? "border-ink bg-ink" : "border-steel-hi"}`}
                   >
-                    {guest.name}
-                    <svg aria-hidden viewBox="0 0 10 10" className="size-2.5">
-                      <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.6" />
-                    </svg>
-                    <span className="sr-only">: remove</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex flex-col gap-3 md:col-span-5">
-            <label className="flex flex-col gap-1.5">
-              <span className="silk text-ink-dim">Your name, to sign with</span>
-              <input
-                value={hostName}
-                onChange={(event) => setHostName(event.target.value)}
-                maxLength={80}
-                autoComplete="name"
-                className={input}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="silk text-ink-dim">Anything to mention</span>
-              <textarea
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                maxLength={500}
-                rows={2}
-                placeholder="Dates you record, the fee, a recent episode…"
-                className={input}
-              />
-            </label>
-          </div>
-          <div className="md:col-span-3 md:self-end">
-            <button type="submit" disabled={pending} className="key key-lit w-full" style={hue("var(--pvw)")}>
-              {pending
-                ? "Writing…"
-                : `${drafts.length ? "Rewrite" : "Write"} ${guests.length === 1 ? "the invitation" : `${guests.length} invitations`}`}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {problem && (
-        <div className="px-4 pb-4">
-          <Problem problem={problem} />
-        </div>
-      )}
-
-      {drafts.length > 0 && (
-        <ol className="grid grid-cols-1 gap-3 border-t border-line p-4 lg:grid-cols-2">
-          {drafts.map((draft) => (
-            <DraftCard
-              key={draft.guest_ref}
-              analysisId={analysis.id}
-              draft={draft}
-              guest={analysis.guests.find((guest) => guest.ref === draft.guest_ref)}
-              hostName={hostName.trim() || undefined}
-              note={note.trim() || undefined}
-              onRevised={replace}
-            />
-          ))}
+                    {on && (
+                      <svg viewBox="0 0 10 10" className="size-2.5 text-on-hue">
+                        <path d="M2 5.2l2 2 4-4.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="readout w-5 text-xs text-ink-dim">{rank(index)}</span>
+                  <span className="min-w-0 flex-1 truncate font-display font-semibold">{guest.name}</span>
+                  <Chip color={LABEL_HUE[guest.label]}>{LABELS[guest.label].name}</Chip>
+                </button>
+              </li>
+            );
+          })}
         </ol>
-      )}
-    </section>
+      </section>
+
+      <section id="invite" aria-labelledby="invite-title" className="zone order-first lg:order-none lg:col-span-8">
+        <ZoneHead id="invite-title" title="Invitations">
+          <span className={guests.length ? "text-ink" : ""}>
+            {guests.length} / {MAX_PICKS} picked
+          </span>
+          <Info>
+            Pick up to {MAX_PICKS} guests and Echo drafts an invitation to each. Echo sends nothing: copy each one into
+            your own email.
+          </Info>
+        </ZoneHead>
+
+        {guests.length === 0 ? (
+          <p className="p-5 text-sm text-ink-dim">
+            Pick up to {MAX_PICKS} guests, from the list or with Pick to invite on a guest. Echo drafts an invitation to
+            each here.
+          </p>
+        ) : (
+          <form onSubmit={write} className="grid gap-4 p-4 md:grid-cols-12 md:gap-x-6">
+            <div className="flex flex-col gap-2 md:col-span-4">
+              <p className="tag text-ink-dim">For</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {guests.map((guest) => (
+                  <li key={guest.ref}>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(guest.ref)}
+                      className="flex items-center gap-1.5 rounded-[2px] bg-ink px-2 py-1 font-display text-sm font-semibold text-on-hue hover:opacity-85"
+                    >
+                      {guest.name}
+                      <svg aria-hidden viewBox="0 0 10 10" className="size-2.5">
+                        <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.6" />
+                      </svg>
+                      <span className="sr-only">: remove</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col gap-3 md:col-span-5">
+              <label className="flex flex-col gap-1.5">
+                <span className="tag text-ink-dim">Your name, to sign with</span>
+                <input
+                  value={hostName}
+                  onChange={(event) => setHostName(event.target.value)}
+                  maxLength={80}
+                  autoComplete="name"
+                  className={input}
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="tag text-ink-dim">Anything to mention</span>
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="Dates you record, the fee, a recent episode…"
+                  className={input}
+                />
+              </label>
+            </div>
+            <div className="md:col-span-3 md:self-end">
+              <button type="submit" disabled={pending} className="btn btn-solid w-full" style={hue("var(--ink)")}>
+                {pending
+                  ? "Writing…"
+                  : `${drafts.length ? "Rewrite" : "Write"} ${guests.length === 1 ? "the invitation" : `${guests.length} invitations`}`}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {problem && (
+          <div className="px-4 pb-4">
+            <Problem problem={problem} />
+          </div>
+        )}
+
+        {drafts.length > 0 && (
+          <ol className="grid grid-cols-1 gap-3 border-t border-steel p-4 lg:grid-cols-2">
+            {drafts.map((draft) => (
+              <DraftCard
+                key={draft.guest_ref}
+                analysisId={analysis.id}
+                draft={draft}
+                guest={analysis.guests.find((guest) => guest.ref === draft.guest_ref)}
+                hostName={hostName.trim() || undefined}
+                note={note.trim() || undefined}
+                onRevised={replace}
+              />
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -186,9 +234,9 @@ function DraftCard({ analysisId, draft, guest, hostName, note, onRevised }: Card
 
   const name = guest?.name ?? draft.guest_ref;
   return (
-    <li className="flex flex-col gap-3 rounded-[3px] bg-bezel/50 p-3">
-      <h3 className="font-cond text-xl leading-none font-semibold uppercase">{name}</h3>
-      <div aria-live="polite" className="monitor rounded-[2px] p-4">
+    <li className="flex flex-col gap-3 border border-steel bg-deck-hi/50 p-3">
+      <h3 className="font-display text-xl leading-none font-semibold">{name}</h3>
+      <div aria-live="polite" className="screen p-4">
         <p className="text-sm text-ink-soft">
           Subject: <span className="font-semibold text-ink">{draft.subject}</span>
         </p>
@@ -206,13 +254,13 @@ function DraftCard({ analysisId, draft, guest, hostName, note, onRevised }: Card
             className={input}
           />
         </label>
-        <button type="submit" disabled={pending || !instruction.trim()} className="key">
+        <button type="submit" disabled={pending || !instruction.trim()} className="btn">
           {pending ? "Rewriting…" : "Rewrite"}
         </button>
       </form>
       {problem && (
         <p role="alert" className="text-sm">
-          <span className="font-semibold text-amber">{problem.title}.</span>{" "}
+          <span className="font-semibold text-alert">{problem.title}.</span>{" "}
           <span className="text-ink-soft">{problem.message}</span>
         </p>
       )}

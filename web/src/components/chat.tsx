@@ -7,7 +7,7 @@ import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
 
-import { hue, Info, Lamp, PanelHead } from "./gallery";
+import { FRAME, hue, Info, Lamp } from "./hud";
 
 // The API takes the last 20 messages (docs/plan.md, API).
 const HISTORY = 20;
@@ -30,13 +30,15 @@ type Props = {
 };
 
 // The agent: the host asks for a change in their own words, and Echo runs again with new filters
-// or rewrites one idea (L4). The previous analysis stays on screen until the new one is done.
+// or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. It's a dock
+// at the bottom of the screen, on every tab; the conversation opens above it and can be folded away.
 export function Chat({ analysis, onRerun, onRewrite }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<HostError | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [folded, setFolded] = useState(false);
   const log = useRef<HTMLOListElement>(null);
 
   const finished = useCallback(
@@ -61,6 +63,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
     if (!content || pending) return;
     const next: Entry[] = [...entries, { role: "user", content }];
     setEntries(next);
+    setFolded(false);
     setText("");
     setPending(true);
     setProblem(null);
@@ -90,115 +93,148 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
   const talking =
     entries.length > 0 || pending || running !== null || failed !== null || (run.error !== null && runId !== null);
 
+  const busy = pending || running?.status === "running";
+  const status = offline
+    ? "Offline"
+    : pending
+      ? "Listening"
+      : running?.status === "running"
+        ? "Running again"
+        : "Ready";
+
   return (
-    <section aria-labelledby="ask" className="panel flex flex-col rounded-[4px]">
-      <PanelHead id="ask" title="Talkback · ask Echo">
-        <span className="flex items-center gap-2">
-          <Lamp
-            color={offline ? "var(--balanced)" : "var(--amber)"}
-            on={pending || running?.status === "running"}
-            className={pending || running?.status === "running" ? "cue size-2" : "size-2"}
-          />
-          {offline ? "Offline" : pending ? "Listening" : running?.status === "running" ? "Running again" : "Open"}
-        </span>
-        <Info>
-          Ask for different guests in your own words, or for a new take on one idea. Echo runs again with the change,
-          and these guests stay until the new ones are ready.
-        </Info>
-      </PanelHead>
-      {!talking && !offline && (
-        <ul aria-label="Suggestions" className="flex flex-wrap gap-1.5 px-2 pt-2">
-          {SUGGESTIONS.map((suggestion) => (
-            <li key={suggestion}>
+    <section
+      aria-labelledby="ask"
+      className="sticky bottom-0 z-30 mt-auto border-t border-steel-hi bg-void/92 shadow-[0_-18px_40px_-20px_rgb(0_0_0/0.9)] backdrop-blur-md"
+    >
+      <div className={`${FRAME} flex flex-col gap-2 py-2.5`}>
+        <ol
+          ref={log}
+          role="log"
+          aria-label="Conversation with Echo"
+          className={
+            talking && !folded ? "screen flex max-h-[38vh] min-h-20 flex-col gap-2 overflow-y-auto p-3" : "sr-only"
+          }
+        >
+          {entries.map((entry, index) => (
+            <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
+              {entry.content}
+            </Line>
+          ))}
+          {pending && <Line who="Echo">…</Line>}
+          {running?.status === "running" && (
+            <Line who="Echo">
+              Running again: {step >= 0 ? running.steps[step].label.toLowerCase() : "finishing"}
+              {step >= 0 && `, step ${step + 1} of ${running.steps.length}`}.
+            </Line>
+          )}
+          {failed && (
+            <Line who="Echo">
+              <span className="font-semibold text-alert">{describe(failed.error).title}.</span> {failed.error?.message}{" "}
+              These guests are still the ones from before.
+            </Line>
+          )}
+          {run.error && runId && (
+            <Line who="Echo">
+              <span className="font-semibold text-alert">{describe(run.error).title}.</span> {run.error.message}
+            </Line>
+          )}
+        </ol>
+
+        {offline ? (
+          <p role="status" className="text-sm text-ink-soft">
+            Asking Echo isn&apos;t available in this demo yet. Everything else on the page works.
+          </p>
+        ) : (
+          problem && (
+            <p role="alert" className="text-sm">
+              <span className="font-semibold text-alert">{problem.title}.</span>{" "}
+              <span className="text-ink-soft">{problem.message}</span>
+            </p>
+          )
+        )}
+
+        <form onSubmit={submit} className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h2 id="ask" className="tag flex items-center gap-2 text-ink">
+            <Lamp
+              color={offline ? "var(--balanced)" : "var(--fit)"}
+              on={!offline}
+              className={busy ? "blink size-2" : "size-2"}
+            />
+            Ask Echo
+            <span className="sr-only">: {status}</span>
+          </h2>
+          {!talking && !offline && (
+            <ul aria-label="Suggestions" className="hidden flex-wrap gap-1.5 xl:flex">
+              {SUGGESTIONS.map((suggestion) => (
+                <li key={suggestion}>
+                  <button
+                    type="button"
+                    onClick={() => send(suggestion)}
+                    disabled={pending}
+                    className="btn btn-sm"
+                    style={hue("var(--fit)")}
+                  >
+                    {suggestion}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex min-w-0 flex-[1_1_20rem] gap-2">
+            <label htmlFor="ask-input" className="sr-only">
+              Ask Echo
+            </label>
+            <textarea
+              id="ask-input"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  send(text);
+                }
+              }}
+              maxLength={2000}
+              rows={1}
+              placeholder="Younger listeners, less famous guests…"
+              disabled={offline}
+              className="field min-h-10 min-w-0 flex-1 resize-none px-3 py-2 disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={offline || pending || !text.trim()}
+              className="btn btn-solid"
+              style={hue("var(--fit)")}
+            >
+              {pending ? "Asking…" : "Send"}
+            </button>
+            {talking && (
               <button
                 type="button"
-                onClick={() => send(suggestion)}
-                disabled={pending}
-                className="key min-h-8 px-2.5 py-1 text-xs"
+                onClick={() => setFolded(!folded)}
+                aria-expanded={!folded}
+                aria-label={folded ? "Show the conversation" : "Hide the conversation"}
+                className="btn px-2.5"
               >
-                {suggestion}
+                <svg
+                  aria-hidden
+                  viewBox="0 0 12 12"
+                  className={`size-3 transition-transform ${folded ? "rotate-180" : ""}`}
+                >
+                  <path d="M2 4.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <ol
-        ref={log}
-        role="log"
-        aria-label="Conversation with Echo"
-        className={
-          talking
-            ? "monitor m-2 mb-0 flex max-h-[22rem] min-h-24 flex-col gap-2 overflow-y-auto rounded-[2px] p-3"
-            : "sr-only"
-        }
-      >
-        {entries.map((entry, index) => (
-          <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
-            {entry.content}
-          </Line>
-        ))}
-        {pending && <Line who="Echo">…</Line>}
-        {running?.status === "running" && (
-          <Line who="Echo">
-            Running again: {step >= 0 ? running.steps[step].label.toLowerCase() : "finishing"}
-            {step >= 0 && `, step ${step + 1} of ${running.steps.length}`}.
-          </Line>
-        )}
-        {failed && (
-          <Line who="Echo">
-            <span className="font-semibold text-amber">{describe(failed.error).title}.</span> {failed.error?.message}{" "}
-            These guests are still the ones from before.
-          </Line>
-        )}
-        {run.error && runId && (
-          <Line who="Echo">
-            <span className="font-semibold text-amber">{describe(run.error).title}.</span> {run.error.message}
-          </Line>
-        )}
-      </ol>
-
-      {offline ? (
-        <p role="status" className="mx-3 mt-3 text-sm text-ink-soft">
-          Asking Echo isn&apos;t available in this demo yet. Everything else in the gallery works.
-        </p>
-      ) : (
-        problem && (
-          <p role="alert" className="mx-3 mt-2 text-sm">
-            <span className="font-semibold text-amber">{problem.title}.</span>{" "}
-            <span className="text-ink-soft">{problem.message}</span>
-          </p>
-        )
-      )}
-
-      <form onSubmit={submit} className="flex gap-2 p-2">
-        <label htmlFor="ask-input" className="sr-only">
-          Ask Echo
-        </label>
-        <textarea
-          id="ask-input"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              send(text);
-            }
-          }}
-          maxLength={2000}
-          rows={1}
-          placeholder="Younger listeners, less famous guests…"
-          disabled={offline}
-          className="well min-h-10 min-w-0 flex-1 resize-none px-3 py-2 disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={offline || pending || !text.trim()}
-          className={`key ${offline ? "" : "key-lit"}`}
-          style={hue("var(--amber)")}
-        >
-          {pending ? "Asking…" : "Talk"}
-        </button>
-      </form>
+            )}
+            <span className="hidden self-center sm:block">
+              <Info label="What Ask Echo does" up>
+                Ask for different guests in your own words, or for a new take on one idea. Echo runs again with the
+                change, and these guests stay until the new ones are ready.
+              </Info>
+            </span>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }
@@ -207,8 +243,10 @@ function Line({ who, children }: { who: string; children: ReactNode }) {
   const you = who === "You";
   return (
     <li className={`flex max-w-[92%] flex-col gap-1 ${you ? "self-end items-end" : "self-start"}`}>
-      <span className={`silk text-[0.5625rem] ${you ? "text-amber" : "text-fit"}`}>{who}</span>
-      <p className={`rounded-[3px] px-3 py-2 text-sm ${you ? "bg-amber/12 text-ink" : "bg-bezel text-ink"}`}>
+      <span className={`tag text-[0.625rem] ${you ? "text-ink-soft" : "text-fit"}`}>{who}</span>
+      <p
+        className={`rounded-[2px] border px-3 py-2 text-sm text-ink ${you ? "border-steel-hi bg-deck-hi" : "border-fit/30 bg-fit/8"}`}
+      >
         {children}
       </p>
     </li>

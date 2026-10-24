@@ -7,7 +7,7 @@ import { echo } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 
 import { CopyButton } from "./copy-button";
-import { hue } from "./gallery";
+import { hue } from "./hud";
 import { Markdown } from "./markdown";
 
 type Load =
@@ -43,7 +43,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
   if (load.state === "done") {
     return (
       <div className="flex flex-col gap-4">
-        <div className="monitor max-w-3xl rounded-[2px] p-4 sm:p-6">
+        <div className="screen max-w-3xl rounded-[2px] p-4 sm:p-6">
           <Markdown text={load.markdown} />
         </div>
         {printing &&
@@ -55,7 +55,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
           )}
         <div className="flex flex-wrap items-center gap-3">
           <CopyButton text={load.markdown} label="Copy the briefing" of={guestName} />
-          <button type="button" onClick={() => setPrinting(true)} className="key">
+          <button type="button" onClick={() => setPrinting(true)} className="btn">
             Print
             <span className="sr-only"> the briefing for {guestName}</span>
           </button>
@@ -73,7 +73,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
         type="button"
         onClick={write}
         disabled={load.state === "loading"}
-        className="key key-lit"
+        className="btn btn-solid"
         style={hue("var(--ink)")}
       >
         {load.state === "loading" ? "Writing…" : "Write the briefing"}
@@ -81,7 +81,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
       </button>
       {load.state === "failed" && (
         <div role="alert" className="text-sm">
-          <p className="font-semibold text-amber">{load.problem.title}</p>
+          <p className="font-semibold text-alert">{load.problem.title}</p>
           <p className="text-ink-soft">{load.problem.message}</p>
         </div>
       )}

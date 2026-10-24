@@ -2,30 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 
 import type { Analysis, Filters, Guest, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
-import { stats } from "@/lib/stats";
+import { stats as computeStats, type Stats } from "@/lib/stats";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
-import { Bridge } from "./bridge";
 import { Chat } from "./chat";
+import { Dossier, type DossierView } from "./dossier";
 import { FeaturedFallback } from "./featured";
-import { FRAME, hue, Lamp, PanelHead, Scribble } from "./gallery";
-import { GuestDetails } from "./guest-details";
+import { GuestList, lockLine } from "./guest-list";
+import { Chip, FRAME, hue, Lamp, ZoneHead } from "./hud";
 import { Invite, MAX_PICKS } from "./invite";
-import { Preview } from "./preview";
+import { LockHeader, ShowLock } from "./lock-header";
 import { Problem } from "./problem";
-import { ProgramMonitor, Readouts } from "./program";
 import { RouterLog } from "./router-log";
 import { Scope } from "./scope";
 import { CommonGround, FanAges, Spectrum } from "./spectrum";
-import { onAirLine, Wall } from "./wall";
 
 const PREFIX = "/analyses/";
 const NARROW = "(max-width: 1023px)";
+
+const TABS = ["guests", "audience", "invite", "qloo"] as const;
+type Tab = (typeof TABS)[number];
+const isTab = (value: string | null): value is Tab => TABS.includes(value as Tab);
 
 export function AnalysisView({ id }: { id: string }) {
   // A run the chat starts takes over the URL with history.pushState, so the analysis shown follows the
@@ -35,7 +37,7 @@ export function AnalysisView({ id }: { id: string }) {
   const { analysis, error, retry, update } = useAnalysis(shown);
 
   const rerun = useCallback((next: Analysis) => {
-    window.history.pushState(null, "", `${PREFIX}${encodeURIComponent(next.id)}`);
+    window.history.pushState(null, "", `${PREFIX}${encodeURIComponent(next.id)}${window.location.search}`);
   }, []);
   const rewrite = useCallback(
     (guestRef: string, idea: Idea) =>
@@ -47,9 +49,9 @@ export function AnalysisView({ id }: { id: string }) {
   );
 
   if (!analysis) {
-    if (!error) return <GallerySkeleton />;
+    if (!error) return <ConsoleSkeleton />;
     return (
-      <div className={`${FRAME} py-3`}>
+      <div className={`${FRAME} py-4`}>
         <Problem problem={describe(error)}>
           <NextStep problem={describe(error)} onRetry={retry} />
         </Problem>
@@ -61,23 +63,21 @@ export function AnalysisView({ id }: { id: string }) {
     <>
       <title>{`${analysis.show.title} · Echo`}</title>
       {analysis.status === "done" && !error ? (
-        <Gallery analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
+        <Console analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
       ) : (
-        <div className={`${FRAME} grid grid-cols-1 gap-3 py-3 lg:grid-cols-12`}>
-          <div className="lg:col-span-4">
-            <ProgramMonitor analysis={analysis} />
-          </div>
-          <div className="lg:col-span-8">
-            {error ? (
-              <Problem problem={describe(error)}>
-                <NextStep problem={describe(error)} onRetry={retry} />
-              </Problem>
-            ) : analysis.status === "running" ? (
-              <Rundown steps={analysis.steps} />
-            ) : (
-              <Failed analysis={analysis} />
-            )}
-          </div>
+        <div className={`${FRAME} flex flex-col gap-4 py-4`}>
+          <section aria-label="Your show" className="zone p-4 sm:p-5">
+            <ShowLock analysis={analysis} />
+          </section>
+          {error ? (
+            <Problem problem={describe(error)}>
+              <NextStep problem={describe(error)} onRetry={retry} />
+            </Problem>
+          ) : analysis.status === "running" ? (
+            <Rundown steps={analysis.steps} />
+          ) : (
+            <Failed analysis={analysis} />
+          )}
         </div>
       )}
     </>
@@ -88,46 +88,37 @@ type UiState = {
   id: string;
   selected: string | null;
   picked: string[];
-  deep: string | null;
+  view: DossierView;
 };
-const fresh = (id: string): UiState => ({
-  id,
-  selected: null,
-  picked: [],
-  deep: null,
-});
+const fresh = (id: string): UiState => ({ id, selected: null, picked: [], view: "profile" });
 
-type GalleryProps = {
+type ConsoleProps = {
   analysis: Analysis;
   onRerun: (analysis: Analysis) => void;
   onRewrite: (guestRef: string, idea: Idea) => void;
 };
 
-// The finished run: the desk readout and the program, then every guest on the bridge and the wall, the
-// selected one on the preview monitor, and the run's data below.
-function Gallery({ analysis, onRerun, onRewrite }: GalleryProps) {
+// The finished run: the lock header, four tabs, and the chat docked under them all.
+function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
   const { guests } = analysis;
-  // Not keyed by the analysis, so the chat keeps its conversation across a rerun; what the host
-  // selected and picked belongs to one analysis and starts over with the next.
-  // A link to #guest-<ref> opens with that guest on preview. The gallery only mounts in the browser,
-  // once the analysis has loaded, so the hash is there to read.
+  // Not keyed by the analysis, so the chat and the tab stay across a rerun; what the host selected and
+  // picked belongs to one analysis and starts over with the next.
+  // A link to #guest-<ref> opens with that guest selected, and ?tab= opens a tab. The console only
+  // mounts in the browser, once the analysis has loaded, so the URL is there to read.
   const [ui, setUi] = useState<UiState>(() => {
     const ref = typeof window === "undefined" ? undefined : window.location.hash.match(/^#guest-(.+)$/)?.[1];
-    return {
-      ...fresh(analysis.id),
-      selected: ref && guests.some((guest) => guest.ref === ref) ? ref : null,
-    };
+    return { ...fresh(analysis.id), selected: ref && guests.some((guest) => guest.ref === ref) ? ref : null };
+  });
+  const [tab, setTab] = useState<Tab>(() => {
+    const value = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return isTab(value) ? value : "guests";
   });
   const current = ui.id === analysis.id ? ui : fresh(analysis.id);
   const change = (next: Partial<UiState>) =>
-    setUi((state) => ({
-      ...(state.id === analysis.id ? state : fresh(analysis.id)),
-      ...next,
-    }));
-  const { selected: selectedRef, picked, deep } = current;
+    setUi((state) => ({ ...(state.id === analysis.id ? state : fresh(analysis.id)), ...next }));
+  const { selected: selectedRef, picked, view } = current;
   const [highlighted, setHighlighted] = useState<string | null>(null);
-  const deepRef = useRef<HTMLDivElement>(null);
-  const figures = stats(analysis);
+  const figures = computeStats(analysis);
 
   const index = Math.max(
     guests.findIndex((guest) => guest.ref === selectedRef),
@@ -140,36 +131,35 @@ function Gallery({ analysis, onRerun, onRewrite }: GalleryProps) {
       setUi((state) => ({
         ...(state.id === analysis.id ? state : fresh(analysis.id)),
         selected: ref,
+        view: "profile",
       }));
       window.history.replaceState(null, "", `#guest-${ref}`);
-      // On one column the preview is below the wall: bring it up.
+      // On one column the dossier is below the list: bring it up.
       if (window.matchMedia(NARROW).matches) {
-        document.getElementById("preview-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("dossier-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     },
     [analysis.id],
   );
 
-  const togglePick = (ref: string) =>
-    change({
-      picked: picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref],
-    });
-
-  const openDeep = (ref: string) => {
-    const next = deep === ref ? null : ref;
-    change({ deep: next });
-    if (next) requestAnimationFrame(() => deepRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  const openTab = (next: Tab) => {
+    setTab(next);
+    const search = next === "guests" ? "" : `?tab=${next}`;
+    window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
   };
+
+  const togglePick = (ref: string) =>
+    change({ picked: picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref] });
 
   if (!guests.length) {
     return (
-      <div className={`${FRAME} grid grid-cols-1 gap-3 py-3 lg:grid-cols-12`}>
-        <div className="lg:col-span-4">
-          <ProgramMonitor analysis={analysis} />
-        </div>
-        <div className="panel rounded-[4px] p-6 lg:col-span-8">
-          <p className="font-cond text-2xl font-semibold">No guests came back for this show.</p>
-          <Link href="/" className="key mt-4">
+      <div className={`${FRAME} flex flex-col gap-4 py-4`}>
+        <section aria-label="Your show" className="zone p-4 sm:p-5">
+          <ShowLock analysis={analysis} />
+        </section>
+        <div className="zone p-6">
+          <p className="font-display text-2xl font-semibold">No guests came back for this show.</p>
+          <Link href="/" className="btn mt-4">
             Find another show
           </Link>
         </div>
@@ -177,182 +167,190 @@ function Gallery({ analysis, onRerun, onRewrite }: GalleryProps) {
     );
   }
 
-  const deepGuest = guests.find((guest) => guest.ref === deep);
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className={`${FRAME} pt-4`}>
+        <LockHeader key={`lock-${analysis.id}`} analysis={analysis} stats={figures} line={lockLine(guests)} />
+      </div>
+
+      <TabBar tab={tab} onTab={openTab} stats={figures} picked={picked.length} />
+
+      <div className={`${FRAME} flex-1 pt-4 pb-8`}>
+        <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
+              <Scope
+                key={`scope-${analysis.id}`}
+                guests={guests}
+                selected={selected?.ref ?? null}
+                highlighted={highlighted}
+                onSelect={select}
+                onHighlight={setHighlighted}
+              />
+              <GuestList
+                key={`list-${analysis.id}`}
+                guests={guests}
+                selected={selected?.ref ?? null}
+                highlighted={highlighted}
+                picked={picked}
+                onSelect={select}
+                onHighlight={setHighlighted}
+              />
+            </div>
+            <aside id="dossier-panel" aria-label="Selected guest" className="min-w-0 scroll-mt-28 lg:col-span-5">
+              <div className="lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12.5rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]">
+                {selected && (
+                  <Dossier
+                    analysis={analysis}
+                    guest={selected}
+                    index={index}
+                    picked={picked.includes(selected.ref)}
+                    full={picked.length >= MAX_PICKS}
+                    view={view}
+                    onPick={() => togglePick(selected.ref)}
+                    onView={(next) => change({ view: next })}
+                  />
+                )}
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <div id="panel-audience" role="tabpanel" aria-labelledby="tab-audience" hidden={tab !== "audience"}>
+          {tab === "audience" && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="md:col-span-3">
+                <Spectrum rows={analysis.audience_map} />
+              </div>
+              <FanAges stats={figures} />
+              <CommonGround guests={guests} />
+              <LeftOut analysis={analysis} />
+            </div>
+          )}
+        </div>
+
+        <div id="panel-invite" role="tabpanel" aria-labelledby="tab-invite" hidden={tab !== "invite"}>
+          <Invite analysis={analysis} picked={picked} onToggle={togglePick} />
+        </div>
+
+        <div id="panel-qloo" role="tabpanel" aria-labelledby="tab-qloo" hidden={tab !== "qloo"}>
+          {tab === "qloo" && <RouterLog calls={analysis.qloo_calls} stats={figures} />}
+        </div>
+      </div>
+
+      <Chat analysis={analysis} onRerun={onRerun} onRewrite={onRewrite} />
+    </div>
+  );
+}
+
+const TAB_NAMES: Record<Tab, string> = { guests: "Guests", audience: "Audience", invite: "Invite", qloo: "Qloo" };
+
+// The tabs, under the status bar while the page scrolls. Arrow keys move between them.
+function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => void; stats: Stats; picked: number }) {
+  const refs = useRef<Record<Tab, HTMLButtonElement | null>>({
+    guests: null,
+    audience: null,
+    invite: null,
+    qloo: null,
+  });
+  const counts: Record<Tab, string> = {
+    guests: String(stats.guests),
+    audience: String(stats.tastes),
+    invite: `${picked}/${MAX_PICKS}`,
+    qloo: String(stats.calls),
+  };
+  const units: Record<Tab, string> = {
+    guests: "guests",
+    audience: "tastes",
+    invite: "picked",
+    qloo: "calls",
+  };
+
+  function keys(event: KeyboardEvent<HTMLDivElement>) {
+    const at = TABS.indexOf(tab);
+    const next =
+      event.key === "ArrowRight"
+        ? TABS[(at + 1) % TABS.length]
+        : event.key === "ArrowLeft"
+          ? TABS[(at - 1 + TABS.length) % TABS.length]
+          : event.key === "Home"
+            ? TABS[0]
+            : event.key === "End"
+              ? TABS[TABS.length - 1]
+              : null;
+    if (!next) return;
+    event.preventDefault();
+    onTab(next);
+    refs.current[next]?.focus();
+  }
 
   return (
-    <div className={`${FRAME} grid grid-cols-1 gap-3 py-3 lg:grid-cols-12`}>
-      <div className="lg:col-span-4">
-        <ProgramMonitor analysis={analysis} />
-      </div>
-      <div className="lg:col-span-8">
-        <Readouts key={`readouts-${analysis.id}`} stats={figures} line={onAirLine(guests)} />
-      </div>
-
-      <div className="min-w-0 lg:col-span-8 lg:row-start-2">
-        <Wall
-          key={`wall-${analysis.id}`}
-          guests={guests}
-          selected={selected?.ref ?? null}
-          highlighted={highlighted}
-          picked={picked}
-          onSelect={select}
-          onHighlight={setHighlighted}
-        />
-      </div>
-
-      {/* The preview sticks inside its column, which spans the wall row and the row below it. On one column it
-          comes straight after the wall. */}
-      <div className="lg:col-span-4 lg:col-start-9 lg:row-span-2 lg:row-start-2">
-        <aside
-          id="preview-panel"
-          aria-label="Preview"
-          className="flex scroll-mt-16 flex-col gap-3 lg:sticky lg:top-15 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
+    <div className="sticky top-12 z-20 mt-4 border-y border-steel bg-void/90 backdrop-blur-md">
+      <div className={FRAME}>
+        <div
+          role="tablist"
+          aria-label="Analysis"
+          onKeyDown={keys}
+          className="-mx-2.5 flex overflow-x-auto [scrollbar-width:none] sm:mx-0"
         >
-          {selected && (
-            <Preview
-              guest={selected}
-              index={index}
-              picked={picked.includes(selected.ref)}
-              full={picked.length >= MAX_PICKS}
-              open={deep === selected.ref}
-              onPick={() => togglePick(selected.ref)}
-              onOpen={() => openDeep(selected.ref)}
-            />
-          )}
-          <PickBus guests={guests} picked={picked} onRemove={togglePick} />
-        </aside>
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-3 lg:col-span-8 lg:row-start-3">
-        <Bridge
-          key={`bridge-${analysis.id}`}
-          guests={guests}
-          selected={selected?.ref ?? null}
-          highlighted={highlighted}
-          onSelect={select}
-          onHighlight={setHighlighted}
-        />
-        <div ref={deepRef} id="deep-dive" className="scroll-mt-16" hidden={!deepGuest}>
-          {deepGuest && (
-            <section aria-labelledby="deep-title" className="panel rounded-[4px]">
-              <PanelHead id="deep-title" title={`Episode & fans · ${deepGuest.name}`}>
-                <button
-                  type="button"
-                  onClick={() => change({ deep: null })}
-                  className="key min-h-8 px-2.5 py-1 text-xs"
-                >
-                  Close
-                </button>
-              </PanelHead>
-              <div className="p-4">
-                <GuestDetails
-                  key={deepGuest.ref}
-                  id={analysis.id}
-                  guestRef={deepGuest.ref}
-                  guestName={deepGuest.name}
-                  showMap={analysis.audience_map}
+          {TABS.map((name) => {
+            const on = tab === name;
+            return (
+              <button
+                key={name}
+                ref={(element) => {
+                  refs.current[name] = element;
+                }}
+                id={`tab-${name}`}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                aria-controls={`panel-${name}`}
+                tabIndex={on ? 0 : -1}
+                onClick={() => onTab(name)}
+                className={`group relative flex shrink-0 items-baseline gap-1.5 px-2.5 py-3.5 transition-colors sm:gap-2.5 sm:px-6 ${
+                  on ? "text-ink" : "text-ink-dim hover:text-ink-soft"
+                }`}
+              >
+                <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">
+                  {TAB_NAMES[name]}
+                </span>
+                <span className={`readout text-xs sm:text-sm ${on ? "text-fit" : ""}`}>
+                  {counts[name]}
+                  <span className="sr-only"> {units[name]}</span>
+                </span>
+                <span
+                  aria-hidden
+                  className={`absolute inset-x-3 bottom-0 h-0.5 transition-opacity ${on ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
+                  style={{ background: "var(--fit)" }}
                 />
-              </div>
-            </section>
-          )}
+              </button>
+            );
+          })}
         </div>
-        <Scope
-          key={`scope-${analysis.id}`}
-          guests={guests}
-          selected={selected?.ref ?? null}
-          highlighted={highlighted}
-          onSelect={select}
-          onHighlight={setHighlighted}
-        />
-        <Chat analysis={analysis} onRerun={onRerun} onRewrite={onRewrite} />
-      </div>
-
-      <div className="lg:col-span-12">
-        <Spectrum key={`spectrum-${analysis.id}`} rows={analysis.audience_map} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:col-span-12">
-        <FanAges stats={figures} />
-        <CommonGround guests={guests} />
-        <LeftOut analysis={analysis} />
-      </div>
-
-      {picked.length > 0 && (
-        <div className="lg:col-span-12">
-          <Invite analysis={analysis} picked={picked} onRemove={togglePick} />
-        </div>
-      )}
-
-      <div className="lg:col-span-12">
-        <RouterLog key={`routerlog-${analysis.id}`} calls={analysis.qloo_calls} stats={figures} />
       </div>
     </div>
   );
 }
 
-// The preview bus: the guests picked to invite, and the way to the invitations.
-function PickBus({ guests, picked, onRemove }: { guests: Guest[]; picked: string[]; onRemove: (ref: string) => void }) {
-  return (
-    <section aria-labelledby="bus" className="panel rounded-[4px]">
-      <PanelHead id="bus" title="Invite bus">
-        <span className={picked.length ? "text-pvw" : ""}>
-          {picked.length} / {MAX_PICKS}
-        </span>
-      </PanelHead>
-      <div className="flex flex-col gap-3 p-3">
-        <ol aria-label="Picked guests" className="grid grid-cols-5 gap-1.5">
-          {Array.from({ length: MAX_PICKS }, (_, slot) => {
-            const guest = guests.find((g) => g.ref === picked[slot]);
-            return (
-              <li
-                key={slot}
-                className={`flex h-9 items-center justify-center rounded-[2px] ${guest ? "lamp" : "lamp-off"}`}
-                style={hue("var(--pvw)")}
-              >
-                {guest ? (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(guest.ref)}
-                    title={`Remove ${guest.name}`}
-                    className="h-full w-full truncate px-1 font-cond text-xs font-semibold text-on-light uppercase"
-                  >
-                    {guest.name.split(/\s+/).pop()}
-                    <span className="sr-only">: remove {guest.name}</span>
-                  </button>
-                ) : (
-                  <span className="sr-only">Empty</span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        {picked.length > 0 ? (
-          <a href="#invite" className="key key-lit w-full" style={hue("var(--pvw)")}>
-            Write {picked.length === 1 ? "the invitation" : `${picked.length} invitations`}
-          </a>
-        ) : (
-          <p className="text-sm text-ink-dim">Pick guests with Invite to draft their invitations.</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function LeftOut({ analysis }: { analysis: Analysis }) {
   return (
-    <section aria-labelledby="left-out" className="panel flex flex-col rounded-[4px]">
-      <PanelHead id="left-out" title="Left out">
+    <section aria-labelledby="left-out" className="zone flex flex-col">
+      <ZoneHead id="left-out" title="Left out">
         <span>{analysis.left_out.length}</span>
-      </PanelHead>
+      </ZoneHead>
       <div className="flex flex-col gap-3 p-4">
         {analysis.left_out.length ? (
-          <ul className="flex flex-wrap gap-1.5">
+          <ul className="flex flex-col gap-1.5">
             {analysis.left_out.map(({ name, why }) => (
-              <li key={`${name}-${why}`} className="flex items-center gap-1.5 rounded-[2px] bg-bezel px-2 py-1 text-sm">
-                <Scribble color={why === "host" ? "var(--amber)" : "var(--balanced)"} className="text-[0.625rem]">
-                  {why === "host" ? "Host" : "Past guest"}
-                </Scribble>
+              <li
+                key={`${name}-${why}`}
+                className="flex items-center justify-between gap-3 border-b border-steel pb-1.5 text-sm"
+              >
                 {name}
+                <Chip color={why === "host" ? "var(--long-shot)" : "var(--balanced)"}>
+                  {why === "host" ? "Host" : "Past guest"}
+                </Chip>
               </li>
             ))}
           </ul>
@@ -367,32 +365,31 @@ function LeftOut({ analysis }: { analysis: Analysis }) {
   );
 }
 
-// Holds the gallery's place while the page loads, so nothing jumps when it arrives.
-export function GallerySkeleton() {
+// Holds the console's place while the page loads, so nothing jumps when it arrives.
+export function ConsoleSkeleton() {
   return (
-    <div aria-busy className={`${FRAME} grid grid-cols-1 gap-3 py-3 lg:grid-cols-12`}>
+    <div aria-busy className={`${FRAME} grid grid-cols-1 gap-4 py-4 lg:grid-cols-12`}>
       <span className="sr-only">Loading the analysis</span>
-      <div className="panel h-72 rounded-[4px] lg:col-span-4" />
-      <div className="panel h-72 rounded-[4px] lg:col-span-8" />
-      <div className="panel h-56 rounded-[4px] lg:col-span-8" />
-      <div className="panel h-56 rounded-[4px] lg:col-span-4" />
+      <div className="zone h-52 lg:col-span-12" />
+      <div className="zone h-96 lg:col-span-7" />
+      <div className="zone h-96 lg:col-span-5" />
     </div>
   );
 }
 
-// The run's six steps as a rundown, with a scope searching while Echo works. Fixed heights, so polling
-// never moves the page.
+// The run's six steps beside a radar sweeping while Echo works. Fixed heights, so polling never moves
+// the page.
 function Rundown({ steps }: { steps: Step[] }) {
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
   return (
-    <section aria-labelledby="running" className="panel flex h-full flex-col rounded-[4px]">
-      <PanelHead id="running" title="Rundown">
-        <span className="text-amber">
+    <section aria-labelledby="running" className="zone flex flex-col">
+      <ZoneHead id="running" title="Echo is running">
+        <span className="text-fit">
           {done} / {steps.length}
         </span>
-      </PanelHead>
-      <div className="grid flex-1 gap-4 p-4 md:grid-cols-[1fr_1.2fr]">
+      </ZoneHead>
+      <div className="grid gap-6 p-5 md:grid-cols-[1fr_auto] md:items-center">
         <ol className="flex flex-col">
           {steps.map((step, index) => {
             const on = index === current;
@@ -400,13 +397,13 @@ function Rundown({ steps }: { steps: Step[] }) {
               <li
                 key={step.key}
                 aria-current={on ? "step" : undefined}
-                className={`flex h-11 items-center gap-3 border-b border-line ${step.done || on ? "text-ink" : "text-ink-dim"}`}
+                className={`flex h-12 items-center gap-4 border-b border-steel ${step.done || on ? "text-ink" : "text-ink-dim"}`}
               >
-                <span className="silk w-6 text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
+                <span className="readout w-6 text-sm text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
                 <Lamp
-                  color={step.done ? "var(--pvw)" : "var(--amber)"}
+                  color={step.done ? "var(--sweet)" : "var(--fit)"}
                   on={step.done || on}
-                  className={`h-3 w-5 ${on ? "cue" : ""}`}
+                  className={`h-2 w-5 ${on ? "blink" : ""}`}
                 />
                 <span className={on ? "font-semibold" : ""}>{step.label}</span>
                 <span className="sr-only">{step.done ? "(done)" : on ? "(running)" : "(waiting)"}</span>
@@ -414,60 +411,93 @@ function Rundown({ steps }: { steps: Step[] }) {
             );
           })}
         </ol>
-        <div aria-hidden className="monitor relative flex min-h-64 flex-col overflow-hidden rounded-[2px]">
-          <svg viewBox="0 0 400 260" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
-            {[0.25, 0.5, 0.75].map((t) => (
-              <g key={t} stroke="var(--line)" strokeOpacity="0.6">
-                <line x1={t * 400} x2={t * 400} y1={0} y2={260} />
-                <line x1={0} x2={400} y1={t * 260} y2={t * 260} />
-              </g>
-            ))}
-          </svg>
-          <span className="searching absolute inset-y-0 w-1/4" />
-          {/* The logo's rings, sounding while Echo listens. */}
-          <svg viewBox="0 0 200 200" className="absolute top-1/2 left-1/2 size-56 -translate-x-1/2 -translate-y-1/2">
-            {[0, 1, 2].map((i) => (
-              <circle
-                key={i}
-                className="ring"
-                cx="100"
-                cy="100"
-                r="8"
-                fill="none"
-                stroke="var(--amber)"
-                vectorEffect="non-scaling-stroke"
-                style={{ animationDelay: `${i * 0.9}s` }}
-              />
-            ))}
-            <circle cx="100" cy="100" r="5" fill="var(--amber)" />
-          </svg>
-          <div className="relative mt-auto flex flex-col gap-2 p-3">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="font-cond text-xl font-semibold text-amber">
-                {current >= 0 ? steps[current].label : "Finishing"}
-              </span>
-              <span className="font-cond text-3xl leading-none font-semibold">
-                {String(done).padStart(2, "0")}
-                <span className="text-ink-dim">/{String(steps.length).padStart(2, "0")}</span>
-              </span>
-            </span>
-            <span className="grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
-              {steps.map((step, index) => (
-                <span
-                  key={step.key}
-                  className={`h-1.5 rounded-[1px] ${step.done || index === current ? "lamp" : "lamp-off"} ${index === current ? "cue" : ""}`}
-                  style={hue(step.done ? "var(--pvw)" : "var(--amber)")}
-                />
-              ))}
-            </span>
-          </div>
-        </div>
+        <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
       </div>
-      <p className="px-4 pb-4 text-sm text-ink-soft">Echo is running. It usually takes under twenty seconds.</p>
+      <p className="px-5 pb-5 text-sm text-ink-soft">It usually takes under twenty seconds.</p>
       <p aria-live="polite" className="sr-only">
         {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
       </p>
     </section>
+  );
+}
+
+// A radar sweeping for guests: range rings, a rotating beam, and the steps done as an arc around it.
+function Radar({ label, done, total }: { label: string; done: number; total: number }) {
+  const r = 120;
+  const arc = 2 * Math.PI * (r + 14);
+  return (
+    <div aria-hidden className="relative mx-auto size-72 shrink-0">
+      <svg viewBox="-150 -150 300 300" className="absolute inset-0 size-full overflow-visible">
+        <defs>
+          <radialGradient id="radar-glow">
+            <stop offset="0" stopColor="var(--fit)" stopOpacity="0.12" />
+            <stop offset="1" stopColor="var(--fit)" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="radar-beam" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="var(--fit)" stopOpacity="0" />
+            <stop offset="1" stopColor="var(--fit)" stopOpacity="0.45" />
+          </linearGradient>
+        </defs>
+        <circle r={r} fill="url(#radar-glow)" />
+        {[0.33, 0.66, 1].map((t) => (
+          <circle
+            key={t}
+            r={r * t}
+            fill="none"
+            stroke="var(--steel-hi)"
+            strokeDasharray={t === 1 ? undefined : "2 4"}
+          />
+        ))}
+        <line x1={-r} x2={r} stroke="var(--steel)" />
+        <line y1={-r} y2={r} stroke="var(--steel)" />
+        {Array.from({ length: 72 }, (_, i) => {
+          const a = (i / 72) * Math.PI * 2;
+          const inner = i % 6 === 0 ? r - 8 : r - 4;
+          return (
+            <line
+              key={i}
+              x1={Math.cos(a) * inner}
+              y1={Math.sin(a) * inner}
+              x2={Math.cos(a) * r}
+              y2={Math.sin(a) * r}
+              stroke="var(--steel-hi)"
+            />
+          );
+        })}
+        <g className="sweep">
+          <path
+            d={`M 0 0 L ${r} 0 A ${r} ${r} 0 0 0 ${Math.cos(-0.6) * r} ${Math.sin(-0.6) * r} Z`}
+            fill="url(#radar-beam)"
+          />
+          <line x1="0" y1="0" x2={r} y2="0" stroke="var(--fit)" strokeWidth="1.5" />
+        </g>
+        {[0, 1, 2].map((i) => (
+          <circle
+            key={i}
+            className="ring"
+            r="9"
+            fill="none"
+            stroke="var(--fit)"
+            vectorEffect="non-scaling-stroke"
+            style={{ animationDelay: `${i * 0.93}s` }}
+          />
+        ))}
+        <circle r="5" fill="var(--fit)" />
+        <circle r={r + 14} fill="none" stroke="var(--fit)" strokeOpacity="0.15" strokeWidth="3" />
+        <circle
+          r={r + 14}
+          fill="none"
+          stroke="var(--sweet)"
+          strokeWidth="3"
+          strokeDasharray={`${(arc * done) / Math.max(total, 1)} ${arc}`}
+          transform="rotate(-90)"
+          style={{ transition: "stroke-dasharray 600ms var(--ease-out)" }}
+        />
+      </svg>
+      <div className="absolute inset-x-0 -bottom-2 flex flex-col items-center">
+        <span className="tag text-fit">{label}</span>
+      </div>
+    </div>
   );
 }
 
@@ -489,10 +519,7 @@ function Failed({ analysis }: { analysis: Analysis }) {
 // The filters as a request, without what the engine filled in.
 function requestFilters(filters: Filters): Filters {
   const about = filters.episode_about;
-  return {
-    ...filters,
-    episode_about: about && { query: about.query, type: about.type },
-  };
+  return { ...filters, episode_about: about && { query: about.query, type: about.type } };
 }
 
 function NextStep({
@@ -510,7 +537,7 @@ function NextStep({
       return (
         <>
           <FeaturedFallback />
-          <Link href="/" className="key self-start">
+          <Link href="/" className="btn self-start">
             Search for another show
           </Link>
         </>
@@ -521,7 +548,7 @@ function NextStep({
           type="button"
           onClick={onRetry}
           disabled={retrying}
-          className="key key-lit self-start"
+          className="btn btn-solid self-start"
           style={hue("var(--ink)")}
         >
           {retrying ? "Starting…" : "Try again"}
@@ -529,13 +556,13 @@ function NextStep({
       );
     case "previous":
       return (
-        <button type="button" onClick={() => router.back()} className="key self-start">
+        <button type="button" onClick={() => router.back()} className="btn self-start">
           Go back
         </button>
       );
     case "home":
       return (
-        <Link href="/" className="key self-start">
+        <Link href="/" className="btn self-start">
           Find your show
         </Link>
       );
