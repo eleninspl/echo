@@ -173,6 +173,8 @@ export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: 
       <Image
         src={url}
         onError={() => setBroken(url)}
+        // Qloo answers some missing portraits with a tiny placeholder instead of an error; theirs are 420 wide.
+        onLoad={(event) => event.currentTarget.naturalWidth < 48 && setBroken(url)}
         alt=""
         fill
         sizes={sizes}
