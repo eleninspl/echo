@@ -17,7 +17,7 @@ export function SignalPath() {
           <span className="text-fit">Your listeners</span>
           <span className="text-love">Their fans</span>
         </p>
-        <svg viewBox="0 0 520 330" className="block w-full" role="img" aria-labelledby="signal-desc">
+        <svg viewBox="0 0 520 330" className="mx-auto block w-full max-w-md md:max-w-none" role="img" aria-labelledby="signal-desc">
           <desc id="signal-desc">
             Two overlapping circles: your listeners and the guest&apos;s fans. Fit runs from your show to the guest,
             love back from the guest to your show, and reach is the part of the guest&apos;s fans outside your
@@ -151,7 +151,7 @@ export function SignalPath() {
 export function ScoreKey() {
   return (
     <section aria-label="How Echo scores a guest" className="panel rounded-[4px]">
-      <dl className="grid grid-cols-1 gap-px p-2 sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-px p-2 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
         {TERMS.map(({ term, color, means }) => (
           <div key={term} className="flex flex-col gap-1 px-2 py-2">
             <dt className="font-cond text-lg leading-none font-semibold" style={{ color }}>
