@@ -393,6 +393,42 @@ a {
     outline-offset: 0;
     border-color: var(--fit);
   }
+
+  .ask-dock {
+    filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--fit) 40%, transparent));
+    transition: filter 300ms ease-in;
+  }
+
+  .ask-shell {
+    clip-path: inset(calc(100% - 4rem) 0.5rem 0.5rem calc(100% - 4rem) round 1.75rem);
+    transition: clip-path 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ask-body {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 120ms ease-in,
+      visibility 0s 120ms;
+  }
+
+  .ask-dock[data-open] {
+    filter: drop-shadow(0 24px 40px rgb(0 0 0 / 0.7));
+    transition: filter 480ms var(--ease-out);
+  }
+
+  .ask-dock[data-open] .ask-shell {
+    clip-path: inset(0 round 1.75rem);
+    transition: clip-path 480ms var(--ease-out);
+  }
+
+  .ask-dock[data-open] .ask-body {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 260ms ease-out 140ms,
+      visibility 0s;
+  }
 }
 
 /* Printing a briefing prints only that briefing, copied to the end of body (components/briefing.tsx). */
@@ -428,5 +464,11 @@ a {
   .sweep,
   .flow {
     animation: none;
+  }
+
+  .ask-dock,
+  .ask-shell,
+  .ask-body {
+    transition: none;
   }
 }

@@ -13,11 +13,44 @@ import { Logo } from "./logo";
 // The API takes the last 20 messages (docs/plan.md, API).
 const HISTORY = 20;
 
-const SUGGESTIONS = [
-  "Younger listeners",
-  "Less famous guests",
-  "An episode about a film",
-  "Make the first idea funnier",
+const SUGGESTIONS: { ask: string; note: string; icon: ReactNode }[] = [
+  {
+    ask: "Younger listeners",
+    note: "Guests for a younger slice of the audience",
+    icon: (
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    ),
+  },
+  {
+    ask: "Less famous guests",
+    note: "Rising names over the obvious picks",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m15.5 8.5-2 5-5 2 2-5z" />
+      </>
+    ),
+  },
+  {
+    ask: "An episode about a film",
+    note: "An episode built around one film",
+    icon: (
+      <>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4" />
+      </>
+    ),
+  },
+  {
+    ask: "Make the first idea funnier",
+    note: "A lighter take on the first idea",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9.5h.01M15 9.5h.01" />
+      </>
+    ),
+  },
 ];
 
 // A note is shown in the transcript but never sent: Echo's own word on a run it started.
@@ -32,7 +65,7 @@ type Props = {
 
 // The agent: the host asks for a change in their own words, and Echo runs again with new filters
 // or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. A round
-// button at the bottom right on every tab opens the conversation above it; closing it keeps the conversation.
+// button at the bottom right on every tab; the panel opens out of it, and closing it keeps the conversation.
 export function Chat({ analysis, onRerun, onRewrite }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
@@ -126,25 +159,20 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
         : "Ready";
 
   return (
-    <>
-      <section
-        id="ask-panel"
-        role="dialog"
-        aria-labelledby="ask"
-        onKeyDown={keys}
-        className={`zone fixed right-4 bottom-22 z-40 flex max-h-[calc(100dvh-9rem)] w-[calc(100vw-2rem)] max-w-[26rem] origin-bottom-right flex-col shadow-[0_24px_60px_rgb(0_0_0/0.8)] motion-reduce:transition-none sm:right-6 sm:bottom-24 ${
-          open
-            ? "visible translate-y-0 scale-100 opacity-100 [transition:opacity_220ms_var(--ease-out),translate_220ms_var(--ease-out),scale_220ms_var(--ease-out),visibility_0s]"
-            : "invisible translate-y-3 scale-95 opacity-0 [transition:opacity_160ms_ease-in,translate_160ms_ease-in,scale_160ms_ease-in,visibility_0s_160ms]"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-steel py-2 pr-2 pl-4">
-          <h2 id="ask" className="flex items-center gap-2.5 font-display text-[0.9375rem] font-semibold text-ink">
-            <Logo className="size-5 text-fit" />
-            Ask Echo
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="tag flex items-center gap-1.5 text-ink-dim">
+    <div
+      data-open={open || undefined}
+      className="ask-dock pointer-events-none fixed right-2 bottom-2 z-40 sm:right-4 sm:bottom-4"
+    >
+      <div className="ask-shell pointer-events-auto relative flex h-[min(42rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] max-w-[28rem] flex-col rounded-[1.75rem] bg-deck shadow-[inset_0_0_0_1px_var(--steel)]">
+        <section
+          id="ask-panel"
+          role="dialog"
+          aria-label="Ask Echo"
+          onKeyDown={keys}
+          className="ask-body flex min-h-0 flex-1 flex-col"
+        >
+          <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
+            <span className="tag flex items-center gap-2 text-ink-dim">
               <Lamp
                 color={offline ? "var(--balanced)" : "var(--fit)"}
                 on={!offline}
@@ -156,89 +184,104 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
               type="button"
               onClick={close}
               aria-label="Close Ask Echo"
-              className="flex size-8 cursor-pointer items-center justify-center rounded-[2px] text-ink-dim transition-colors hover:bg-deck-hi hover:text-ink"
+              title="Close"
+              className="flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-deck-hi hover:text-ink"
             >
-              <Cross />
+              <Collapse />
             </button>
           </div>
-        </div>
 
-        <ol
-          ref={log}
-          role="log"
-          aria-label="Conversation with Echo"
-          className="flex min-h-40 flex-1 flex-col gap-3 overflow-y-auto p-4 [scrollbar-width:thin]"
-        >
-          {!talking && (
-            <li className="flex flex-col gap-4">
-              <p className="text-sm leading-relaxed text-ink-soft">
-                Ask for different guests in your own words, or for a new take on one idea. Echo runs again, and these
-                guests stay until the new ones are ready.
-              </p>
-              {!offline && (
-                <div className="flex flex-col gap-2">
-                  <span id="ask-try" className="tag text-ink-dim">
-                    Try
-                  </span>
-                  <ul aria-labelledby="ask-try" className="flex flex-col gap-1.5">
-                    {SUGGESTIONS.map((suggestion) => (
-                      <li key={suggestion}>
+          <ol
+            ref={log}
+            role="log"
+            aria-label="Conversation with Echo"
+            className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-4 [scrollbar-width:thin]"
+          >
+            {!talking && (
+              <li className="my-auto flex flex-col items-center gap-7 py-2 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Logo className="mb-2 size-14 text-fit drop-shadow-[0_0_18px_color-mix(in_srgb,var(--fit)_45%,transparent)]" />
+                  <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
+                    What should Echo change?
+                  </h2>
+                  <p className="max-w-[23rem] text-sm leading-relaxed text-balance text-ink-dim">
+                    Ask for different guests or a new take on one idea. These guests stay until the new ones are ready.
+                  </p>
+                </div>
+                {!offline && (
+                  <ul aria-label="Suggestions" className="grid w-full grid-cols-2 gap-1">
+                    {SUGGESTIONS.map(({ ask, note, icon }) => (
+                      <li key={ask}>
                         <button
                           type="button"
-                          onClick={() => send(suggestion)}
+                          onClick={() => {
+                            send(ask);
+                            input.current?.focus();
+                          }}
                           disabled={pending}
-                          className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[2px] border border-steel px-3 py-2 text-left text-sm text-ink-soft transition-colors hover:border-fit/50 hover:bg-fit/8 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                          className="group flex size-full cursor-pointer flex-col items-center gap-1 rounded-2xl px-3 py-4 transition-colors hover:bg-deck-hi disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {suggestion}
-                          <Arrow className="size-3.5 shrink-0 text-fit opacity-50 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                          <svg
+                            aria-hidden
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="mb-2 size-6 text-ink-soft transition-colors group-hover:text-fit"
+                          >
+                            {icon}
+                          </svg>
+                          <span className="font-display text-[0.9375rem] font-semibold text-ink">{ask}</span>
+                          <span className="text-xs leading-snug text-balance text-ink-dim">{note}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-            </li>
-          )}
-          {entries.map((entry, index) => (
-            <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
-              {entry.content}
-            </Line>
-          ))}
-          {pending && <Line who="Echo">…</Line>}
-          {running?.status === "running" && (
-            <Line who="Echo">
-              Running again: {step >= 0 ? running.steps[step].label.toLowerCase() : "finishing"}
-              {step >= 0 && `, step ${step + 1} of ${running.steps.length}`}.
-            </Line>
-          )}
-          {failed && (
-            <Line who="Echo">
-              <span className="font-semibold text-alert">{describe(failed.error).title}.</span> {failed.error?.message}{" "}
-              These guests are still the ones from before.
-            </Line>
-          )}
-          {run.error && runId && (
-            <Line who="Echo">
-              <span className="font-semibold text-alert">{describe(run.error).title}.</span> {run.error.message}
-            </Line>
-          )}
-        </ol>
+                )}
+              </li>
+            )}
+            {entries.map((entry, index) => (
+              <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
+                {entry.content}
+              </Line>
+            ))}
+            {pending && <Line who="Echo">…</Line>}
+            {running?.status === "running" && (
+              <Line who="Echo">
+                Running again: {step >= 0 ? running.steps[step].label.toLowerCase() : "finishing"}
+                {step >= 0 && `, step ${step + 1} of ${running.steps.length}`}.
+              </Line>
+            )}
+            {failed && (
+              <Line who="Echo">
+                <span className="font-semibold text-alert">{describe(failed.error).title}.</span>{" "}
+                {failed.error?.message} These guests are still the ones from before.
+              </Line>
+            )}
+            {run.error && runId && (
+              <Line who="Echo">
+                <span className="font-semibold text-alert">{describe(run.error).title}.</span> {run.error.message}
+              </Line>
+            )}
+          </ol>
 
-        <div className="flex flex-col gap-2 border-t border-steel px-4 py-3">
           {offline ? (
-            <p role="status" className="text-sm text-ink-soft">
+            <p role="status" className="px-6 pb-1 text-sm text-ink-soft">
               Asking Echo isn&apos;t available in this demo yet. Everything else on the page works.
             </p>
           ) : (
             problem && (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="px-6 pb-1 text-sm">
                 <span className="font-semibold text-alert">{problem.title}.</span>{" "}
                 <span className="text-ink-soft">{problem.message}</span>
               </p>
             )
           )}
-          <form onSubmit={submit} className="flex flex-col gap-1.5">
-            <div className="flex items-end gap-2 rounded-[2px] border border-steel-hi bg-well py-1.5 pr-1.5 pl-3 shadow-[inset_0_2px_6px_rgb(0_0_0/0.6)] transition-[border-color,box-shadow] duration-150 focus-within:border-fit focus-within:shadow-[inset_0_2px_6px_rgb(0_0_0/0.6),0_0_0_3px_color-mix(in_srgb,var(--fit)_18%,transparent)] hover:not-focus-within:border-ink-dim has-[textarea:disabled]:opacity-50">
+
+          <form onSubmit={submit} className="flex py-2 pr-[4.5rem] pl-2">
+            <div className="flex min-h-14 flex-1 items-end gap-2 rounded-[1.75rem] bg-deck-hi py-2 pr-2 pl-5 shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--fit),0_0_0_3px_color-mix(in_srgb,var(--fit)_18%,transparent)] has-[textarea:disabled]:opacity-50">
               <label htmlFor="ask-input" className="sr-only">
                 Ask Echo
               </label>
@@ -255,53 +298,52 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
                 }}
                 maxLength={2000}
                 rows={1}
-                placeholder="Younger listeners, less famous guests…"
+                placeholder="Ask Echo something…"
                 disabled={offline}
-                className="max-h-32 min-h-8 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink [field-sizing:content] placeholder:text-ink-dim focus-visible:outline-none! disabled:cursor-not-allowed"
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-[0.9375rem] text-ink [field-sizing:content] placeholder:text-ink-dim focus-visible:outline-none! disabled:cursor-not-allowed"
               />
               <button
                 type="submit"
                 disabled={offline || pending || !text.trim()}
                 aria-label={pending ? "Asking" : "Send"}
-                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[2px] bg-fit text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
+                className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
               >
                 <Send />
               </button>
             </div>
-            {!offline && <p className="tag text-[0.6875rem] text-ink-dim">Enter to send, Shift+Enter for a new line</p>}
           </form>
-        </div>
-      </section>
+        </section>
 
-      <button
-        ref={bubble}
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-controls="ask-panel"
-        aria-label={open ? "Close Ask Echo" : `Ask Echo${unread ? ", new reply" : ""}`}
-        title={open ? undefined : "Ask Echo"}
-        className="fixed right-4 bottom-4 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue shadow-[0_10px_30px_-6px_color-mix(in_srgb,var(--fit)_55%,transparent)] transition hover:brightness-110 sm:right-6 sm:bottom-6"
-      >
-        {open ? <Cross className="size-4" /> : <Logo className="size-8" />}
-        {!open && (busy || unread) && (
-          <span
-            aria-hidden
-            className={`absolute top-0.5 right-0.5 size-3.5 rounded-full border-2 border-void bg-sweet ${busy ? "blink" : ""}`}
-          />
-        )}
-      </button>
-    </>
+        <button
+          ref={bubble}
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls="ask-panel"
+          aria-label={open ? "Close Ask Echo" : `Ask Echo${unread ? ", new reply" : ""}`}
+          title={open ? undefined : "Ask Echo"}
+          className="absolute right-2 bottom-2 flex size-14 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue transition hover:brightness-110 focus-visible:-outline-offset-4! focus-visible:outline-on-hue!"
+        >
+          <Logo className="size-8" />
+          {!open && (busy || unread) && (
+            <span
+              aria-hidden
+              className={`absolute top-2 right-2 size-3 rounded-full border-2 border-void bg-sweet ${busy ? "blink" : ""}`}
+            />
+          )}
+        </button>
+      </div>
+    </div>
   );
 }
 
 function Line({ who, children }: { who: string; children: ReactNode }) {
   const you = who === "You";
   return (
-    <li className={`flex max-w-[92%] flex-col gap-1 ${you ? "self-end items-end" : "self-start"}`}>
-      <span className={`tag text-[0.625rem] ${you ? "text-ink-soft" : "text-fit"}`}>{who}</span>
+    <li className={`flex max-w-[85%] flex-col gap-1 ${you ? "self-end items-end" : "self-start"}`}>
+      <span className={`tag px-1 text-[0.625rem] ${you ? "text-ink-dim" : "text-fit"}`}>{who}</span>
       <p
-        className={`rounded-[2px] border px-3 py-2 text-sm text-ink ${you ? "border-steel-hi bg-deck-hi" : "border-fit/30 bg-fit/8"}`}
+        className={`rounded-[1.25rem] border px-4 py-2.5 text-sm leading-relaxed text-ink ${you ? "rounded-br-md border-steel-hi bg-deck-hi" : "rounded-bl-md border-fit/25 bg-fit/8"}`}
       >
         {children}
       </p>
@@ -309,18 +351,19 @@ function Line({ who, children }: { who: string; children: ReactNode }) {
   );
 }
 
-function Cross({ className = "size-3" }: { className?: string }) {
+function Collapse() {
   return (
-    <svg aria-hidden viewBox="0 0 12 12" className={className}>
-      <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function Arrow({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" className={className}>
-      <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-5"
+    >
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
     </svg>
   );
 }
