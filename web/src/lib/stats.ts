@@ -1,4 +1,4 @@
-import type { AgeBucket, Analysis, Guest, Label, QlooCall } from "./echo";
+import type { AgeBucket, Analysis, Guest, Label } from "./echo";
 
 // The desk's readouts, all computed from the analysis itself. Nothing here is estimated or invented.
 
@@ -19,27 +19,14 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-// How long the Qloo calls took from the first starting to the last finishing. They run in parallel,
-// so this is shorter than their sum.
-function span(calls: QlooCall[]): number | null {
-  const times = calls
-    .map((call) => ({ start: Date.parse(call.at), duration: call.duration_ms }))
-    .filter(({ start }) => !Number.isNaN(start));
-  if (!times.length) return null;
-  const start = Math.min(...times.map((t) => t.start));
-  const end = Math.max(...times.map((t) => t.start + t.duration));
-  return Math.max(end - start, 0);
-}
-
 export type Stats = ReturnType<typeof stats>;
 
 export function stats(analysis: Analysis) {
-  const { guests, qloo_calls: calls, left_out: leftOut, audience_map: map } = analysis;
+  const { guests, left_out: leftOut, audience_map: map } = analysis;
   const labels = Object.fromEntries(LABEL_ORDER.map((label) => [label, 0])) as Record<Label, number>;
   for (const guest of guests) labels[guest.label] += 1;
 
   const reach = guests.map((guest) => guest.scores.reach).filter((value): value is number => value !== null);
-  const fresh = calls.filter((call) => !call.cached);
 
   const ages = Object.fromEntries(AGE_ORDER.map((age) => [age, 0])) as Record<AgeBucket, number>;
   let withAges = 0;
@@ -61,13 +48,6 @@ export function stats(analysis: Analysis) {
     medianLove: median(guests.map((guest) => guest.scores.love_back)),
     medianReach: median(reach),
     unscoredReach: guests.length - reach.length,
-    calls: calls.length,
-    fresh: fresh.length,
-    cached: calls.length - fresh.length,
-    slowest: fresh.length ? Math.max(...fresh.map((call) => call.duration_ms)) : null,
-    medianCall: median(fresh.map((call) => call.duration_ms)),
-    qlooTime: span(fresh),
-    failedCalls: calls.filter((call) => call.status >= 400).length,
     hosts: leftOut.filter((entry) => entry.why === "host").length,
     pastGuests: leftOut.filter((entry) => entry.why === "past_guest").length,
     categories: map.filter((row) => row.items.length > 0).length,
@@ -77,12 +57,4 @@ export function stats(analysis: Analysis) {
     ages,
     withAges,
   };
-}
-
-// A duration as a value and its unit, for a readout.
-export function ms(value: number | null): { value: string; unit?: string } {
-  if (value === null) return { value: "–" };
-  return value >= 1000
-    ? { value: (value / 1000).toFixed(1), unit: "s" }
-    : { value: String(Math.round(value)), unit: "ms" };
 }

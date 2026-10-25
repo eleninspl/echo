@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import type { Guest } from "@/lib/echo";
 import { LABELS } from "@/lib/format";
@@ -13,9 +13,18 @@ import { Info, LABEL_HUE, out100, rank, ZoneHead } from "./hud";
 // reticle, the tooltip names the label, and the list and the dossier say it in words.
 const ZONE = { reach: 0.33, fit: 0.5 };
 const RAMP = [4, 5.5, 7, 8.5, 10];
-const PAD = { top: 22, right: 22, bottom: 38, left: 44 };
-// Guests without a reach score sit in a lane of their own, left of the axis.
-const LANE = 44;
+const PAD = { top: 26, right: 22, bottom: 50, left: 58 };
+// Guests without a reach score sit in a lane of their own inside the plot, between the fit axis and reach's zero.
+const LANE = 64;
+
+// What each axis and the dot size mean, for the hints on their names.
+const MEANS = {
+  fit: "How much your listeners over-index on this guest, beyond what their fame explains. Higher is better.",
+  reach:
+    "How new the guest's fans are to your show. Further right, more of their audience is people your show doesn't reach yet.",
+  love: "How much the guest's fans over-index on your show. A bigger dot means the new listeners are likelier to enjoy it.",
+};
+const SCALE = "Each score runs from 0 to 100 against the other guests in this run.";
 
 // When a dot starts growing, in seconds after the scope mounts.
 const entry = (order: number) => 0.25 + order * 0.04;
@@ -59,6 +68,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
   const unscored = guests.filter((guest) => guest.scores.reach === null);
   const lane = unscored.length ? LANE : 0;
   const height = Math.round(Math.min(Math.max(width * 0.62, 300), 500));
+  const axis = PAD.left;
   const plot = {
     left: PAD.left + lane,
     right: Math.max(width - PAD.right, PAD.left + lane + 1),
@@ -70,7 +80,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
   const position = (guest: Guest) => {
     if (guest.scores.reach !== null) return { cx: x(guest.scores.reach), cy: y(guest.scores.fit) };
     const slot = unscored.indexOf(guest);
-    return { cx: PAD.left + 10 + ((slot * 11) % Math.max(lane - 20, 1)), cy: y(guest.scores.fit) };
+    return { cx: axis + 16 + ((slot * 12) % Math.max(lane - 44, 1)), cy: y(guest.scores.fit) };
   };
 
   const focus = highlighted ?? selected;
@@ -85,13 +95,9 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
   return (
     <section aria-labelledby="scope" className="zone flex flex-col">
       <ZoneHead id="scope" title="Fit by reach">
-        <span className="flex items-center gap-1.5">
-          <svg aria-hidden viewBox="0 0 26 12" className="h-3 w-6.5">
-            <circle cx="4" cy="6" r="2.5" fill="none" stroke="currentColor" />
-            <circle cx="17" cy="6" r="5" fill="none" stroke="currentColor" />
-          </svg>
-          Love back
-        </span>
+        <Hint name="Love back" color="var(--love)" place={{ top: "100%", right: 0, marginTop: 8 }}>
+          {MEANS.love}
+        </Hint>
         <Info>
           Up is how much your listeners over-index on a guest beyond their fame; right, how new the guest&apos;s fans
           are to you. Bigger dots: their fans over-index on your show. The lime corner is the sweet spot, high on all
@@ -121,10 +127,34 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
               </linearGradient>
             </defs>
 
+            {lane > 0 && (
+              <>
+                <rect
+                  x={axis}
+                  y={plot.top}
+                  width={lane}
+                  height={plot.bottom - plot.top}
+                  fill="var(--steel)"
+                  fillOpacity="0.3"
+                />
+                <line x1={axis} x2={axis} y1={plot.top} y2={plot.bottom} stroke="var(--steel)" />
+                <text
+                  x={axis + lane / 2}
+                  y={plot.top - 9}
+                  textAnchor="middle"
+                  className="tag"
+                  fill="var(--ink-dim)"
+                  style={{ fontSize: 9.5 }}
+                >
+                  No reach
+                </text>
+              </>
+            )}
+
             {/* Graticule: dashed lines at quarters, ticks at twentieths along both axes. */}
             {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
               <g key={`g${tick}`} stroke="var(--steel)" strokeDasharray={tick === 0 ? undefined : "2 4"}>
-                <line x1={plot.left} x2={plot.right} y1={y(tick)} y2={y(tick)} />
+                <line x1={axis} x2={plot.right} y1={y(tick)} y2={y(tick)} />
                 <line x1={x(tick)} x2={x(tick)} y1={plot.top} y2={plot.bottom} />
               </g>
             ))}
@@ -134,7 +164,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
               return (
                 <g key={`t${i}`} stroke="var(--steel-hi)">
                   <line x1={x(tick)} x2={x(tick)} y1={plot.bottom} y2={plot.bottom + size} />
-                  <line x1={plot.left - size} x2={plot.left} y1={y(tick)} y2={y(tick)} />
+                  <line x1={axis - size} x2={axis} y1={y(tick)} y2={y(tick)} />
                 </g>
               );
             })}
@@ -168,7 +198,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
             {[0, 0.5, 1].map((tick) => (
               <text
                 key={`y${tick}`}
-                x={plot.left - 10}
+                x={axis - 10}
                 y={y(tick) + 3.5}
                 textAnchor="end"
                 className="readout"
@@ -191,46 +221,6 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
                 {out100(tick)}
               </text>
             ))}
-            <text
-              x={plot.right}
-              y={height - 6}
-              textAnchor="end"
-              className="tag"
-              fill="var(--reach)"
-              style={{ fontSize: 9.5 }}
-            >
-              Reach →
-            </text>
-            <text
-              transform={`translate(12 ${plot.bottom}) rotate(-90)`}
-              className="tag"
-              fill="var(--fit)"
-              style={{ fontSize: 9.5 }}
-            >
-              Fit →
-            </text>
-            {lane > 0 && (
-              <>
-                <line
-                  x1={plot.left - 4}
-                  x2={plot.left - 4}
-                  y1={plot.top}
-                  y2={plot.bottom}
-                  stroke="var(--steel-hi)"
-                  strokeDasharray="2 3"
-                />
-                <text
-                  x={PAD.left + lane / 2 - 4}
-                  y={plot.bottom + 19}
-                  textAnchor="middle"
-                  className="tag"
-                  fill="var(--ink-dim)"
-                  style={{ fontSize: 8.5 }}
-                >
-                  No reach
-                </text>
-              </>
-            )}
 
             {/* The beam crosses once as the scope comes up. SVG's own animation, not CSS: Chrome can skip
                 repainting CSS-animated SVG children, which would leave the dots unseen. */}
@@ -253,14 +243,14 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
             {markedAt && marked && (
               <g aria-hidden>
                 <g stroke="var(--ink)" strokeOpacity="0.45" strokeDasharray="3 3">
-                  <line x1={plot.left} x2={plot.right} y1={markedAt.cy} y2={markedAt.cy} />
+                  <line x1={axis} x2={plot.right} y1={markedAt.cy} y2={markedAt.cy} />
                   {marked.scores.reach !== null && (
                     <line x1={markedAt.cx} x2={markedAt.cx} y1={plot.top} y2={plot.bottom} />
                   )}
                 </g>
-                <rect x={plot.left - 34} y={markedAt.cy - 8} width={30} height={16} fill="var(--fit)" />
+                <rect x={axis - 34} y={markedAt.cy - 8} width={30} height={16} fill="var(--fit)" />
                 <text
-                  x={plot.left - 19}
+                  x={axis - 19}
                   y={markedAt.cy + 4}
                   textAnchor="middle"
                   className="readout"
@@ -349,8 +339,9 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
                   </circle>
                   {(isSweet || on) && (
                     <text
-                      x={cx + r + 11}
-                      y={cy + 3.5}
+                      x={guest.scores.reach === null ? cx : cx + r + 11}
+                      y={guest.scores.reach === null ? cy - r - 12 : cy + 3.5}
+                      textAnchor={guest.scores.reach === null ? "middle" : "start"}
                       className="readout pointer-events-none"
                       fill="var(--ink)"
                       style={{ fontSize: 12 }}
@@ -362,6 +353,37 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
               );
             })}
           </svg>
+        )}
+
+        {width > 0 && (
+          <>
+            <span
+              className="absolute z-20 flex justify-center"
+              style={{ left: plot.left, width: plot.right - plot.left, bottom: 4 }}
+            >
+              <Hint
+                name="Reach"
+                color="var(--reach)"
+                axis="x"
+                place={{ bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 8 }}
+              >
+                {MEANS.reach} {SCALE}
+              </Hint>
+            </span>
+            <span
+              className="absolute z-20 flex items-center"
+              style={{ left: 4, top: plot.top, bottom: height - plot.bottom }}
+            >
+              <Hint
+                name="Fit"
+                color="var(--fit)"
+                axis="y"
+                place={{ left: "100%", top: "50%", transform: "translateY(-50%)", marginLeft: 8 }}
+              >
+                {MEANS.fit} {SCALE}
+              </Hint>
+            </span>
+          </>
         )}
 
         {active && activeAt && (
@@ -387,5 +409,65 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
       </div>
       <p className="sr-only">{sweet.length} guests sit in the sweet-spot zone.</p>
     </section>
+  );
+}
+
+// An axis name, or the dot-size key when there's no axis, that explains itself on hover, focus or a tap.
+function Hint({
+  name,
+  color,
+  axis,
+  place,
+  children,
+}: {
+  name: string;
+  color: string;
+  axis?: "x" | "y";
+  place: CSSProperties;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="group relative flex">
+      <button
+        type="button"
+        aria-describedby={id}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => event.key === "Escape" && setOpen(false)}
+        className={`flex cursor-help items-center gap-1.5 font-display font-semibold tracking-[0.08em] uppercase ${axis ? "text-[0.9375rem]" : "text-[0.8125rem]"} ${axis === "y" ? "flex-col-reverse" : ""}`}
+        style={{ color }}
+      >
+        {!axis && (
+          <svg aria-hidden viewBox="0 0 26 12" className="h-3 w-6.5">
+            <circle cx="4" cy="6" r="2.5" fill="none" stroke="currentColor" />
+            <circle cx="17" cy="6" r="5" fill="none" stroke="currentColor" />
+          </svg>
+        )}
+        <span className={axis === "y" ? "rotate-180 [writing-mode:vertical-rl]" : ""}>{name}</span>
+        {axis && (
+          <span
+            aria-hidden
+            className="flex size-4 items-center justify-center rounded-full border text-[0.625rem] leading-none tracking-normal"
+            style={{ borderColor: `color-mix(in srgb, ${color} 55%, transparent)` }}
+          >
+            ?
+          </span>
+        )}
+      </button>
+      <span
+        role="tooltip"
+        id={id}
+        className={`pointer-events-none absolute z-30 w-64 border border-steel-hi bg-deck-hi/95 px-3 py-2 font-sans text-sm tracking-normal text-ink normal-case shadow-[0_10px_24px_rgb(0_0_0/0.6)] transition-opacity group-hover:visible group-hover:opacity-100 ${open ? "visible opacity-100" : "invisible opacity-0"}`}
+        style={place}
+      >
+        <span className="font-semibold" style={{ color }}>
+          {name}:{" "}
+        </span>
+        {children}
+      </span>
+    </span>
   );
 }

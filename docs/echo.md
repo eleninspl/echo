@@ -55,7 +55,7 @@ Four criteria, equal weight. Ties go to the first.
 
 | Criterion | What judges ask | Echo's case |
 | --- | --- | --- |
-| Technical implementation | How thoroughly and well does it use Qloo? | Insights in both directions, cross-category maps, audience makeup, and every call shown in "What Qloo saw". |
+| Technical implementation | How thoroughly and well does it use Qloo? | Insights in both directions, cross-category maps, audience makeup. The app no longer names Qloo (25 Oct call), so the Devpost text and the demo must show where it comes in. |
 | Design | A complete, coherent product? | Show name to invitation draft and briefing in one flow. |
 | Potential impact | A real problem for a real audience? | Hosts and producers book guests every week. |
 | Quality of the idea | Creative, non-obvious use of Qloo? | Nobody else does guest booking, and love back makes it a two-way match. |

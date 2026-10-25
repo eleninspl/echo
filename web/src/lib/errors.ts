@@ -12,7 +12,7 @@ const PROBLEMS: Record<string, Problem> = {
   daily_cap: { title: "Echo is resting until tomorrow", next: "featured" },
   filters_too_narrow: { title: "No guests match those changes", next: "previous" },
   unknown_country: { title: "Echo doesn't know that country", next: "previous" },
-  qloo_error: { title: "Qloo is out of reach", next: "retry" },
+  qloo_error: { title: "Taste data is out of reach", next: "retry" },
   llm_error: { title: "The writing step failed", next: "retry" },
   engine_error: { title: "Echo hit a problem", next: "retry" },
   [OFFLINE]: { title: "Echo isn't answering", next: "retry" },

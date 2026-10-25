@@ -52,9 +52,7 @@ export function ShowFinder() {
   return (
     <div className="flex flex-col gap-6">
       <form onSubmit={submit} noValidate className="zone flex flex-col" role="search">
-        <ZoneHead title="Find your show">
-          <span>Podcasts in Qloo</span>
-        </ZoneHead>
+        <ZoneHead title="Find your show" />
         <div className="flex flex-col gap-2 p-4">
           <label htmlFor="show" className="sr-only">
             Your show
@@ -142,7 +140,7 @@ export function ShowFinder() {
           problem={{
             code: "show_unusable",
             title: "Echo can't analyse this show yet",
-            message: `Qloo doesn't know "${search.query}", or knows too little about its audience. Check the spelling, or try another show.`,
+            message: `Echo doesn't know "${search.query}", or knows too little about its audience. Check the spelling, or try another show.`,
             next: "featured",
           }}
         />

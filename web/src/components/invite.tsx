@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { echo, type Analysis, type Draft, type Guest } from "@/lib/echo";
 import { LABELS } from "@/lib/format";
 import { describe, type HostError } from "@/lib/errors";
+import { saveHostName, useHostName } from "@/lib/host-name";
 
 import { CopyButton } from "./copy-button";
 import { Chip, hue, Info, LABEL_HUE, rank, ZoneHead } from "./hud";
@@ -25,7 +26,10 @@ export function Invite({
   picked: string[];
   onToggle: (ref: string) => void;
 }) {
-  const [hostName, setHostName] = useState("");
+  const saved = useHostName();
+  const [typed, setTyped] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const hostName = typed ?? saved;
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [pending, setPending] = useState(false);
@@ -38,6 +42,8 @@ export function Invite({
     event.preventDefault();
     setPending(true);
     setProblem(null);
+    if (hostName.trim()) saveHostName(hostName.trim());
+    setRenaming(false);
     try {
       const response = await echo.drafts({
         analysis_id: analysis.id,
@@ -138,16 +144,30 @@ export function Invite({
               </ul>
             </div>
             <div className="flex flex-col gap-3 md:col-span-5">
-              <label className="flex flex-col gap-1.5">
-                <span className="tag text-ink-dim">Your name, to sign with</span>
-                <input
-                  value={hostName}
-                  onChange={(event) => setHostName(event.target.value)}
-                  maxLength={80}
-                  autoComplete="name"
-                  className={input}
-                />
-              </label>
+              {saved && !renaming ? (
+                <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
+                  Signed as <span className="font-semibold text-ink">{saved}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(true)}
+                    className="text-fit underline underline-offset-4 hover:text-ink"
+                  >
+                    Change
+                  </button>
+                </p>
+              ) : (
+                <label className="flex flex-col gap-1.5">
+                  <span className="tag text-ink-dim">Your name, to sign with</span>
+                  <input
+                    value={hostName}
+                    onChange={(event) => setTyped(event.target.value)}
+                    maxLength={80}
+                    autoComplete="name"
+                    autoFocus={renaming}
+                    className={input}
+                  />
+                </label>
+              )}
               <label className="flex flex-col gap-1.5">
                 <span className="tag text-ink-dim">Anything to mention</span>
                 <textarea

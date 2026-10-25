@@ -30,7 +30,7 @@
       },
       "at": "candidates",
       "error": "show_unusable",
-      "message": "Echo can't analyse this show yet: Qloo knows too few people for it."
+      "message": "Echo can't analyse this show yet: too little data on its audience."
     },
     {
       "show": {
@@ -52,7 +52,7 @@
       },
       "at": "candidates",
       "error": "unknown_country",
-      "message": "Qloo doesn't recognise that country."
+      "message": "Echo doesn't recognise that country."
     },
     {
       "show": {
@@ -63,7 +63,7 @@
       },
       "at": "score",
       "error": "daily_cap",
-      "message": "Echo has used today's Qloo calls. Featured shows still open."
+      "message": "Echo has reached today's limit. Featured shows still open."
     },
     {
       "show": {
@@ -75,7 +75,7 @@
       "at": "start",
       "status": 429,
       "error": "daily_cap",
-      "message": "Echo has used today's Qloo calls. Featured shows still open."
+      "message": "Echo has reached today's limit. Featured shows still open."
     },
     {
       "show": {
@@ -86,7 +86,7 @@
       },
       "at": "evidence",
       "error": "qloo_error",
-      "message": "Qloo didn't answer. Try again in a minute."
+      "message": "Echo's taste data didn't answer. Try again in a minute."
     },
     {
       "show": {

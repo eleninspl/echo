@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 
 import { echo, EchoError, type Filters } from "./echo";
 
@@ -10,6 +10,10 @@ export function useStart() {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<EchoError | null>(null);
+
+  // Next keeps the page alive with React's Activity once it opens the analysis, so Back would bring the
+  // show back still "Opening…". Hiding the page clears it.
+  useLayoutEffect(() => () => setPending(null), []);
 
   async function start(showId: string, filters?: Partial<Filters>) {
     setPending(showId);
