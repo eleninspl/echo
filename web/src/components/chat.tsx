@@ -7,7 +7,6 @@ import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
 
-import { Lamp } from "./hud";
 import { Logo } from "./logo";
 
 // The API takes the last 20 messages (docs/plan.md, API).
@@ -150,13 +149,6 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
 
   const busy = pending || running?.status === "running";
   const unread = !open && entries.length > seen;
-  const status = offline
-    ? "Offline"
-    : pending
-      ? "Listening"
-      : running?.status === "running"
-        ? "Running again"
-        : "Ready";
 
   return (
     <div
@@ -171,15 +163,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
           onKeyDown={keys}
           className="ask-body flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex items-center justify-between gap-3 py-3 pr-3 pl-6">
-            <span className="tag flex items-center gap-2 text-ink-dim">
-              <Lamp
-                color={offline ? "var(--balanced)" : "var(--fit)"}
-                on={!offline}
-                className={busy ? "blink size-1.5" : "size-1.5"}
-              />
-              {status}
-            </span>
+          <div className="flex justify-end p-3">
             <button
               type="button"
               onClick={close}
