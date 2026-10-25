@@ -1,0 +1,156 @@
+.v9b-root {
+  --v9b-ground: #1b1020;
+  --v9b-plum: #25162b;
+  --v9b-plum-hi: #321e39;
+  --v9b-line: #47304d;
+  --v9b-ink: #fff4ec;
+  --v9b-soft: #ead9dc;
+  --v9b-dim: #bba3b0;
+  --v9b-on-hue: #2a0f1f;
+  --v9b-amber: #ffbe5c;
+  --v9b-fit: #ff9a52;
+  --v9b-love: #ff5c93;
+  --v9b-reach: #b48aff;
+  --v9b-gradient: linear-gradient(100deg, #ffbe5c 0%, #ff8a4c 24%, #ff5c93 56%, #b48aff 100%);
+
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  color: var(--v9b-ink);
+  background-color: var(--v9b-ground);
+  background-image:
+    radial-gradient(70rem 42rem at 92% -8%, rgb(180 138 255 / 0.2), transparent 70%),
+    radial-gradient(56rem 36rem at -6% 46rem, rgb(255 138 76 / 0.13), transparent 70%),
+    radial-gradient(60rem 40rem at 50% 100%, rgb(255 92 147 / 0.08), transparent 70%);
+  font-family: var(--font-v9b-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+.v9b-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.v9b-root :focus-visible {
+  outline: 2px solid var(--v9b-amber);
+  outline-offset: 3px;
+}
+
+.v9b-root input:focus-visible {
+  outline: none;
+}
+
+.v9b-display {
+  font-family: var(--font-v9b-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+.v9b-gradient-text {
+  background-image: var(--v9b-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.v9b-gradient-fill {
+  background-image: var(--v9b-gradient);
+}
+
+.v9b-gradient-edge {
+  background:
+    linear-gradient(var(--v9b-plum), var(--v9b-plum)) padding-box,
+    var(--v9b-gradient) border-box;
+  border: 1.5px solid transparent;
+}
+
+.v9b-track-bars rect {
+  transition: fill 0.25s ease;
+}
+
+.v9b-now {
+  transition:
+    margin-left 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease;
+}
+
+.v9b-rise {
+  animation: v9b-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--order, 0) * 80ms);
+}
+
+@keyframes v9b-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.v9b-eq {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.v9b-eq > span {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: center;
+  animation: v9b-eq 0.9s ease-in-out infinite alternate;
+}
+
+.v9b-eq > span:nth-child(2) {
+  animation-delay: -0.3s;
+}
+
+.v9b-eq > span:nth-child(3) {
+  animation-delay: -0.6s;
+}
+
+.v9b-eq > span:nth-child(4) {
+  animation-delay: -0.45s;
+}
+
+@keyframes v9b-eq {
+  from {
+    transform: scaleY(0.3);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.v9b-waiting {
+  animation: v9b-waiting 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes v9b-waiting {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v9b-rise,
+  .v9b-eq > span,
+  .v9b-waiting {
+    animation: none;
+  }
+
+  .v9b-eq > span {
+    transform: scaleY(0.6);
+  }
+
+  .v9b-track-bars rect,
+  .v9b-now {
+    transition: none;
+  }
+}

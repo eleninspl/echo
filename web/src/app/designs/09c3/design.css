@@ -1,0 +1,148 @@
+.w3-root {
+  --w3-ground: #fff0e8;
+  --w3-paper: #fffaf6;
+  --w3-well: #fbe6dc;
+  --w3-track: #f3e0d7;
+  --w3-line: #f0dbd1;
+  --w3-rule: #e2c5b9;
+  --w3-ink: #2a1030;
+  --w3-ink-hover: #45204d;
+  --w3-soft: #5a4060;
+  --w3-dim: #7a5f77;
+  --w3-on-ink: #fff0e8;
+  --w3-fit: #e8621a;
+  --w3-love: #db2b6e;
+  --w3-reach: #7c4ce6;
+  --w3-fit-ink: #b5420b;
+  --w3-love-ink: #c01f5c;
+  --w3-reach-ink: #6638d4;
+
+  overflow-x: clip;
+  color: var(--w3-ink);
+  background: var(--w3-ground);
+  font-family: var(--font-w3-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.w3-serif {
+  font-family: var(--font-w3-serif), ui-serif, Georgia, serif;
+}
+
+.w3-figure {
+  font-stretch: 78%;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.w3-narrow {
+  font-stretch: 88%;
+}
+
+.w3-wide {
+  font-stretch: 122%;
+}
+
+.w3-root ::selection {
+  background: rgb(42 16 48 / 0.14);
+}
+
+.w3-root :focus-visible {
+  outline: 2px solid var(--w3-ink);
+  outline-offset: 2px;
+}
+
+.w3-root .w3-field:focus-visible {
+  outline: 2px solid var(--w3-ink);
+  outline-offset: -2px;
+}
+
+.w3-field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.w3-field::placeholder {
+  color: var(--w3-dim);
+  opacity: 1;
+}
+
+.w3-progress {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background: var(--w3-line);
+}
+
+.w3-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 28%;
+  background: var(--w3-ink);
+  animation: w3-slide 1.15s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes w3-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(360%);
+  }
+}
+
+.w3-spoke {
+  transform-box: view-box;
+  transform-origin: 310px 310px;
+  animation: w3-spoke 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--order, 0) * 35ms);
+}
+
+@keyframes w3-spoke {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+}
+
+.w3-enter {
+  animation: w3-enter 0.35s ease-out both;
+  animation-delay: calc(var(--order, 0) * 50ms);
+}
+
+@keyframes w3-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.w3-wait {
+  animation: w3-wait 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes w3-wait {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.9;
+  }
+}
+
+.w3-sweet {
+  box-shadow: inset 3px 0 0 var(--w3-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w3-spoke,
+  .w3-enter,
+  .w3-wait {
+    animation: none;
+  }
+
+  .w3-progress::after {
+    animation: none;
+    transform: translateX(120%);
+  }
+}
