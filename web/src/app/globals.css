@@ -5,7 +5,7 @@
 
 /*
  * Warm plum and cream carry the page, and actions are drawn in the page's ink (buttons, links, focus). Each score
- * has a hue, fit orange, love back pink and reach violet, and teal marks the sweet spot, the result Echo exists to
+ * has a hue, fit sky blue, love back coral and reach rose, and teal marks the sweet spot, the result Echo exists to
  * find. Colour otherwise lives only inside the charts: quiet tones for the other labels and the audience categories,
  * red only for alerts. Hues are lighter in the dark theme and deeper in the light one, so each reads on its own ground.
  */
@@ -22,11 +22,12 @@
   --on-hue: #2a0f1f;
 
   --accent: #fff4ec;
-  --brand: #a370ff;
+  --brand: #8ccbff;
+  --on-brand: #0d1a26;
 
-  --fit: #ff9a52;
-  --love: #ff5c93;
-  --reach: #b48aff;
+  --fit: #4db5ff;
+  --love: #ff7a52;
+  --reach: #ff4d94;
 
   /* The sweet spot is teal, the one cool thing on the page; the other labels are quiet, told apart by tone
      and always named. */
@@ -68,12 +69,12 @@
   --on-hue: #fffbf8;
 
   --accent: #2a0f1f;
-  --brand: #6a3fd4;
+  --brand: #3d8fd6;
   --sweet: #0f7f70;
 
-  --fit: #d96a32;
-  --love: #c94563;
-  --reach: #754fe1;
+  --fit: #1673cc;
+  --love: #e0502b;
+  --reach: #d42e6e;
 
   --safe: #7787ab;
   --far: #9b86b5;
@@ -135,6 +136,12 @@ html {
 
 html::-webkit-scrollbar {
   display: none;
+}
+
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 body {
@@ -323,53 +330,16 @@ a {
     animation: ring 2.8s var(--ease-out) infinite;
   }
 
-  .ripple {
-    transform-box: fill-box;
-    transform-origin: center;
-    opacity: 0;
-    animation: ripple var(--ring-duration, 7s) cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
-    animation-delay: var(--ring-delay, 0s);
+  .orbit {
+    animation: orbit var(--orbit-time, 40s) linear infinite;
   }
 
-  @keyframes ripple {
-    0% {
-      transform: scale(0.12);
-      opacity: 0;
-    }
-    14% {
-      opacity: var(--ring-peak, 0.7);
-    }
-    100% {
-      transform: scale(1);
-      opacity: 0;
-    }
-  }
-
-  .carry {
-    stroke-dasharray: 2 7;
-    animation: carry 1.4s linear infinite;
-  }
-
-  @keyframes carry {
-    to {
-      stroke-dashoffset: -18;
-    }
-  }
-
-  .glow {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: glow 3.5s ease-in-out infinite alternate;
-  }
-
-  @keyframes glow {
+  @keyframes orbit {
     from {
-      transform: scale(0.85);
-      opacity: 0.55;
+      transform: rotate(0turn) translateX(var(--orbit-radius, 4%)) rotate(0turn);
     }
     to {
-      transform: scale(1.15);
-      opacity: 1;
+      transform: rotate(1turn) translateX(var(--orbit-radius, 4%)) rotate(-1turn);
     }
   }
 
@@ -447,6 +417,23 @@ a {
     background: var(--deck-hi);
     color: var(--ink-dim);
     filter: none;
+  }
+
+  .btn-brand {
+    border-color: transparent;
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+
+  .btn-brand:hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--brand);
+    filter: brightness(1.08) saturate(1.05);
+  }
+
+  .btn-brand:disabled {
+    background: var(--deck-hi);
+    color: var(--ink-dim);
   }
 
   .btn-sm {
@@ -534,14 +521,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ripple {
-    animation: none;
-    opacity: var(--still-opacity, 0.3);
-    transform: scale(var(--still-scale, 1));
-  }
-
-  .carry,
-  .glow {
+  .orbit {
     animation: none;
   }
 

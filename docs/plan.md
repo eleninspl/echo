@@ -265,7 +265,7 @@ The analysis, when done:
       "label": "sweet_spot",
       "scores": { "fit": 0.74, "love_back": 0.41, "reach": 0.52, "echo": 0.55 },
       "evidence": { "shared_tastes": ["Example tag"], "new_podcasts": ["Example Podcast B"], "ages": ["25_to_29", "30_to_34"] },
-      "idea": { "reason": "Your listeners and Guest A's fans both over-index on example tag.", "title": "Example episode title", "pitch": "Two sentences on the episode." }
+      "idea": { "reason": "Your listeners and Guest A's fans both tend to love example tag.", "title": "Example episode title", "pitch": "Two sentences on the episode." }
     }
   ],
   "left_out": [{ "name": "Host Person", "why": "host" }],

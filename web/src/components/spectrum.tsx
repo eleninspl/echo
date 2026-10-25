@@ -6,7 +6,7 @@ import { AGE_ORDER, type Stats } from "@/lib/stats";
 
 import { categoryHue, hue, Info, Meter, ZoneHead } from "./hud";
 
-// The audience spectrum: what the show's listeners over-index on, a column per category in its own hue,
+// The audience spectrum: what the show's listeners like most, a column per category in its own hue,
 // each taste a bar as long as its affinity. Above it, how the tastes split across the categories. The
 // guests come from the same data.
 export function Spectrum({ rows }: { rows: MapRow[] }) {
@@ -20,8 +20,8 @@ export function Spectrum({ rows }: { rows: MapRow[] }) {
           {total} tastes · {filled.length} categories
         </span>
         <Info>
-          What your listeners over-index on as a group, strongest first in each category. A longer bar is a stronger
-          affinity, out of 100.
+          What your listeners like more than most people do, as a group, strongest first in each category. A longer bar
+          is a stronger affinity, out of 100.
         </Info>
       </ZoneHead>
       <div className="flex flex-col gap-2 px-4 pt-4">
@@ -117,13 +117,7 @@ export function FanAges({ stats }: { stats: Stats }) {
               <li key={age} className="flex h-full flex-col items-center justify-end gap-1.5">
                 <span className="readout text-sm">{stats.ages[age]}</span>
                 <span className="block w-full" style={{ height: `${Math.max(stats.ages[age] / peak, 0.02) * 100}%` }}>
-                  <Meter
-                    vertical
-                    value={1}
-                    color="var(--love)"
-                    order={index}
-                    className="h-full w-full"
-                  />
+                  <Meter vertical value={1} color="var(--love)" order={index} className="h-full w-full" />
                 </span>
                 <span className="sr-only">{AGES[age]}</span>
               </li>

@@ -25,10 +25,10 @@ const LANE = 64;
 
 // What each axis and the dot size mean, for the hints on their names.
 const MEANS = {
-  fit: "How much your listeners over-index on this guest, beyond what their fame explains. Higher is better.",
+  fit: "How much more your listeners like this guest than their fame alone explains. Higher is better.",
   reach:
     "How new the guest's fans are to your show. Further right, more of their audience is people your show doesn't reach yet.",
-  love: "How much the guest's fans over-index on your show. A bigger dot means the new listeners are likelier to enjoy it.",
+  love: "How much more than most people the guest's fans like your show. A bigger dot means the new listeners are likelier to enjoy it.",
 };
 const SCALE = "Each score runs from 0 to 100 against the other guests in this run.";
 
@@ -121,9 +121,9 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
           {MEANS.love}
         </Hint>
         <Info>
-          Up is how much your listeners over-index on a guest beyond their fame; right, how new the guest&apos;s fans
-          are to you. Bigger dots: their fans over-index on your show. The teal corner is the sweet spot, high on all
-          three; the shaded regions are the labels fit and reach decide on their own.
+          Up is how much your listeners like a guest beyond their fame; right, how new the guest&apos;s fans are to you.
+          Bigger dots: their fans like your show more. The teal corner is the sweet spot, high on all three; the shaded
+          regions are the labels fit and reach decide on their own.
         </Info>
       </ZoneHead>
       <div ref={frame} className="screen relative mx-4 mt-2 mb-4 shrink-0" style={{ height }}>
@@ -199,7 +199,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
               anchor="end"
               color="var(--long-shot)"
               name="Long shot"
-              means={roomy ? "your audience is lukewarm" : undefined}
+              means={roomy ? "your listeners aren't into them" : undefined}
             />
 
             {/* The sweet-spot zone. */}
@@ -568,7 +568,8 @@ function placeNames(
     ];
     for (const side of sides) {
       const box = { ...side.box, top: side.y - h + 3, bottom: side.y + 3 };
-      const inside = box.left >= plot.left + 2 && box.right <= plot.right - 2 && box.top >= plot.top && box.bottom <= plot.bottom;
+      const inside =
+        box.left >= plot.left + 2 && box.right <= plot.right - 2 && box.top >= plot.top && box.bottom <= plot.bottom;
       const clear =
         !placed.some((other) => overlaps(box, other)) && !dots.some((dot, d) => d !== i && overlaps(box, dot));
       if (inside && clear) {
