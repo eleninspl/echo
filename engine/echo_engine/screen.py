@@ -38,6 +38,11 @@ POLITICS = terms(
     "communist communism libertarian election partisan maga gop activism activist trump biden government"
 )
 MONEY_TROUBLE = terms("debt loan loans credit bankruptcy payday gambling betting")
+HARDSHIP = terms(
+    "suffering struggle trauma traumatic grief grieving bereavement loss loneliness lonely alienation despair abuse "
+    "misery pain drug drugs"
+)
+PLACEHOLDER_TAGS = {"not applicable", "n a", "none", "unknown", "other"}
 PHRASES = (
     "mental health",
     "left wing",
@@ -48,7 +53,7 @@ PHRASES = (
     "religion and spirituality",
 )
 
-TAG_TERMS = RELIGION | SEXUALITY | SEX | GENDER | ETHNICITY | HEALTH | WELLBEING | POLITICS | MONEY_TROUBLE
+TAG_TERMS = RELIGION | SEXUALITY | SEX | GENDER | ETHNICITY | HEALTH | WELLBEING | POLITICS | MONEY_TROUBLE | HARDSHIP
 GENRE_TERMS = RELIGION | SEXUALITY | HEALTH | POLITICS | MONEY_TROUBLE
 NAME_TERMS = (
     terms(
@@ -70,7 +75,7 @@ def has_term(text: str, vocabulary: frozenset[str]) -> bool:
 
 
 def clean_tag_name(name: str) -> bool:
-    return bool(name.strip()) and not has_term(name, TAG_TERMS)
+    return bool(name.strip()) and normalize(name) not in PLACEHOLDER_TAGS and not has_term(name, TAG_TERMS)
 
 
 def clean_name(name: str) -> bool:

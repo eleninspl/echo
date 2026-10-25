@@ -18,13 +18,14 @@ type Props = {
   picked: boolean;
   full: boolean;
   view: DossierView;
+  rewritten: boolean;
   onPick: () => void;
   onView: (view: DossierView) => void;
 };
 
 // The selected guest: portrait, label, the three scores as gauges, invite, and two views: the profile
 // (the episode idea and the evidence behind it) and the full episode with their fans next to yours.
-export function Dossier({ analysis, guest, index, picked, full, view, onPick, onView }: Props) {
+export function Dossier({ analysis, guest, index, picked, full, view, rewritten, onPick, onView }: Props) {
   const { scores } = guest;
   const color = LABEL_HUE[guest.label];
   return (
@@ -55,7 +56,14 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
 
       <div className="flex flex-col gap-5 p-5">
         <div className="flex flex-col">
-          <Voiceprint fit={scores.fit} love={scores.love_back} reach={scores.reach} bars={60} height={64} className="w-full" />
+          <Voiceprint
+            fit={scores.fit}
+            love={scores.love_back}
+            reach={scores.reach}
+            bars={60}
+            height={64}
+            className="w-full"
+          />
           <dl className="grid grid-cols-3">
             <Level name="Fit" value={scores.fit} color={SCORE_HUE.fit} />
             <Level name="Love back" value={scores.love_back} color={SCORE_HUE.love_back} />
@@ -103,7 +111,7 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
               showMap={analysis.audience_map}
             />
           ) : (
-            <Profile guest={guest} />
+            <Profile guest={guest} rewritten={rewritten} />
           )}
         </div>
       </div>
@@ -111,13 +119,20 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
   );
 }
 
-function Profile({ guest }: { guest: Guest }) {
+function Profile({ guest, rewritten }: { guest: Guest; rewritten: boolean }) {
   const { idea, evidence } = guest;
   return (
     <>
       {idea ? (
-        <div className="flex flex-col gap-2 border-t border-steel pt-4">
-          <p className="tag text-ink-dim">Episode idea</p>
+        <div id="dossier-idea" className="flex scroll-mt-4 flex-col gap-2 border-t border-steel pt-4">
+          <p className="flex items-center justify-between gap-3">
+            <span className="tag text-ink-dim">Episode idea</span>
+            {rewritten && (
+              <Chip color="var(--accent)" plain>
+                Rewritten by Echo
+              </Chip>
+            )}
+          </p>
           <p className="font-display text-xl leading-tight font-semibold text-balance">{idea.title}</p>
           <p className="text-sm text-ink-soft">{idea.pitch}</p>
           <p className="text-sm text-ink">{idea.reason}</p>
@@ -199,22 +214,24 @@ function Evidence({ evidence }: { evidence: NonNullable<Guest["evidence"]> }) {
       )}
       <div className="flex flex-col gap-2">
         <dt className="tag text-ink-dim">Their fans skew</dt>
-        <dd>
-          <span className="sr-only">
-            {evidence.ages.length ? evidence.ages.map((age) => AGES[age]).join(", ") : "No age data yet"}
-          </span>
-          <span aria-hidden className="grid grid-cols-6 gap-1">
-            {AGE_ORDER.map((age) => {
-              const on = evidence.ages.includes(age);
-              return (
-                <span key={age} className="flex flex-col items-center gap-1">
-                  <span className={`h-2 w-full ${on ? "lamp" : "lamp-off"}`} style={hue("var(--love)")} />
-                  <span className={`text-[0.6875rem] ${on ? "text-ink" : "text-ink-dim"}`}>{SHORT_AGE[age]}</span>
-                </span>
-              );
-            })}
-          </span>
-        </dd>
+        {evidence.ages.length === 0 ? (
+          <dd className="text-sm text-ink-dim">No age group stands out.</dd>
+        ) : (
+          <dd>
+            <span className="sr-only">{evidence.ages.map((age) => AGES[age]).join(", ")}</span>
+            <span aria-hidden className="grid grid-cols-6 gap-1">
+              {AGE_ORDER.map((age) => {
+                const on = evidence.ages.includes(age);
+                return (
+                  <span key={age} className="flex flex-col items-center gap-1">
+                    <span className={`h-2 w-full ${on ? "lamp" : "lamp-off"}`} style={hue("var(--love)")} />
+                    <span className={`text-[0.6875rem] ${on ? "text-ink" : "text-ink-dim"}`}>{SHORT_AGE[age]}</span>
+                  </span>
+                );
+              })}
+            </span>
+          </dd>
+        )}
       </div>
     </dl>
   );

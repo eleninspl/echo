@@ -124,7 +124,10 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
       setEntries((current) => [...current, { role: "assistant", content: reply.reply }]);
       if (reply.action === "rerun" && reply.analysis_id && reply.analysis_id !== analysis.id)
         setRunId(reply.analysis_id);
-      if (reply.action === "rewrite" && reply.guest_ref && reply.idea) onRewrite(reply.guest_ref, reply.idea);
+      if (reply.action === "rewrite" && reply.guest_ref && reply.idea) {
+        onRewrite(reply.guest_ref, reply.idea);
+        close();
+      }
     } catch (error) {
       setProblem(describe(error));
     }

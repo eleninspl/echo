@@ -32,7 +32,7 @@ export function GuestDetails({ id, guestRef, guestName, showMap }: Props) {
 
   if (load.state === "loading") {
     return (
-      <div aria-busy className="flex min-h-40 items-center gap-3 text-ink-soft">
+      <div aria-busy className="flex min-h-[28rem] items-start gap-3 border-t border-steel pt-4 text-ink-soft">
         <Lamp color="var(--accent)" className="pulse size-2" />
         Writing the episode and mapping their audience…
       </div>
@@ -100,10 +100,7 @@ function EpisodePlan({ episode }: { episode: Episode }) {
       </div>
       <ol className="flex flex-col gap-2">
         {episode.segments.map((segment, index) => (
-          <li
-            key={`${segment.title}-${index}`}
-            className="grid grid-cols-[2rem_1fr] gap-x-3 rounded-xl bg-well p-3.5"
-          >
+          <li key={`${segment.title}-${index}`} className="grid grid-cols-[2rem_1fr] gap-x-3 rounded-xl bg-well p-3.5">
             <span className="tag pt-1 text-accent">{String(index + 1).padStart(2, "0")}</span>
             <div>
               <p className="font-semibold">{segment.title}</p>

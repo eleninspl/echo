@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import type { Analysis, Filters, Guest, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
+import { readPicks, savePicks } from "@/lib/picks";
 import { stats as computeStats, type Stats } from "@/lib/stats";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
@@ -89,7 +90,7 @@ type UiState = {
   picked: string[];
   view: DossierView;
 };
-const fresh = (id: string): UiState => ({ id, selected: null, picked: [], view: "profile" });
+const fresh = (id: string): UiState => ({ id, selected: null, picked: readPicks(id), view: "profile" });
 
 type ConsoleProps = {
   analysis: Analysis;
@@ -115,8 +116,10 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
   const current = ui.id === analysis.id ? ui : fresh(analysis.id);
   const change = (next: Partial<UiState>) =>
     setUi((state) => ({ ...(state.id === analysis.id ? state : fresh(analysis.id)), ...next }));
-  const { selected: selectedRef, picked, view } = current;
+  const { selected: selectedRef, view } = current;
+  const picked = current.picked.filter((ref) => guests.some((guest) => guest.ref === ref));
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [rewritten, setRewritten] = useState<{ id: string; ref: string; idea: Idea } | null>(null);
   const figures = computeStats(analysis);
 
   // A hidden page never hears the pointer leave, so Back and Forward would bring a guest's tooltip back.
@@ -148,10 +151,26 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
     setTab(next);
     const search = next === "guests" ? "" : `?tab=${next}`;
     window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+    const panels = document.getElementById("tab-panels");
+    if (panels && panels.getBoundingClientRect().top < 0) panels.scrollIntoView({ block: "start" });
   };
 
-  const togglePick = (ref: string) =>
-    change({ picked: picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref] });
+  const togglePick = (ref: string) => {
+    const next = picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref];
+    change({ picked: next });
+    savePicks(analysis.id, next);
+  };
+
+  const showRewrite = (ref: string, idea: Idea) => {
+    onRewrite(ref, idea);
+    openTab("guests");
+    select(ref);
+    setRewritten({ id: analysis.id, ref, idea });
+  };
+
+  useEffect(() => {
+    if (rewritten) document.getElementById("dossier-idea")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [rewritten]);
 
   if (!guests.length) {
     return (
@@ -177,7 +196,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
 
       <TabBar tab={tab} onTab={openTab} stats={figures} picked={picked.length} />
 
-      <div className={`${FRAME} flex-1 pt-4 pb-24`}>
+      <div id="tab-panels" className={`${FRAME} flex-1 scroll-mt-28 pt-4 pb-24`}>
         <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 xl:col-span-8">
@@ -199,8 +218,12 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
                 onHighlight={setHighlighted}
               />
             </div>
-            <aside id="dossier-panel" aria-label="Selected guest" className="min-w-0 scroll-mt-28 lg:col-span-5 xl:col-span-4">
-              <div className="lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12.5rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]">
+            <aside
+              id="dossier-panel"
+              aria-label="Selected guest"
+              className="min-w-0 scroll-mt-28 lg:col-span-5 xl:col-span-4"
+            >
+              <div className="lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12.5rem)] lg:overflow-y-auto lg:pb-20 lg:[scrollbar-width:thin]">
                 {selected && (
                   <Dossier
                     analysis={analysis}
@@ -209,6 +232,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
                     picked={picked.includes(selected.ref)}
                     full={picked.length >= MAX_PICKS}
                     view={view}
+                    rewritten={rewritten?.id === analysis.id && rewritten.ref === selected.ref}
                     onPick={() => togglePick(selected.ref)}
                     onView={(next) => change({ view: next })}
                   />
@@ -236,7 +260,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
         </div>
       </div>
 
-      <Chat analysis={analysis} onRerun={onRerun} onRewrite={onRewrite} />
+      <Chat analysis={analysis} onRerun={onRerun} onRewrite={showRewrite} />
     </div>
   );
 }
@@ -304,7 +328,9 @@ function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => 
                 tabIndex={on ? 0 : -1}
                 onClick={() => onTab(name)}
                 className={`flex shrink-0 items-baseline gap-1.5 rounded-full px-4 py-2 transition-colors sm:gap-2 sm:px-5 ${
-                  on ? "bg-deck text-ink shadow-[inset_0_0_0_1px_var(--steel)]" : "text-ink-dim hover:bg-deck/60 hover:text-ink-soft"
+                  on
+                    ? "bg-deck text-ink shadow-[inset_0_0_0_1px_var(--steel)]"
+                    : "text-ink-dim hover:bg-deck/60 hover:text-ink-soft"
                 }`}
               >
                 <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">{TAB_NAMES[name]}</span>
