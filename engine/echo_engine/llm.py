@@ -29,7 +29,7 @@ RULES = """You write for Echo, a tool that helps a podcast host find guests thei
 Rules for everything you write:
 - Use only the facts in the input. A person's one-line description is all you know about them: add no books, shows, \
 roles, quotes, awards or life events that aren't given, even if you think you know them.
-- Tastes describe groups of listeners, never one person. Write "your listeners over-index on" or "their fans tend to", \
+- Tastes describe groups of listeners, never one person. Write "your listeners tend to love" or "their fans tend to", \
 never that a listener will do something.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
 - Never quote scores or numbers, and never say where the data comes from.

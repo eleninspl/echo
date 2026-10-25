@@ -158,13 +158,13 @@ const LOBES = [1 / 6, 1 / 2, 5 / 6];
 const SPREAD = 0.13;
 
 // The same fixed texture for every guest, so two voiceprints differ only by their scores.
-export const texture = (index: number) => {
+const texture = (index: number) => {
   const value = Math.sin(index * 12.9898 + 4.1) * 43758.5453;
   return value - Math.floor(value);
 };
 
 // A bar's hue: fit's at the first lobe, love back's at the second, reach's at the third, blended between.
-export function voiceHue(position: number) {
+function voiceHue(position: number) {
   if (position <= LOBES[0]) return SCORE_HUE.fit;
   if (position <= LOBES[1]) {
     const love = Math.round(((position - LOBES[0]) / (LOBES[1] - LOBES[0])) * 100);

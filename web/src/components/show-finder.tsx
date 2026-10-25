@@ -67,13 +67,12 @@ export function ShowFinder() {
             placeholder="Your podcast's name"
             aria-invalid={hint !== null}
             aria-describedby={hint ? "show-hint" : undefined}
-            className="field min-h-13 min-w-0 flex-1 px-4 py-3 text-lg"
+            className="field min-h-12 min-w-0 flex-1 px-4 py-2.5 text-base"
           />
           <button
             type="submit"
             disabled={search.state === "searching"}
-            className="btn btn-solid min-h-13 rounded-[0.875rem] px-7 text-base"
-            style={hue("var(--brand)")}
+            className="btn btn-brand min-h-12 rounded-[0.875rem] px-6 text-base"
           >
             {search.state === "searching" ? "Looking…" : "Find it"}
           </button>

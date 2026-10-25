@@ -4,18 +4,18 @@ import type { AgeBucket, Fame, Filters, Label } from "./echo";
 export const LABELS: Record<Label, { name: string; means: string }> = {
   sweet_spot: {
     name: "Sweet spot",
-    means: "Your audience over-indexes on them; their audience is new to you and likely to enjoy the show.",
+    means: "Your listeners tend to love them; their fans are new to you and likely to enjoy the show.",
   },
   safe: { name: "Safe", means: "Your audience is likely to enjoy it; few new listeners." },
   far: { name: "Far", means: "Brings new people who may not stay." },
-  long_shot: { name: "Long shot", means: "Their fans might come; your audience is lukewarm." },
+  long_shot: { name: "Long shot", means: "Their fans might come, but your listeners aren't into them." },
   balanced: { name: "Balanced", means: "Decent on each, not top on any." },
 };
 
 // What a label means for this guest. A sweet spot without reach is scored on fit and love back alone.
 export function labelMeans(label: Label, noReach: boolean): string {
   if (label === "sweet_spot" && noReach) {
-    return "Your audience over-indexes on them and their fans on your show; too little data to say how new those fans are.";
+    return "Your listeners tend to love them and their fans your show; too little data to say how new those fans are.";
   }
   return LABELS[label].means;
 }

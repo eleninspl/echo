@@ -362,7 +362,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest L's fans both over-index on example tag.",
+          "reason": "Your listeners and Guest L's fans both tend to love example tag.",
           "title": "Example episode with Guest L",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -397,7 +397,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest A's fans both over-index on satire.",
+          "reason": "Your listeners and Guest A's fans both tend to love satire.",
           "title": "Example episode with Guest A",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -427,7 +427,7 @@
           "ages": []
         },
         "idea": {
-          "reason": "Your listeners and Guest B's fans both over-index on late-night comedy.",
+          "reason": "Your listeners and Guest B's fans both tend to love late-night comedy.",
           "title": "Example episode with Guest B",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -461,7 +461,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest C's fans both over-index on indie folk.",
+          "reason": "Your listeners and Guest C's fans both tend to love indie folk.",
           "title": "Example episode with Guest C",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -496,7 +496,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest D's fans both over-index on example tag.",
+          "reason": "Your listeners and Guest D's fans both tend to love example tag.",
           "title": "Example episode with Guest D",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -531,7 +531,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest E's fans both over-index on satire.",
+          "reason": "Your listeners and Guest E's fans both tend to love satire.",
           "title": "Example episode with Guest E",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -561,7 +561,7 @@
           "ages": []
         },
         "idea": {
-          "reason": "Your listeners and Guest I's fans both over-index on late-night comedy.",
+          "reason": "Your listeners and Guest I's fans both tend to love late-night comedy.",
           "title": "Example episode with Guest I",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -595,7 +595,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest F's fans both over-index on indie folk.",
+          "reason": "Your listeners and Guest F's fans both tend to love indie folk.",
           "title": "Example episode with Guest F",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -630,7 +630,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest G's fans both over-index on example tag.",
+          "reason": "Your listeners and Guest G's fans both tend to love example tag.",
           "title": "Example episode with Guest G",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -663,7 +663,7 @@
           ]
         },
         "idea": {
-          "reason": "Your listeners and Guest H's fans both over-index on satire.",
+          "reason": "Your listeners and Guest H's fans both tend to love satire.",
           "title": "Example episode with Guest H",
           "pitch": "Two sentences on what the episode would be. Invented for the mock."
         }
@@ -1052,7 +1052,7 @@
         {
           "title": "The shared taste",
           "points": [
-            "Why both audiences over-index on road trips",
+            "Why both audiences love road trips",
             "A favourite place"
           ]
         },
@@ -1085,5 +1085,5 @@
     "subject": "An invitation to {show}",
     "body": "Hi {name},\n\nI host {show}. Our listeners and your fans have a lot in common, and I'd love to have you on.\n\nInvented for the mock.\n\n{host}"
   },
-  "briefing": "# {name}\n\n## Who they are\n\nInvented for the mock.\n\n## What their audience over-indexes on\n\n- Example Band\n- Example Western\n\n## Where your audiences meet\n\n- Road trips\n\n## Questions to ask\n\n1. What surprised you most this year?\n"
+  "briefing": "# {name}\n\n## Who they are\n\nInvented for the mock.\n\n## What their audience loves\n\n- Example Band\n- Example Western\n\n## Where your audiences meet\n\n- Road trips\n\n## Questions to ask\n\n1. What surprised you most this year?\n"
 }

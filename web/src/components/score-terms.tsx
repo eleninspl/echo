@@ -6,39 +6,21 @@ import { SCORE_HUE, VOICE_STEP, VOICE_THICK, voiceBars } from "./hud";
 
 type Part = "fit" | "love" | "reach";
 
-const TERMS: { part: Part; term: string; color: string; path: string; means: string }[] = [
-  {
-    part: "fit",
-    term: "Fit",
-    color: SCORE_HUE.fit,
-    path: "Your show to the guest",
-    means: "Your listeners over-index on the guest, beyond what the guest's fame alone explains.",
-  },
-  {
-    part: "love",
-    term: "Love back",
-    color: SCORE_HUE.love_back,
-    path: "The guest to your show",
-    means: "The guest's fans over-index on your show, so the people they bring have a reason to stay.",
-  },
-  {
-    part: "reach",
-    term: "Reach",
-    color: SCORE_HUE.reach,
-    path: "Fans you don't have yet",
-    means: "The guest's fans are new to you: the podcasts they favour are ones your audience doesn't.",
-  },
+const TERMS: { part: Part; term: string; color: string; means: string }[] = [
+  { part: "fit", term: "Fit", color: SCORE_HUE.fit, means: "Your listeners tend to love them" },
+  { part: "love", term: "Love back", color: SCORE_HUE.love_back, means: "Their fans tend to love your show" },
+  { part: "reach", term: "Reach", color: SCORE_HUE.reach, means: "Their fans are new to you" },
 ];
 
-const BARS = 144;
+const BARS = 200;
 const HEIGHT = 40;
 const SHAPE = voiceBars(0.9, 0.9, 0.9, BARS, HEIGHT);
 const RAISED = 0.85 * (HEIGHT - 2);
 const WAVE_PERIOD = 2.4;
-const WAVE_LAG = 0.035;
+const WAVE_LAG = 0.025;
 const RIPPLE_PERIOD = 1.2;
-const RIPPLE_LENGTH = 36;
-const LENS_WIDTH = 8;
+const RIPPLE_LENGTH = 50;
+const LENS_WIDTH = 11;
 const SETTLE = 0.12;
 
 export function ScoreTerms() {
@@ -99,7 +81,7 @@ export function ScoreTerms() {
         aria-hidden
         viewBox={`0 0 ${BARS * VOICE_STEP} ${HEIGHT}`}
         preserveAspectRatio="none"
-        className="block h-28 w-full"
+        className="block h-20 w-full md:h-36"
         onPointerMove={follow}
         onPointerLeave={leave}
         onPointerCancel={leave}
@@ -116,11 +98,11 @@ export function ScoreTerms() {
           />
         ))}
       </svg>
-      <ol className="mt-6 grid grid-cols-1 gap-x-8 gap-y-8 md:mt-0 md:grid-cols-3">
-        {TERMS.map(({ part, term, color, path, means }, index) => (
+      <ol className="mt-6 grid grid-cols-1 gap-x-8 gap-y-8 px-4 sm:px-6 md:mt-0 md:grid-cols-3">
+        {TERMS.map(({ part, term, color, means }, index) => (
           <li
             key={part}
-            className="flex flex-col items-center transition-opacity duration-300"
+            className="flex flex-col transition-opacity duration-300 md:items-center"
             style={{ opacity: active === null || active === index ? 1 : 0.35 }}
           >
             <span aria-hidden className="hidden h-5 w-px md:block" style={{ background: color }} />
@@ -131,8 +113,7 @@ export function ScoreTerms() {
                 <h3 className="font-display text-xl leading-none font-semibold md:text-2xl" style={{ color }}>
                   {term}
                 </h3>
-                <p className="tag mt-1.5 text-ink-dim">{path}</p>
-                <p className="mt-3 leading-snug text-ink-soft">{means}</p>
+                <p className="mt-2 leading-snug text-ink-soft">{means}</p>
               </div>
             </div>
           </li>

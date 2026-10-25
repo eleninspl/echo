@@ -89,9 +89,9 @@ Labels, first match wins:
 
 | Label | Rule | On the card |
 | --- | --- | --- |
-| `sweet_spot` | fit ≥ 0.5, love ≥ 0.33, reach ≥ 0.33 | Your audience over-indexes on them; their audience is new to you and likely to enjoy the show. |
+| `sweet_spot` | fit ≥ 0.5, love ≥ 0.33, reach ≥ 0.33 | Your listeners tend to love them; their fans are new to you and likely to enjoy the show. |
 | `far` | reach ≥ 0.67, love < 0.33 | Brings new people who may not stay. |
-| `long_shot` | fit < 0.33 | Their fans might come; your audience is lukewarm. |
+| `long_shot` | fit < 0.33 | Their fans might come, but your listeners aren't into them. |
 | `safe` | reach < 0.33 | Your audience is likely to enjoy it; few new listeners. |
 | `balanced` | otherwise | Decent on each, not top on any. |
 
@@ -103,7 +103,7 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
 
 - Person fields: `/entities` and insights return gender, birth date, citizenship, spouse and children. Echo shows name, short description, image and links only.
 - Never filter or pick guests by gender. Never use the political, beliefs, communities, global issues, investing or spending audience types.
-- Copy reads "your listeners over-index on", never "your listeners like", and never says anything about one listener or one guest's fans as people.
+- Copy says what a group likes more than most people do ("your listeners tend to love", "more than most"), never "over-index" (jargon, dropped in the 25 Oct UI review), and never says anything about one listener or one guest's fans as people.
 
 ## Errors
 
