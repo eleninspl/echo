@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from echo_engine import apple, llm
 from echo_engine.app import create_app
+from echo_engine.llm_client import LlmError, Reply
 from echo_engine.models import Filters
 from echo_engine.qloo_client import QlooClient
 from scripts import warm
@@ -266,3 +267,40 @@ def test_featured_needs_no_qloo_call(tmp_path, engine):
     again = TestClient(create_app(mock=False, client_factory=no_qloo, store=tmp_path / "analyses"))
     featured = again.get("/featured").json()["featured"]
     assert again.get(f"/analyses/{featured[0]['analysis_id']}").json()["status"] == "done"
+
+
+def test_a_run_with_the_llm_puts_ideas_on_the_top_guests(engine, monkeypatch):
+    class Ideas:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def json(self, system, prompt, schema, name, **kwargs):
+            if name == "hosts":
+                data = {"host_ids": []}
+            else:
+                refs = schema["properties"]["ideas"]["items"]["properties"]["ref"]["enum"]
+                ideas = [{"ref": ref, "reason": "Why.", "title": f"Idea {ref}", "pitch": "Two."} for ref in refs]
+                data = {"ideas": ideas}
+            return Reply(data=data, model="fake", input_tokens=0, output_tokens=0, cost_usd=None, duration_ms=0)
+
+    monkeypatch.setattr(llm, "client", Ideas)
+    analysis = run(engine)
+    assert analysis["status"] == "done"
+    with_ideas = [guest["ref"] for guest in analysis["guests"] if guest["idea"]]
+    assert with_ideas == [guest["ref"] for guest in analysis["guests"] if guest["evidence"]]
+    assert analysis["guests"][0]["idea"]["title"] == f"Idea {analysis['guests'][0]['ref']}"
+
+
+def test_a_failed_llm_call_on_a_route_is_a_502_llm_error(engine, monkeypatch):
+    async def broken(analysis, messages):
+        raise LlmError("the model sent nonsense")
+
+    monkeypatch.setattr(llm, "chat", broken)
+    analysis = run(engine)
+    messages = [{"role": "user", "content": "Hi"}]
+    response = engine.post("/chat", json={"analysis_id": analysis["id"], "messages": messages})
+    assert response.status_code == 502
+    assert response.json() == {"error": "llm_error", "message": "Echo couldn't write that. Try again in a minute."}

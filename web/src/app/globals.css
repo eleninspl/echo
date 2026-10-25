@@ -255,8 +255,8 @@ a {
   }
 
   .sweep {
-    transform-origin: center;
-    transform-box: fill-box;
+    transform-origin: 0 0;
+    transform-box: view-box;
     animation: spin 3.2s linear infinite;
   }
 

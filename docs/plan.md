@@ -90,15 +90,15 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 
 | # | L: LLM side | Days | |
 | --- | --- | --- | --- |
-| L1 | Host check: which candidates are the show's hosts or regular co-hosts | 0.25 | must |
-| L2 | Ideas for the top 10 in one call | 0.5 | must |
-| L3 | The full episode idea for one guest | 0.25 | must |
-| L4 | Chat: three tools (run again with filters, rewrite one idea, just answer) | 1 | must |
-| L5 | Drafts for 1 to 5 guests, and revise | 0.5 | must |
-| L6 | Briefing | 0.25 | must |
+| L1 | Host check: which candidates are the show's hosts or regular co-hosts | 0.25 | first version |
+| L2 | Ideas for the top 10 in one call | 0.5 | first version |
+| L3 | The full episode idea for one guest | 0.25 | first version |
+| L4 | Chat: one structured decision with three actions (run again with filters, rewrite one idea, just answer) | 1 | first version |
+| L5 | Drafts for 1 to 5 guests, and revise | 0.5 | first version |
+| L6 | Briefing | 0.25 | first version |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q17 are done and deployed. L is about 3 days and not started (point 2 under To agree). `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. The model is `gpt-oss-120b` on Groq ([The LLM](#the-llm)).
+Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. Next: compare models on OpenRouter and tune the prompts. Without `OPENROUTER_API_KEY` the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
 
 ## Web app tasks
 
@@ -158,13 +158,16 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 
 ## The LLM
 
-Decided 24 Oct (Eleni): a cheap open-weight model. **`openai/gpt-oss-120b` on Groq** (Apache 2.0), called through Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1` with `GROQ_API_KEY`. `ECHO_LLM_MODEL` can name another Groq model.
+24 Oct (Eleni): a cheap open-weight model, **`openai/gpt-oss-120b`**, on Groq (#38). 25 Oct (Leonidas): calls go through **OpenRouter** instead, so one key can try several models and we keep the cheapest that writes well enough. gpt-oss-120b stays the default and the first candidate. Eleni to confirm.
 
-- **Why.** $0.15 per million input tokens and $0.60 per million output, about 500 tokens a second, JSON-schema structured output with `strict: true`, and tool calling. A run's ideas (L2) are one call of a few thousand tokens each way, well under a cent; a few thousand judge runs cost a few dollars.
-- **What it needs.** Groq's paid Developer plan (pay as you go, 250,000 tokens and 1,000 requests a minute). The free plan's 8,000 tokens a minute is less than one analysis. Set a spend limit in Groq's console.
-- **Limits, from Groq's docs (24 Oct, not yet tried).** Structured output can't be combined with tools or streaming in one call: ideas, the episode, drafts and the briefing use structured output, and the chat (L4) uses tools. gpt-oss makes one tool call at a time. Strict schemas need every property in `required` and `additionalProperties: false`, with optional fields as `["string", "null"]`. It's a reasoning model: set `reasoning_effort` low for the host check and medium for the writing, and measure what L2 adds to the 5 to 10 s run.
-- **Other hosts of the same model**, if Groq fails or is slow: Cerebras (about 3,000 tokens a second, $0.35 and $0.75) or DeepInfra (cheapest, $0.04 and $0.17, much slower). Both speak the same API, so only the URL, key and model ID change.
-- **Not chosen:** `qwen/qwen3.8-27b` on Groq ($0.80 and $4) is the step up if gpt-oss writes weak pitches; closed models (Claude, GPT, Gemini) cost 10 to 100 times more.
+- **Client:** `engine/echo_engine/llm_client.py`. A call is a system prompt, a user prompt and a JSON schema; it returns the parsed object with the model, tokens, cost and time. It retries a 429, a 5xx or an answer that isn't JSON, twice. `ECHO_LLM` picks the backend:
+  - `openrouter`, the default and the only one in production: OpenAI-compatible API at `https://openrouter.ai/api/v1` with `OPENROUTER_API_KEY`, `response_format` with a strict JSON schema, and `provider.require_parameters`, so a request only goes to providers that support the schema. The cost comes back in every response.
+  - `claude-cli`, local only: Leonidas's [claude-cli-wrapper](https://github.com/anagnole/claude-cli-wrapper) runs the Claude Code CLI on a Claude subscription behind an Anthropic Messages API at `http://127.0.0.1:4301`. Start it with `cd ~/Projects/claude-api && pnpm dev`. The engine sends the schema, turns the CLI's tools and MCP servers off and runs it in an empty folder outside the repo, so no `CLAUDE.md` is read. Default model `claude-sonnet-5-5`; model names must start with `claude-`. The engine refuses it on Vercel.
+- `ECHO_LLM_MODEL` names the model on either backend and `ECHO_LLM_URL` overrides the URL. `scripts/llm_check.py` (`--backend`, `--model`, `--effort`) sends one small call and prints the time, tokens and cost. Through the wrapper, `claude-haiku-5-5` answered in 5 s on 25 Oct.
+- **Building on Claude isn't testing the model.** Claude can hide what a cheap model gets wrong (broken JSON, facts the evidence doesn't give). Use `claude-cli` for the plumbing and the web app, and judge the prompts on OpenRouter models. Next: a script that runs L2 for 3 cached shows on several models and puts the pitches, cost and time side by side; rerun it after prompt changes.
+- **The chat (L4) returns a decision, not tool calls:** `{action: rerun | rewrite | answer, ...}` as structured output. The CLI ignores `tools` and gpt-oss can't mix tools with structured output, so this works the same on every model.
+- **Strict schemas:** every property in `required`, `additionalProperties: false`, optional fields as `["string", "null"]`. gpt-oss is a reasoning model: effort low for the host check and medium for the writing; measure what L2 adds to the 5 to 10 s run.
+- **Prices** (Eleni, 24 Oct, on Groq): gpt-oss-120b is $0.15 and $0.60 per million tokens in and out, so a run's ideas cost well under a cent. `qwen/qwen3.8-27b` is the step up if gpt-oss writes weak pitches; closed models cost 10 to 100 times more. Set a spend limit on the OpenRouter key.
 
 ## Hosting
 
@@ -200,7 +203,8 @@ Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, s
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | The `echo` database | The same |
 | `ECHO_WEB_ORIGINS` | The web app's URL. CORS takes exact origins, comma-separated. | Not set: `http://localhost:3000` |
 | `ECHO_DAILY_QLOO_CALLS` | Not set: 3000 | |
-| `GROQ_API_KEY` | When L is built | |
+| `OPENROUTER_API_KEY` | When L is built | |
+| `ECHO_LLM` | Not set: `openrouter`. Never `claude-cli`. | |
 | `ECHO_LLM_MODEL` | Not set: `openai/gpt-oss-120b` | |
 
 All of them are Sensitive. Add or change one with `vercel env add NAME production` from `engine/` (linked to the project; `engine/.vercel` is git-ignored), then `vercel redeploy <url> --target production`. Sensitive values can't be pulled back: `vercel env pull` gives placeholders. `ECHO_MOCK`, `ECHO_CACHE_DIR` and `ECHO_FEATURED` aren't used on Vercel.

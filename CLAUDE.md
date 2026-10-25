@@ -18,7 +18,7 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 ## Stack
 
-- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and an LLM: open-weight `gpt-oss-120b` on Groq, through Groq's OpenAI-compatible API (`docs/plan.md`, "The LLM"). Which file each half owns is in `docs/plan.md`.
+- Engine: Python 3.12, FastAPI, uv, in `engine/`, hosted on Vercel with Neon Postgres and Upstash Redis (`docs/plan.md`, Hosting). It calls Qloo and an LLM through `llm_client.py`: OpenRouter in production (default model `gpt-oss-120b`, the final pick waits for a comparison), and locally a Claude subscription through Leonidas's claude-cli-wrapper (`docs/plan.md`, "The LLM"). Which file each half owns is in `docs/plan.md`.
 - Web app: Next.js 16, TypeScript, Tailwind, in `web/`, on Vercel. It talks to the engine only, through `web/src/lib/echo.ts`. Next 16 differs from older versions: read `web/AGENTS.md` and the docs it points to before writing web code.
 - No bot in v1 (open in `docs/plan.md`).
 
@@ -26,7 +26,7 @@ The long 21 Oct proposal (features, a 26-endpoint contract, checks C1 to C90) is
 
 Set keys with `scripts/set-env.sh KEY`, or `pbpaste | scripts/set-env.sh KEY`. Never print, log or commit values from `.env`.
 
-Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`. The Postgres store tests run only with `TEST_DATABASE_URL` set to a throwaway UTF8 database (they drop its tables). Run it with `uv run uvicorn echo_engine.app:app --reload` (port 8000), or with `ECHO_MOCK=1` in front to serve the invented example data instead of Qloo and the LLM.
+Engine: `cd engine && uv sync && uv run pytest`, lint with `uv run ruff check .`. The Postgres store tests run only with `TEST_DATABASE_URL` set to a throwaway UTF8 database (they drop its tables). Run it with `uv run uvicorn echo_engine.app:app --reload` (port 8000), or with `ECHO_MOCK=1` in front to serve the invented example data instead of Qloo and the LLM. For the LLM locally, put `ECHO_LLM=claude-cli` in `.env` and start the wrapper (`cd ~/Projects/claude-api && pnpm dev`); `uv run python scripts/llm_check.py` checks the backend with one call.
 
 Web: `cd web && npm install && npm run dev` (port 3000). Copy `web/.env.example` to `web/.env.local`. Check with `npm run lint` and `npm run build`.
 
@@ -70,6 +70,7 @@ Update this section whenever something changes.
 - **24 Oct:** W14, the web app redesigned as a film-style broadcast-gallery dashboard (dark only, visual first, every number from real data), PR #34, merged 24 Oct.
 - **24 Oct:** W15, the web app redesigned again as a restrained film-style console: four tabs (Guests, Audience, Invite, Qloo), one view of the guests instead of three, a colour per meaning, plain labels, the chat docked on every tab. The analysis page is about a third shorter. PR #37.
 - **24 Oct:** the LLM chosen (Eleni): a cheap open-weight model, `gpt-oss-120b` on Groq (#38). Not yet tried on a real show.
+- **25 Oct:** the LLM client (`llm_client.py`, Leonidas): OpenRouter for production and the model comparison, the Claude CLI wrapper for local development. L1 to L6 have a first version on it, run end to end through the wrapper on a real show (an analysis with ideas takes about 27 s that way). OpenRouter waits for a key; without one, production treats L as not built. Moves the LLM off Groq direct, so Eleni to confirm.
 - **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain.
 
 ## Keeping this file current

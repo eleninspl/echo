@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from . import llm, pipeline
 from .config import get_settings
+from .llm_client import LlmError
 from .models import (
     Analysis,
     AnalysisRequest,
@@ -300,6 +301,11 @@ def create_app(
     @app.exception_handler(NotImplementedError)
     async def not_implemented(_: Request, error: NotImplementedError) -> JSONResponse:
         return JSONResponse({"error": "not_implemented", "message": str(error) or "Not built yet."}, 501)
+
+    @app.exception_handler(LlmError)
+    async def llm_error(_: Request, error: LlmError) -> JSONResponse:
+        log.error("LLM call failed: %s", error)
+        return JSONResponse({"error": "llm_error", "message": "Echo couldn't write that. Try again in a minute."}, 502)
 
     @app.get("/")
     async def root() -> dict[str, str]:

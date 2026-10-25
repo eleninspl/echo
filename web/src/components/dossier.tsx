@@ -37,7 +37,7 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
         <Chip color={color}>{LABELS[guest.label].name}</Chip>
       </div>
 
-      <div className="group relative m-3 mb-0 aspect-[16/10] overflow-hidden screen">
+      <div className="group relative m-3 mb-0 aspect-[4/3] overflow-hidden screen">
         <Picture guest={guest} sizes="(min-width: 1024px) 34vw, 95vw" />
         <Brackets color={color} />
         <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-well via-well/85 to-transparent px-4 pt-14 pb-3">
