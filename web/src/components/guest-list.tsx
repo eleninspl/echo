@@ -165,21 +165,32 @@ function Score({ value, color, order }: { value: number | null; color: string; o
 
 // The guest's picture from Qloo, or their initials on a dark screen tinted with the label's hue when there's
 // none or it doesn't load.
+const QLOO_WIDTH = /-\d+x-auto(?=\.\w+$)/;
+const LARGE_WIDTH = 1200;
+
+function sources(url: string | null, small: boolean): string[] {
+  if (!url) return [];
+  const large = url.replace(QLOO_WIDTH, `-${LARGE_WIDTH}x-auto`);
+  return small || large === url ? [url] : [large, url];
+}
+
 export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: string; small?: boolean }) {
-  const [broken, setBroken] = useState<string | null>(null);
-  if (guest.image_url && broken !== guest.image_url) {
-    const url = guest.image_url;
+  const [broken, setBroken] = useState<string[]>([]);
+  const url = sources(guest.image_url, small).find((source) => !broken.includes(source));
+  const markBroken = (source: string) => setBroken((failed) => [...failed, source]);
+  if (url) {
     return (
       <Image
+        key={url}
         src={url}
-        onError={() => setBroken(url)}
+        onError={() => markBroken(url)}
         // Qloo answers some missing portraits with a tiny placeholder instead of an error; theirs are 420 wide.
-        onLoad={(event) => event.currentTarget.naturalWidth < 48 && setBroken(url)}
+        onLoad={(event) => event.currentTarget.naturalWidth < 48 && markBroken(url)}
         alt=""
         fill
         sizes={sizes}
         unoptimized
-        className="object-cover object-top opacity-90 grayscale-[35%] transition group-hover:opacity-100 group-hover:grayscale-0"
+        className="object-cover object-[50%_25%] opacity-90 grayscale-[35%] transition group-hover:opacity-100 group-hover:grayscale-0"
       />
     );
   }
