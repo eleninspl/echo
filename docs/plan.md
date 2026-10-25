@@ -102,7 +102,7 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 
 ## Web app tasks
 
-**W**, in `web/`: the whole v1 flow above, built against mock mode first (`ECHO_MOCK=1`), then on the live engine. The app talks to the engine only, from the browser, through `web/src/lib/echo.ts`. Two routes: `/` (find the show, featured shows) and `/analyses/[id]` (everything else, so a featured show or a rerun is just another ID).
+**W**, in `web/`: the whole v1 flow above, built against mock mode first (`ECHO_MOCK=1`), then on the live engine. The app talks to the engine only, from the browser, through `web/src/lib/echo.ts`. Three routes: `/` (find the show, featured shows), `/analyses/[id]` (everything else, so a featured show or a rerun is just another ID) and `/analyses/[id]/guests/[ref]` (one guest's page). A layout over the last two holds the analysis, the picks, the selected guest and the chat, so they carry across.
 
 | # | W: web app | Days | |
 | --- | --- | --- | --- |
@@ -122,6 +122,8 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 | W14 | Redesign as a broadcast-gallery dashboard, dark only and visual first: desk readout, meter bridge, fit-by-reach scope, multiviewer wall, preview monitor, audience spectrum, Qloo call timeline. Every number comes from the analysis or `/health`. Replaces W1's light and dark poster look | 1 | done |
 | W15 | Redesign as a film-style targeting console with four tabs (Guests, Audience, Invite, Qloo) under a header with the show and the sweet-spot count. One view of the guests (the fit-by-reach scope and a ranked list, with the selected guest beside them) in place of W14's wall, bridge and scope. A colour per meaning, plain labels, the chat docked on every tab, the landing redone to match. Replaces W14 | 1 | done |
 | W16 | From the 25 Oct call: the Qloo tab and every mention of Qloo out of the UI (the quota too, kept in `/health` for us); bigger fit and reach axis names, centred on their axes, that explain themselves on hover or tap, and the guests without a reach score in a lane inside the chart; Ask Echo as a round button at the bottom right that the chat panel opens out of; the sign-off name remembered in the browser, so Invite asks for it once; the landing no longer stuck on "Opening…" after Back | 0.5 | done |
+| W17 | A calm look in place of the game-like console (To agree 8): neutral greys, light and dark with a toggle in the header (the system's by default, remembered in the browser), blue for actions and orange for the sweet spot, rounded panels and pill controls, no brackets, tick scales, glows or blinking. Each guest's three scores as a voiceprint (a lobe per score) in the list, the selected guest and the landing's key. The fit-by-reach chart as the main feature: the Safe and Long shot regions shaded and named, the top 10 guests named beside their dots, bigger love back sizes, the rest dimmed on hover. Score and label colours checked for colour blindness. Replaces W15's look | 1 | done |
+| W18 | A page per guest. The Guests tab keeps the chart and the ranked list, with a short overview of the selected guest beside them (portrait, scores, label, idea, evidence, pick) and "Open guest". The guest's page lays the full analysis out in columns: the scores and Echo score, the idea and why, where the audiences meet, the full episode next to their fans, the briefing, with the previous and next guest. The episode loads when the page opens, once per guest per visit | 0.5 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
@@ -158,7 +160,7 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
 6. **A 3D chart** (25 Oct call). Fit, love back and reach are three axes, so a 2D/3D toggle on the chart, if the 3D view isn't harder to read. After the UX pass; the tool is open.
 7. **The Audience tab as a picture** (25 Oct call). It's lists and numbers now. Ideas: a map coloured by strength, clicking a weak area to ask for guests who grow it. Names (shows, films) have no coordinates, so it needs a layout first, at most 2 or 3 dimensions. Leonidas.
-8. **The look** (25 Oct call). The console reads a bit like a game. Consider another design once the UX is settled.
+8. **The look** (25 Oct call). Done in W17: neutral, light and dark, blue for actions, orange for the sweet spot. The home page still waits for the team's pick from `/designs`.
 
 ## The LLM
 

@@ -22,7 +22,7 @@ export function EngineNote() {
   if (health === "offline") {
     return (
       <p className="tag flex items-center gap-2 text-alert">
-        <Lamp color="var(--alert)" className="blink size-2" />
+        <Lamp color="var(--alert)" className="pulse size-2" />
         Engine offline
       </p>
     );

@@ -43,7 +43,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
   if (load.state === "done") {
     return (
       <div className="flex flex-col gap-4">
-        <div className="screen max-w-3xl rounded-[2px] p-4 sm:p-6">
+        <div className="screen max-w-3xl p-4 sm:p-6">
           <Markdown text={load.markdown} />
         </div>
         {printing &&

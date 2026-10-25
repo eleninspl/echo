@@ -72,7 +72,7 @@ export function Invite({
             {picked.length} / {MAX_PICKS}
           </span>
         </ZoneHead>
-        <ol className="flex flex-col py-1">
+        <ol className="flex flex-col px-2 pt-1 pb-2">
           {analysis.guests.map((guest, index) => {
             const on = picked.includes(guest.ref);
             return (
@@ -83,11 +83,11 @@ export function Invite({
                   aria-checked={on}
                   disabled={full && !on}
                   onClick={() => onToggle(guest.ref)}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-deck-hi/70 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-deck-hi/70 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span
                     aria-hidden
-                    className={`flex size-4 shrink-0 items-center justify-center border ${on ? "border-ink bg-ink" : "border-steel-hi"}`}
+                    className={`flex size-[1.125rem] shrink-0 items-center justify-center rounded-md border ${on ? "border-accent bg-accent" : "border-steel-hi"}`}
                   >
                     {on && (
                       <svg viewBox="0 0 10 10" className="size-2.5 text-on-hue">
@@ -131,7 +131,7 @@ export function Invite({
                     <button
                       type="button"
                       onClick={() => onToggle(guest.ref)}
-                      className="flex items-center gap-1.5 rounded-[2px] bg-ink px-2 py-1 font-display text-sm font-semibold text-on-hue hover:opacity-85"
+                      className="flex items-center gap-1.5 rounded-full bg-ink px-2 py-1 font-display text-sm font-semibold text-on-hue hover:opacity-85"
                     >
                       {guest.name}
                       <svg aria-hidden viewBox="0 0 10 10" className="size-2.5">
@@ -150,7 +150,7 @@ export function Invite({
                   <button
                     type="button"
                     onClick={() => setRenaming(true)}
-                    className="text-fit underline underline-offset-4 hover:text-ink"
+                    className="text-accent underline underline-offset-4 hover:text-ink"
                   >
                     Change
                   </button>
@@ -254,7 +254,7 @@ function DraftCard({ analysisId, draft, guest, hostName, note, onRevised }: Card
 
   const name = guest?.name ?? draft.guest_ref;
   return (
-    <li className="flex flex-col gap-3 border border-steel bg-deck-hi/50 p-3">
+    <li className="flex flex-col gap-3 rounded-xl bg-well p-4">
       <h3 className="font-display text-xl leading-none font-semibold">{name}</h3>
       <div aria-live="polite" className="screen p-4">
         <p className="text-sm text-ink-soft">
