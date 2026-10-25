@@ -33,7 +33,7 @@ export function ShowLock({ analysis, children }: { analysis: Analysis; children?
           <ul aria-label="Filters" className="flex flex-wrap gap-1.5">
             {phrases.map((phrase) => (
               <li key={phrase}>
-                <Chip color="var(--fit)">{phrase}</Chip>
+                <Chip color="var(--accent)">{phrase}</Chip>
               </li>
             ))}
           </ul>
@@ -50,10 +50,10 @@ export function ShowLock({ analysis, children }: { analysis: Analysis; children?
   );
 }
 
-// The show's artwork, or its initial on a dark screen.
+// The show's artwork, or its initial on a recessed surface.
 function Cover({ children }: { children: ReactNode }) {
   return (
-    <span className="screen relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[2px] sm:size-28">
+    <span className="screen relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl sm:size-28">
       {children}
     </span>
   );
@@ -64,16 +64,22 @@ function Cover({ children }: { children: ReactNode }) {
 export function LockHeader({ analysis, stats, line }: { analysis: Analysis; stats: Stats; line: string }) {
   return (
     <section aria-label="This analysis" className="zone">
-      <div className="grid gap-x-8 gap-y-6 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] lg:items-center">
-        <ShowLock analysis={analysis} />
+      <div className="grid gap-x-8 gap-y-6 p-5 sm:p-6 md:grid-cols-[auto_minmax(0,1fr)] md:items-center lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)]">
+        <div className="md:col-span-2 lg:col-span-1">
+          <ShowLock analysis={analysis} />
+        </div>
         <LockDial stats={stats} line={line} />
         <div className="flex min-w-0 flex-col gap-5">
           <LabelSpectrum stats={stats} />
-          <dl className="grid grid-cols-2 gap-px bg-steel">
+          <dl className="grid grid-cols-2 gap-3">
             <Instrument name="Tastes" value={stats.tastes} note={`${stats.categories} categories`}>
-              <span aria-hidden className="flex h-1.5 gap-[2px]">
+              <span aria-hidden className="flex h-1.5 gap-1">
                 {stats.bands.map((band) => (
-                  <span key={band.category} style={{ flexGrow: band.n, background: categoryHue(band.category) }} />
+                  <span
+                    key={band.category}
+                    className="rounded-full"
+                    style={{ flexGrow: band.n, background: categoryHue(band.category) }}
+                  />
                 ))}
               </span>
             </Instrument>
@@ -98,79 +104,65 @@ export function LockHeader({ analysis, stats, line }: { analysis: Analysis; stat
   );
 }
 
-// The lock: a ring of ticks, one per guest in label order from the top, the sweet spots lit lime; the
-// count of sweet spots in the middle.
+// The lock: a ring filled to the share of guests that are sweet spots, the count in the middle.
 function LockDial({ stats, line }: { stats: Stats; line: string }) {
-  const size = 168;
+  const size = 160;
   const c = size / 2;
-  const n = Math.max(stats.guests, 1);
-  const order = LABEL_ORDER.flatMap((label) => Array.from({ length: stats.labels[label] }, () => label));
+  const r = 66;
+  const length = 2 * Math.PI * r;
+  const share = stats.guests ? stats.sweet / stats.guests : 0;
   return (
-    <figure className="flex items-center gap-4 lg:flex-col lg:gap-2">
+    <figure className="flex items-center gap-4 md:flex-col md:gap-3">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg aria-hidden viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 overflow-visible">
-          <circle cx={c} cy={c} r={58} fill="none" stroke="var(--steel-hi)" strokeDasharray="1 4" />
-          <circle cx={c} cy={c} r={50} fill="none" stroke="var(--steel)" />
-          {order.map((label, i) => {
-            const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
-            const x1 = c + Math.cos(angle) * 66;
-            const y1 = c + Math.sin(angle) * 66;
-            const x2 = c + Math.cos(angle) * 80;
-            const y2 = c + Math.sin(angle) * 80;
-            const sweet = label === "sweet_spot";
-            return (
-              <line
-                key={i}
-                className="fade"
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={LABEL_HUE[label]}
-                strokeOpacity={sweet ? 1 : 0.55}
-                strokeWidth={sweet ? 5 : 3.5}
-                style={{ "--order": i } as CSSProperties}
-              />
-            );
-          })}
+        <svg aria-hidden viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 -rotate-90">
+          <circle cx={c} cy={c} r={r} fill="none" stroke="var(--sweet)" strokeOpacity="0.16" strokeWidth="12" />
+          {share > 0 && (
+            <circle
+              className="arc"
+              cx={c}
+              cy={c}
+              r={r}
+              fill="none"
+              stroke="var(--sweet)"
+              strokeWidth="12"
+              strokeLinecap="round"
+              strokeDasharray={`${length * share} ${length}`}
+              style={{ "--length": `${length * share}` } as CSSProperties}
+            />
+          )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="readout text-6xl"
-            style={{
-              color: stats.sweet ? "var(--sweet)" : "var(--ink-soft)",
-            }}
-          >
+          <span className="readout text-5xl" style={{ color: stats.sweet ? "var(--sweet)" : "var(--ink-soft)" }}>
             {stats.sweet}
           </span>
-          <span className="tag mt-1.5 text-center leading-snug text-ink-dim">
+          <span className="tag mt-1 text-center leading-snug text-ink-dim">
             sweet {stats.sweet === 1 ? "spot" : "spots"}
             <br />
             of {stats.guests}
           </span>
         </div>
       </div>
-      <figcaption className="max-w-48 text-sm leading-snug text-ink-soft lg:text-center">{line}</figcaption>
+      <figcaption className="max-w-48 text-sm leading-snug text-ink-soft md:text-center">{line}</figcaption>
     </figure>
   );
 }
 
-// How the guests split across the five labels: one segmented bar, a block per guest, and the legend.
+// How the guests split across the five labels: a block per guest in one row, and the legend.
 function LabelSpectrum({ stats }: { stats: Stats }) {
   const present = LABEL_ORDER.filter((label) => stats.labels[label] > 0);
   const blocks = LABEL_ORDER.flatMap((label) => Array.from({ length: stats.labels[label] }, () => label));
   return (
     <div className="flex flex-col gap-2.5">
       <p className="tag text-ink-dim">Guests by label</p>
-      <div aria-hidden className="flex h-4 gap-[3px]">
+      <div aria-hidden className="flex h-3 gap-1">
         {blocks.map((label, i) => (
           <span
             key={i}
-            className="fade flex-1"
+            className="fade flex-1 rounded-full"
             style={
               {
                 background: LABEL_HUE[label],
-                opacity: label === "sweet_spot" ? 1 : 0.75,
+                opacity: label === "sweet_spot" ? 1 : 0.7,
                 "--order": i,
               } as CSSProperties
             }
@@ -180,8 +172,8 @@ function LabelSpectrum({ stats }: { stats: Stats }) {
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {present.map((label) => (
           <li key={label} className="flex items-center gap-1.5 text-sm">
-            <span aria-hidden className="size-2" style={{ background: LABEL_HUE[label] }} />
-            <span style={{ color: LABEL_HUE[label] }}>{LABELS[label].name}</span>
+            <span aria-hidden className="size-2 rounded-full" style={{ background: LABEL_HUE[label] }} />
+            <span className="text-ink-soft">{LABELS[label].name}</span>
             <span className="readout text-ink">{stats.labels[label]}</span>
           </li>
         ))}
@@ -203,7 +195,7 @@ function Instrument({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 bg-deck p-3">
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-xl bg-well p-3.5">
       <dt className="tag text-ink-dim">{name}</dt>
       <dd className="flex flex-col gap-1.5">
         <span className="readout text-3xl">{value}</span>

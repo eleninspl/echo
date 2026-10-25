@@ -184,7 +184,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
             {!talking && (
               <li className="my-auto flex flex-col items-center gap-7 py-2 text-center">
                 <div className="flex flex-col items-center gap-3">
-                  <Logo className="mb-2 size-14 text-fit drop-shadow-[0_0_18px_color-mix(in_srgb,var(--fit)_45%,transparent)]" />
+                  <Logo className="mb-2 size-14 text-ink" />
                   <h2 className="font-display text-2xl leading-tight font-semibold text-ink">
                     What should Echo change?
                   </h2>
@@ -213,7 +213,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
                             strokeWidth="1.5"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="mb-2 size-6 text-ink-soft transition-colors group-hover:text-fit"
+                            className="mb-2 size-6 text-ink-soft transition-colors group-hover:text-accent"
                           >
                             {icon}
                           </svg>
@@ -265,7 +265,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
           )}
 
           <form onSubmit={submit} className="flex py-2 pr-[4.5rem] pl-2">
-            <div className="flex min-h-14 flex-1 items-end gap-2 rounded-[1.75rem] bg-deck-hi py-2 pr-2 pl-5 shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--fit),0_0_0_3px_color-mix(in_srgb,var(--fit)_18%,transparent)] has-[textarea:disabled]:opacity-50">
+            <div className="flex min-h-14 flex-1 items-end gap-2 rounded-[1.75rem] bg-deck-hi py-2 pr-2 pl-5 shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)] has-[textarea:disabled]:opacity-50">
               <label htmlFor="ask-input" className="sr-only">
                 Ask Echo
               </label>
@@ -290,7 +290,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
                 type="submit"
                 disabled={offline || pending || !text.trim()}
                 aria-label={pending ? "Asking" : "Send"}
-                className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
+                className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
               >
                 <Send />
               </button>
@@ -306,13 +306,13 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
           aria-controls="ask-panel"
           aria-label={open ? "Close Ask Echo" : `Ask Echo${unread ? ", new reply" : ""}`}
           title={open ? undefined : "Ask Echo"}
-          className="absolute right-2 bottom-2 flex size-14 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue transition hover:brightness-110 focus-visible:-outline-offset-4! focus-visible:outline-on-hue!"
+          className="absolute right-2 bottom-2 flex size-14 cursor-pointer items-center justify-center rounded-full bg-accent text-on-hue transition hover:brightness-110 focus-visible:-outline-offset-4! focus-visible:outline-on-hue!"
         >
           <Logo className="size-8" />
           {!open && (busy || unread) && (
             <span
               aria-hidden
-              className={`absolute top-2 right-2 size-3 rounded-full border-2 border-void bg-sweet ${busy ? "blink" : ""}`}
+              className={`absolute top-2 right-2 size-3 rounded-full border-2 border-void bg-sweet ${busy ? "pulse" : ""}`}
             />
           )}
         </button>
@@ -325,9 +325,9 @@ function Line({ who, children }: { who: string; children: ReactNode }) {
   const you = who === "You";
   return (
     <li className={`flex max-w-[85%] flex-col gap-1 ${you ? "self-end items-end" : "self-start"}`}>
-      <span className={`tag px-1 text-[0.625rem] ${you ? "text-ink-dim" : "text-fit"}`}>{who}</span>
+      <span className={`tag px-1 text-[0.625rem] ${you ? "text-ink-dim" : "text-accent"}`}>{who}</span>
       <p
-        className={`rounded-[1.25rem] border px-4 py-2.5 text-sm leading-relaxed text-ink ${you ? "rounded-br-md border-steel-hi bg-deck-hi" : "rounded-bl-md border-fit/25 bg-fit/8"}`}
+        className={`rounded-[1.25rem] border px-4 py-2.5 text-sm leading-relaxed text-ink ${you ? "rounded-br-md border-steel-hi bg-deck-hi" : "rounded-bl-md border-accent/25 bg-accent/8"}`}
       >
         {children}
       </p>

@@ -6,7 +6,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { echo, type Analysis, type Featured, type Guest } from "@/lib/echo";
 
-import { LABEL_HUE, Meter, ZoneHead, SCORE_HUE } from "./hud";
+import { Voiceprint, ZoneHead } from "./hud";
 import { ShowCover } from "./show-cover";
 
 // The precomputed shows. Null while loading; empty when there are none or the engine isn't answering.
@@ -90,10 +90,10 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
   const sweet = analysis?.guests.filter((guest) => guest.label === "sweet_spot").length ?? 0;
 
   return (
-    <li className="acquire" style={{ "--order": index } as CSSProperties}>
+    <li className="rise" style={{ "--order": index } as CSSProperties}>
       <Link
         href={`/analyses/${encodeURIComponent(analysis_id)}`}
-        className="group flex flex-col overflow-hidden bg-well shadow-[0_0_0_1px_var(--steel)] transition-shadow hover:shadow-[0_0_0_1px_var(--ink-soft)]"
+        className="group flex flex-col overflow-hidden rounded-2xl bg-deck shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow hover:shadow-[inset_0_0_0_1px_var(--steel-hi),var(--shadow-pop)]"
       >
         <span className="screen relative flex aspect-video max-h-52 w-full items-end justify-center overflow-hidden">
           {show.image_url ? (
@@ -106,18 +106,18 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
                 sizes="(min-width: 1280px) 25vw, 50vw"
                 className="scale-125 object-cover opacity-35 blur-2xl"
               />
-              <span className="absolute top-1/2 left-1/2 aspect-square h-[78%] -translate-x-1/2 -translate-y-1/2 overflow-hidden shadow-[0_10px_30px_rgb(0_0_0/0.6)]">
+              <span className="absolute top-1/2 left-1/2 aspect-square h-[78%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl shadow-pop">
                 <Image src={show.image_url} alt="" fill unoptimized sizes="12rem" className="object-cover" />
               </span>
             </>
           ) : (
-            // No artwork: the show's own channel levels are the picture.
-            <span aria-hidden className="flex h-full w-full items-end gap-1 px-3 pt-8 pb-3">
-              <Levels guests={guests} />
+            // No artwork: the top guests' voiceprints are the picture.
+            <span aria-hidden className="grid h-full w-full grid-cols-2 content-center gap-x-5 gap-y-3 px-5 pt-10 pb-4">
+              <Lineup guests={guests} count={6} />
             </span>
           )}
           {sweet > 0 && (
-            <span className="tag absolute top-2 right-2 bg-sweet px-1.5 py-1 text-[0.625rem] text-on-hue">
+            <span className="tag absolute top-2.5 right-2.5 rounded-full bg-sweet px-2.5 py-1 text-[0.6875rem] text-on-hue">
               {sweet} sweet {sweet === 1 ? "spot" : "spots"}
             </span>
           )}
@@ -129,11 +129,11 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
                 {show.title.trim().charAt(0)}
               </span>
             )}
-            <span className="truncate font-display text-lg font-semibold group-hover:text-white">{show.title}</span>
+            <span className="truncate font-display text-lg font-semibold">{show.title}</span>
           </span>
           {show.image_url && (
-            <span aria-hidden className="flex h-8 items-end gap-1">
-              <Levels guests={guests} />
+            <span aria-hidden className="grid grid-cols-3 gap-3">
+              <Lineup guests={guests} count={3} />
             </span>
           )}
         </span>
@@ -142,35 +142,26 @@ function ShowTile({ item, index }: { item: Featured; index: number }) {
   );
 }
 
-// A show's guests as a row of three-meter channels; dim placeholders while the analysis loads.
-function Levels({ guests }: { guests: Guest[] }) {
+// The top guests' voiceprints, best first; dim flat ones while the analysis loads.
+function Lineup({ guests, count }: { guests: Guest[]; count: number }) {
   if (!guests.length) {
-    return Array.from({ length: 12 }, (_, i) => <span key={i} className="h-full flex-1 bg-deck-hi/60" />);
+    return Array.from({ length: count }, (_, i) => (
+      <Voiceprint key={i} fit={0} love={0} reach={0} bars={30} height={22} className="w-full opacity-25" />
+    ));
   }
-  return guests.map((guest, i) => (
-    <span key={guest.ref} className="flex h-full flex-1 flex-col gap-0.5">
-      <span className="flex flex-1 gap-px">
-        <Meter vertical value={guest.scores.fit} color={SCORE_HUE.fit} segments={22} order={i} className="flex-1" />
-        <Meter
-          vertical
-          value={guest.scores.love_back}
-          color={SCORE_HUE.love_back}
-          segments={22}
-          order={i}
-          className="flex-1"
-        />
-        <Meter
-          vertical
-          value={guest.scores.reach ?? 0}
-          color={SCORE_HUE.reach}
-          segments={22}
-          order={i}
-          className="flex-1"
-        />
-      </span>
-      <span className="h-0.5" style={{ background: LABEL_HUE[guest.label] }} />
-    </span>
-  ));
+  return guests
+    .slice(0, count)
+    .map((guest) => (
+      <Voiceprint
+        key={guest.ref}
+        fit={guest.scores.fit}
+        love={guest.scores.love_back}
+        reach={guest.scores.reach}
+        bars={30}
+        height={22}
+        className="w-full"
+      />
+    ));
 }
 
 // For errors that send the host to the featured shows.

@@ -33,7 +33,7 @@ export function GuestDetails({ id, guestRef, guestName, showMap }: Props) {
   if (load.state === "loading") {
     return (
       <div aria-busy className="flex min-h-40 items-center gap-3 text-ink-soft">
-        <Lamp color="var(--fit)" className="blink h-2 w-4" />
+        <Lamp color="var(--accent)" className="pulse size-2" />
         Writing the episode and mapping their audience…
       </div>
     );
@@ -102,9 +102,9 @@ function EpisodePlan({ episode }: { episode: Episode }) {
         {episode.segments.map((segment, index) => (
           <li
             key={`${segment.title}-${index}`}
-            className="grid grid-cols-[2rem_1fr] gap-x-3 border border-steel bg-deck-hi/50 p-3"
+            className="grid grid-cols-[2rem_1fr] gap-x-3 rounded-xl bg-well p-3.5"
           >
-            <span className="tag pt-1 text-fit">{String(index + 1).padStart(2, "0")}</span>
+            <span className="tag pt-1 text-accent">{String(index + 1).padStart(2, "0")}</span>
             <div>
               <p className="font-semibold">{segment.title}</p>
               <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-soft marker:text-ink-dim">
@@ -119,7 +119,7 @@ function EpisodePlan({ episode }: { episode: Episode }) {
       {episode.questions.length > 0 && (
         <div>
           <p className="tag text-ink-dim">Questions to ask</p>
-          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm marker:text-fit">
+          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm marker:text-accent">
             {episode.questions.map((question, index) => (
               <li key={`${question}-${index}`}>{question}</li>
             ))}

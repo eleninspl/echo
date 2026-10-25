@@ -4,7 +4,7 @@ import { AGE_ORDER } from "@/lib/stats";
 
 import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
-import { Chip, Gauge, hue, LABEL_HUE, out100, rank, SCORE_HUE } from "./hud";
+import { Chip, hue, LABEL_HUE, out100, rank, SCORE_HUE, Voiceprint } from "./hud";
 import { MAX_PICKS } from "./invite";
 
 const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
@@ -29,7 +29,7 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
   const color = LABEL_HUE[guest.label];
   return (
     <section aria-labelledby="dossier" aria-live="polite" className="zone flex flex-col">
-      <div className="flex min-h-11 items-center justify-between gap-3 border-b border-steel px-4 py-2.5">
+      <div className="flex min-h-12 items-center justify-between gap-3 px-5 pt-4 pb-1">
         <h2 id="dossier" className="font-display text-[0.9375rem] font-semibold text-ink">
           <span className="sr-only">Selected guest, </span>
           Guest {rank(index)}
@@ -37,21 +37,31 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
         <Chip color={color}>{LABELS[guest.label].name}</Chip>
       </div>
 
-      <div className="group relative m-3 mb-0 aspect-[4/3] overflow-hidden screen">
-        <Picture guest={guest} sizes="(min-width: 1024px) 34vw, 95vw" />
-        <Brackets color={color} />
-        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-well via-well/85 to-transparent px-4 pt-14 pb-3">
-          <h3 className="font-display text-[1.875rem] leading-none font-semibold">{guest.name}</h3>
-          {guest.description && <p className="mt-1.5 text-sm text-ink-soft">{guest.description}</p>}
+      {/* Beside the list on a wide screen the portrait is large with the name over it; stacked under the list,
+          a smaller portrait with the name beside it, so the scores stay near the top. */}
+      <div className="mx-4 mt-3 flex items-center gap-5 lg:block">
+        <div className="relative size-28 shrink-0 overflow-hidden rounded-xl bg-well sm:size-32 lg:aspect-[4/3] lg:size-auto lg:w-full">
+          <Picture guest={guest} sizes="(min-width: 1024px) 34vw, 128px" />
+          <div className="absolute inset-x-0 bottom-0 hidden bg-linear-to-t from-black/75 via-black/45 to-transparent px-4 pt-16 pb-3.5 lg:block">
+            <h3 className="font-display text-[1.875rem] leading-none font-semibold text-white">{guest.name}</h3>
+            {guest.description && <p className="mt-1.5 text-sm text-white/80">{guest.description}</p>}
+          </div>
+        </div>
+        <div className="min-w-0 lg:hidden">
+          <h3 className="font-display text-[1.75rem] leading-tight font-semibold text-balance">{guest.name}</h3>
+          {guest.description && <p className="mt-1 text-sm text-ink-soft">{guest.description}</p>}
         </div>
       </div>
 
-      <div className="flex flex-col gap-5 p-4">
-        <dl className="grid grid-cols-3 gap-2">
-          <Level name="Fit" value={scores.fit} color={SCORE_HUE.fit} order={0} />
-          <Level name="Love back" value={scores.love_back} color={SCORE_HUE.love_back} order={1} />
-          <Level name="Reach" value={scores.reach} color={SCORE_HUE.reach} order={2} />
-        </dl>
+      <div className="flex flex-col gap-5 p-5">
+        <div className="flex flex-col">
+          <Voiceprint fit={scores.fit} love={scores.love_back} reach={scores.reach} bars={60} height={64} className="w-full" />
+          <dl className="grid grid-cols-3">
+            <Level name="Fit" value={scores.fit} color={SCORE_HUE.fit} />
+            <Level name="Love back" value={scores.love_back} color={SCORE_HUE.love_back} />
+            <Level name="Reach" value={scores.reach} color={SCORE_HUE.reach} />
+          </dl>
+        </div>
         <p className="text-sm text-ink-soft">
           <span className="font-semibold" style={{ color }}>
             {LABELS[guest.label].name}.
@@ -77,7 +87,7 @@ export function Dossier({ analysis, guest, index, picked, full, view, onPick, on
             aria-expanded={view === "episode"}
             aria-controls="dossier-view"
             className={`btn ${view === "episode" ? "btn-solid" : ""}`}
-            style={hue("var(--fit)")}
+            style={hue("var(--accent)")}
           >
             {view === "episode" ? "Back to profile" : "Episode & fans"}
           </button>
@@ -128,7 +138,7 @@ function Profile({ guest }: { guest: Guest }) {
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-fit underline"
+              className="inline-flex items-center gap-1 text-accent underline"
             >
               {SITES[site] ?? site}
               <svg aria-hidden viewBox="0 0 12 12" className="size-3">
@@ -143,36 +153,18 @@ function Profile({ guest }: { guest: Guest }) {
   );
 }
 
-// Targeting brackets over the portrait, in the label's hue.
-function Brackets({ color }: { color: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 160 100"
-      preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 size-full"
-    >
-      <g fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke">
-        <path d="M4 14V4h14M142 4h14v10M156 86v10h-14M18 96H4V86" />
-      </g>
-      <g stroke={color} strokeOpacity="0.5" vectorEffect="non-scaling-stroke">
-        <path d="M80 4v5M80 91v5M4 50h4M152 50h4" />
-      </g>
-    </svg>
-  );
-}
-
-function Level({ name, value, color, order }: { name: string; value: number | null; color: string; order: number }) {
+// One score under its lobe of the voiceprint: a leader down from the lobe, the name and the figure.
+function Level({ name, value, color }: { name: string; value: number | null; color: string }) {
   return (
     <div className="flex flex-col-reverse items-center gap-1">
       <dt className="tag text-center" style={{ color }}>
         {name}
       </dt>
-      <dd>
-        <Gauge value={value} color={color} size={96} order={order}>
-          <span className="readout text-[1.75rem]">{out100(value)}</span>
-          {value === null && <span className="text-[0.625rem] leading-tight text-ink-dim">Too little data</span>}
-        </Gauge>
+      <dd className="flex flex-col items-center">
+        <span aria-hidden className="h-3 w-px" style={{ background: color }} />
+        <span aria-hidden className="mb-1.5 size-1.5 rounded-full" style={{ background: color }} />
+        <span className="readout text-[1.75rem]">{out100(value)}</span>
+        {value === null && <span className="text-[0.6875rem] leading-tight text-ink-dim">Too little data</span>}
       </dd>
     </div>
   );

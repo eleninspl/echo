@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import type { Guest } from "@/lib/echo";
 import { LABELS } from "@/lib/format";
 
-import { Chip, hue, Info, LABEL_HUE, Meter, out100, rank, SCORE_HUE, ZoneHead } from "./hud";
+import { Chip, hue, Info, LABEL_HUE, out100, rank, SCORE_HUE, Voiceprint, ZoneHead } from "./hud";
 
 type Props = {
   guests: Guest[];
@@ -31,11 +31,11 @@ export function lockLine(guests: Guest[]): string {
   return `${n} sweet spots. For ${count(unscored).toLowerCase()}, too little data to score reach.`;
 }
 
-// Every guest, best Echo score first: rank, portrait, name, label, the three scores as bars and the Echo
-// score. A row selects its guest; the scope above and the dossier beside follow it.
+// Every guest, best Echo score first: rank, portrait, name, label, the three scores as a voiceprint and the
+// Echo score. A row selects its guest; the scope above and the dossier beside follow it.
 export function GuestList({ guests, selected, highlighted, picked, onSelect, onHighlight }: Props) {
   return (
-    <section aria-labelledby="guests" className="zone">
+    <section aria-labelledby="guests" className="zone @container">
       <ZoneHead id="guests" title="Guests, ranked">
         <span className="hidden items-center gap-3 sm:flex">
           <span className="text-fit">Fit</span>
@@ -47,7 +47,7 @@ export function GuestList({ guests, selected, highlighted, picked, onSelect, onH
           within these guests. The top 10 come with an episode idea and evidence.
         </Info>
       </ZoneHead>
-      <ol className="flex flex-col py-1">
+      <ol className="flex flex-col pt-1 pb-2">
         {guests.map((guest, index) => (
           <Row
             key={guest.ref}
@@ -86,7 +86,7 @@ function Row({
   const sweet = guest.label === "sweet_spot";
   const { fit, love_back, reach } = guest.scores;
   return (
-    <li className="acquire" style={{ "--order": index } as CSSProperties}>
+    <li className="rise px-2" style={{ "--order": index } as CSSProperties}>
       <button
         type="button"
         aria-pressed={selected}
@@ -95,27 +95,26 @@ function Row({
         onPointerLeave={() => onHighlight(null)}
         onFocus={() => onHighlight(guest.ref)}
         onBlur={() => onHighlight(null)}
-        className={`group relative grid w-full grid-cols-[1.75rem_2.75rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-2 text-left transition-colors md:grid-cols-[1.75rem_2.75rem_minmax(0,1fr)_6.5rem_minmax(0,13rem)_2.75rem] ${
+        className={`group relative grid w-full grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors @2xl:grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem] @2xl:gap-x-5 ${
           selected ? "bg-deck-hi" : lit ? "bg-deck-hi/60" : "hover:bg-deck-hi/60"
         }`}
         style={hue(color)}
       >
-        {/* The selection: an edge in the guest's label hue. */}
-        {selected && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 w-0.5"
-            style={{ background: color }}
-          />
-        )}
-        <span className={`readout text-sm ${selected ? "text-ink" : "text-ink-dim"}`}>{rank(index)}</span>
+        <span className={`readout row-span-2 text-sm @2xl:row-span-1 ${selected ? "text-ink" : "text-ink-dim"}`}>
+          {rank(index)}
+        </span>
         <span
-          className="screen relative size-11 overflow-hidden"
-          style={{ boxShadow: `inset 0 0 0 1px ${sweet ? color : "var(--steel)"}` }}
+          className="relative row-span-2 size-11 self-center rounded-full bg-well @2xl:row-span-1"
+          style={{ boxShadow: sweet ? `0 0 0 2px var(--deck), 0 0 0 3.5px ${color}` : "inset 0 0 0 1px var(--steel)" }}
         >
-          <Picture guest={guest} sizes="44px" small />
+          <span className="absolute inset-0 overflow-hidden rounded-full">
+            <Picture guest={guest} sizes="44px" small />
+          </span>
           {picked && (
-            <span aria-hidden className="absolute right-0 bottom-0 flex size-4 items-center justify-center bg-ink">
+            <span
+              aria-hidden
+              className="absolute -right-1 -bottom-1 flex size-4.5 items-center justify-center rounded-full bg-ink ring-2 ring-deck"
+            >
               <svg viewBox="0 0 10 10" className="size-2.5 text-on-hue">
                 <path d="M2 5.2l2 2 4-4.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
               </svg>
@@ -123,20 +122,26 @@ function Row({
           )}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-display text-base leading-tight font-semibold group-hover:text-white">
+          <span className="block truncate font-display text-base leading-tight font-semibold ">
             {guest.name}
           </span>
-          {guest.description && <span className="block truncate text-xs text-ink-dim">{guest.description}</span>}
+          {guest.description && <span className="mt-0.5 block truncate text-xs text-ink-dim">{guest.description}</span>}
         </span>
-        <span className="justify-self-end md:justify-self-start">
+        {/* Narrow: the label and the voiceprint on a second line under the name. Wide: their own columns. */}
+        <span className="col-[3/-1] row-start-2 flex items-center justify-between gap-4 @2xl:contents">
           <Chip color={color}>{LABELS[guest.label].name}</Chip>
+          <span aria-hidden className="flex max-w-40 min-w-0 flex-1 flex-col gap-1 @2xl:max-w-none">
+            <Voiceprint fit={fit} love={love_back} reach={reach} className="w-full" />
+            <span className="readout grid grid-cols-3 text-center text-[0.6875rem]">
+              <span style={{ color: SCORE_HUE.fit }}>{out100(fit)}</span>
+              <span style={{ color: SCORE_HUE.love_back }}>{out100(love_back)}</span>
+              <span style={{ color: SCORE_HUE.reach }}>{out100(reach)}</span>
+            </span>
+          </span>
         </span>
-        <span aria-hidden className="col-[3/-1] grid grid-cols-3 gap-2 md:col-auto">
-          <Score value={fit} color={SCORE_HUE.fit} order={index} />
-          <Score value={love_back} color={SCORE_HUE.love_back} order={index} />
-          <Score value={reach} color={SCORE_HUE.reach} order={index} />
+        <span className="readout col-start-4 row-start-1 text-right text-xl @2xl:col-start-auto @2xl:row-start-auto">
+          {out100(guest.scores.echo)}
         </span>
-        <span className="readout hidden text-right text-xl md:block">{out100(guest.scores.echo)}</span>
         <span className="sr-only">
           , {LABELS[guest.label].name}: fit {out100(fit)}, love back {out100(love_back)}, reach{" "}
           {reach === null ? "not scored" : out100(reach)}, Echo score {out100(guest.scores.echo)}
@@ -147,23 +152,7 @@ function Row({
   );
 }
 
-// One score: its figure over a short segmented bar. No reach score is a dashed line.
-function Score({ value, color, order }: { value: number | null; color: string; order: number }) {
-  return (
-    <span className="flex min-w-0 flex-col gap-1">
-      <span className="readout text-xs" style={{ color }}>
-        {out100(value)}
-      </span>
-      {value === null ? (
-        <span className="h-1.5 border-t border-dashed border-steel-hi" />
-      ) : (
-        <Meter value={value} color={color} segments={12} order={order} className="h-1.5" />
-      )}
-    </span>
-  );
-}
-
-// The guest's picture from Qloo, or their initials on a dark screen tinted with the label's hue when there's
+// The guest's picture from Qloo, or their initials on a recessed surface tinted with the label's hue when there's
 // none or it doesn't load.
 const QLOO_WIDTH = /-\d+x-auto(?=\.\w+$)/;
 const LARGE_WIDTH = 1200;
@@ -190,7 +179,7 @@ export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: 
         fill
         sizes={sizes}
         unoptimized
-        className="object-cover object-[50%_25%] opacity-90 grayscale-[35%] transition group-hover:opacity-100 group-hover:grayscale-0"
+        className="object-cover object-[50%_25%]"
       />
     );
   }
@@ -202,11 +191,8 @@ export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: 
     .join("");
   return (
     <span aria-hidden className="absolute inset-0 flex items-center justify-center" style={hue(LABEL_HUE[guest.label])}>
-      <span
-        className="absolute inset-x-0 bottom-0 h-2/3 opacity-20"
-        style={{ background: "linear-gradient(to top, var(--hue), transparent)" }}
-      />
-      <span className={`font-display font-semibold tracking-wider text-ink-soft ${small ? "text-sm" : "text-5xl"}`}>
+      <span className="absolute inset-0" style={{ background: "color-mix(in srgb, var(--hue) 16%, transparent)" }} />
+      <span className={`relative font-display font-semibold text-ink-soft ${small ? "text-sm" : "text-5xl"}`}>
         {initials}
       </span>
     </span>

@@ -1,4 +1,6 @@
-import { Lamp, SCORE_HUE } from "./hud";
+import { LABELS } from "@/lib/format";
+
+import { LABEL_HUE, SCORE_HUE, Voiceprint } from "./hud";
 
 const TERMS = [
   { term: "Fit", color: SCORE_HUE.fit, means: "Your listeners over-index on them, beyond their fame" },
@@ -6,11 +8,9 @@ const TERMS = [
   { term: "Reach", color: SCORE_HUE.reach, means: "Their fans are new to you" },
 ];
 
-// How Echo scores a guest, drawn as a targeting display: two audiences overlap; fit runs from your show to
-// the guest, love back runs home, and reach is the part of their audience you don't have yet. Rings sound
-// from the show and a scale turns slowly around it all.
+// How Echo scores a guest: two audiences overlap; fit runs from your show to the guest, love back runs home,
+// and reach is the part of their audience you don't have yet. Rings sound from the show.
 export function SignalPath() {
-  const ticks = Array.from({ length: 120 }, (_, i) => i);
   return (
     <figure className="relative">
       <svg viewBox="0 0 560 460" className="block w-full" role="img" aria-labelledby="signal-desc">
@@ -44,27 +44,6 @@ export function SignalPath() {
             <path d="M0 0L10 5L0 10z" fill="var(--love)" />
           </marker>
         </defs>
-
-        {/* The turning scale around the display. */}
-        <g>
-          {ticks.map((i) => {
-            const a = (i / ticks.length) * Math.PI * 2;
-            const inner = i % 10 === 0 ? 196 : 202;
-            return (
-              <line
-                key={i}
-                x1={280 + Math.cos(a) * inner}
-                y1={230 + Math.sin(a) * inner}
-                x2={280 + Math.cos(a) * 208}
-                y2={230 + Math.sin(a) * 208}
-                stroke={i % 10 === 0 ? "var(--steel-hi)" : "var(--steel)"}
-              />
-            );
-          })}
-        </g>
-        <circle cx="280" cy="230" r="214" fill="none" stroke="var(--steel)" strokeDasharray="2 6" />
-        <line x1="40" x2="520" y1="230" y2="230" stroke="var(--steel)" strokeDasharray="2 4" />
-        <line x1="280" x2="280" y1="10" y2="450" stroke="var(--steel)" strokeDasharray="2 4" />
 
         <circle cx="230" cy="230" r="120" fill="url(#ours-fill)" stroke="var(--fit)" strokeOpacity="0.8" />
         <circle cx="330" cy="230" r="120" fill="url(#theirs-fill)" stroke="var(--love)" strokeOpacity="0.8" />
@@ -103,30 +82,28 @@ export function SignalPath() {
           markerEnd="url(#tip-love)"
         />
 
-        {/* The two nodes, each in a reticle. */}
-        <g fill="none" strokeWidth="1.5">
-          <path d="M191 220v-6h6M213 214h6v6M219 240v6h-6M197 246h-6v-6" stroke="var(--fit)" />
-          <path d="M351 220v-6h6M373 214h6v6M379 240v6h-6M357 246h-6v-6" stroke="var(--love)" />
-        </g>
+        {/* The two nodes, each with a soft halo. */}
+        <circle cx="205" cy="230" r="14" fill="var(--fit)" fillOpacity="0.18" />
+        <circle cx="365" cy="230" r="14" fill="var(--love)" fillOpacity="0.18" />
         <circle cx="205" cy="230" r="7" fill="var(--fit)" />
         <circle cx="365" cy="230" r="7" fill="var(--love)" />
 
-        <g className="font-display" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.08em" }}>
+        <g className="font-display" style={{ fontSize: 18, fontWeight: 600 }}>
           <text x="183" y="236" textAnchor="end" fill="var(--ink)">
-            YOUR SHOW
+            Your show
           </text>
           <text x="387" y="236" fill="var(--ink)">
-            GUEST
+            Guest
           </text>
           <text x="284" y="160" textAnchor="middle" fill="var(--fit)">
-            FIT
+            Fit
           </text>
           <text x="284" y="316" textAnchor="middle" fill="var(--love)">
-            LOVE BACK
+            Love back
           </text>
         </g>
         {/* Reach: a leader line from the hatched crescent to its label. */}
-        <path d="M 420 190 L 470 120 H 520" fill="none" stroke="var(--reach)" />
+        <path d="M 420 190 Q 440 120 520 120" fill="none" stroke="var(--reach)" strokeLinecap="round" />
         <circle cx="420" cy="190" r="3" fill="var(--reach)" />
         <text
           x="520"
@@ -134,14 +111,14 @@ export function SignalPath() {
           textAnchor="end"
           className="font-display"
           fill="var(--reach)"
-          style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.08em" }}
+          style={{ fontSize: 18, fontWeight: 600 }}
         >
-          REACH
+          Reach
         </text>
-        <text x="40" y="40" className="tag" fill="var(--fit)" style={{ fontSize: 10 }}>
+        <text x="70" y="70" className="tag" fill="var(--fit)" style={{ fontSize: 11 }}>
           Your listeners
         </text>
-        <text x="520" y="440" textAnchor="end" className="tag" fill="var(--love)" style={{ fontSize: 10 }}>
+        <text x="490" y="400" textAnchor="end" className="tag" fill="var(--love)" style={{ fontSize: 11 }}>
           Their fans
         </text>
       </svg>
@@ -149,28 +126,47 @@ export function SignalPath() {
   );
 }
 
-// The three scores in words, and what a sweet spot is: the key to the diagram and the whole console.
+// What each label's voiceprint looks like: illustrative shapes for the key, not any guest's scores.
+const SHAPES = [
+  { label: "sweet_spot", fit: 0.85, love: 0.8, reach: 0.85 },
+  { label: "safe", fit: 0.85, love: 0.85, reach: 0.08 },
+  { label: "far", fit: 0.55, love: 0.12, reach: 0.9 },
+  { label: "long_shot", fit: 0.1, love: 0.75, reach: 0.6 },
+] as const;
+
+// The three scores in words under one voiceprint, a lobe each, and what each label's shape looks like: the
+// key to the diagram and the whole page.
 export function ScoreKey() {
   return (
-    <section aria-label="How Echo scores a guest" className="flex flex-col gap-4">
-      <dl className="grid grid-cols-1 gap-px bg-steel sm:grid-cols-3">
-        {TERMS.map(({ term, color, means }) => (
-          <div key={term} className="flex flex-col gap-1.5 bg-void p-3">
-            <dt className="flex items-center gap-2 font-display text-lg leading-none font-semibold" style={{ color }}>
-              <span aria-hidden className="h-0.5 w-4" style={{ background: color }} />
-              {term}
-            </dt>
-            <dd className="text-sm leading-snug text-ink-soft">{means}</dd>
-          </div>
+    <section aria-label="How Echo scores a guest" className="flex flex-col gap-5 @container">
+      <div className="flex flex-col">
+        <Voiceprint fit={0.9} love={0.9} reach={0.9} bars={72} height={48} className="w-full" />
+        <dl className="grid grid-cols-3 gap-3">
+          {TERMS.map(({ term, color, means }) => (
+            <div key={term} className="flex flex-col items-center gap-1.5 text-center">
+              <span aria-hidden className="h-3 w-px" style={{ background: color }} />
+              <span aria-hidden className="size-1.5 rounded-full" style={{ background: color }} />
+              <dt className="mt-1 font-display text-lg leading-none font-semibold" style={{ color }}>
+                {term}
+              </dt>
+              <dd className="text-sm leading-snug text-ink-soft">{means}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <ul aria-label="What each label looks like" className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-2xl bg-deck p-4 @xl:grid-cols-2">
+        {SHAPES.map(({ label, fit, love, reach }) => (
+          <li key={label} className="flex items-center gap-3">
+            <Voiceprint fit={fit} love={love} reach={reach} bars={22} height={26} className="w-20 shrink-0" />
+            <p className="text-sm leading-snug text-ink-soft">
+              <span className="font-display font-semibold" style={{ color: LABEL_HUE[label] }}>
+                {LABELS[label].name}.
+              </span>{" "}
+              {label === "sweet_spot" ? "High on all three. Rare, and Echo says so." : LABELS[label].means}
+            </p>
+          </li>
         ))}
-      </dl>
-      <p className="flex items-center gap-2.5 text-sm text-ink-soft">
-        <Lamp color="var(--sweet)" className="h-2 w-4" />
-        <span>
-          <span className="font-display font-semibold tracking-wider text-sweet uppercase">Sweet spot</span>: high on
-          all three. Rare, and Echo says so.
-        </span>
-      </p>
+      </ul>
     </section>
   );
 }

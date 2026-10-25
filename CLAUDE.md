@@ -75,7 +75,8 @@ Update this section whenever something changes.
 - **25 Oct:** Ask Echo restyled: the panel opens out of the round button, which stays where it is and shows the Echo logo, with the suggestions as a grid of four.
 - **25 Oct:** the LLM client (`llm_client.py`, Leonidas): OpenRouter for production and the model comparison, the Claude CLI wrapper for local development. L1 to L6 have a first version on it, run end to end through the wrapper on a real show (an analysis with ideas takes about 27 s that way). OpenRouter waits for a key; without one, production treats L as not built. Moves the LLM off Groq direct, so Eleni to confirm.
 - **25 Oct:** ten home page directions, one per subagent, each a working page at `/designs/01` to `/designs/10` (index at `/designs`), merged to `main` on 25 Oct, built against mock mode. Screenshots and a pick per teammate in a private claude.ai artifact. The team picks one, then it replaces the home page and the `/designs` routes go.
-- **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain, the 3D chart, the Audience picture, the look.
+- **25 Oct:** W17, a calm look in place of the game-like console (Eleni): neutral greys, light and dark with a toggle, blue for actions and orange for the sweet spot, each guest's scores as a voiceprint, and the fit-by-reach chart made the main feature (named regions, the top guests named on it).
+- **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain, the 3D chart, the Audience picture, the home page pick.
 
 ## Keeping this file current
 

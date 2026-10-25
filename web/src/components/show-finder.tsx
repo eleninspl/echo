@@ -75,7 +75,7 @@ export function ShowFinder() {
               type="submit"
               disabled={search.state === "searching"}
               className="btn btn-solid min-h-13 px-7 text-base"
-              style={hue("var(--fit)")}
+              style={hue("var(--accent)")}
             >
               {search.state === "searching" ? "Looking…" : "Find it"}
             </button>
@@ -104,7 +104,7 @@ export function ShowFinder() {
             {search.shows.map((show, index) => (
               <li
                 key={show.id}
-                className="acquire border-b border-steel last:border-b-0"
+                className="rise border-b border-steel last:border-b-0"
                 style={{ "--order": index } as CSSProperties}
               >
                 <button
@@ -115,14 +115,14 @@ export function ShowFinder() {
                 >
                   <ShowCover show={show} size={56} />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-display text-xl leading-tight font-semibold group-hover:text-white">
+                    <span className="block font-display text-xl leading-tight font-semibold">
                       {show.title}
                     </span>
                     {show.description && (
                       <span className="mt-1 line-clamp-2 block text-sm text-ink-soft">{show.description}</span>
                     )}
                   </span>
-                  <span className={`btn shrink-0 ${pending === show.id ? "btn-solid" : ""}`} style={hue("var(--fit)")}>
+                  <span className={`btn shrink-0 ${pending === show.id ? "btn-solid" : ""}`} style={hue("var(--accent)")}>
                     {pending === show.id ? "Opening…" : "Run Echo"}
                   </span>
                 </button>

@@ -25,11 +25,11 @@ export function Spectrum({ rows }: { rows: MapRow[] }) {
         </Info>
       </ZoneHead>
       <div className="flex flex-col gap-2 px-4 pt-4">
-        <div aria-hidden className="flex h-3 gap-[3px]">
+        <div aria-hidden className="flex h-2.5 gap-1">
           {filled.map((row, index) => (
             <span
               key={row.category}
-              className="bar"
+              className="bar rounded-full"
               style={
                 {
                   flexGrow: row.items.length,
@@ -43,25 +43,23 @@ export function Spectrum({ rows }: { rows: MapRow[] }) {
         <ul className="flex flex-wrap gap-x-5 gap-y-1">
           {filled.map((row) => (
             <li key={row.category} className="flex items-center gap-1.5 text-sm">
-              <span aria-hidden className="size-2" style={{ background: categoryHue(row.category) }} />
-              <span style={{ color: categoryHue(row.category) }}>{category(row.category)}</span>
+              <span aria-hidden className="size-2 rounded-full" style={{ background: categoryHue(row.category) }} />
+              <span className="text-ink-soft">{category(row.category)}</span>
               <span className="readout">{row.items.length}</span>
             </li>
           ))}
         </ul>
       </div>
-      <div className="grid grid-cols-1 gap-px p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {filled.map((row) => (
           <div
             key={row.category}
-            className="flex flex-col gap-2 border-t-2 bg-deck-hi/40 p-3"
-            style={{ ...hue(categoryHue(row.category)), borderColor: categoryHue(row.category) }}
+            className="flex flex-col gap-2 rounded-xl bg-well p-3"
+            style={hue(categoryHue(row.category))}
           >
             <h3 className="flex items-center justify-between">
-              <span
-                className="font-display text-base font-semibold tracking-[0.1em] uppercase"
-                style={{ color: "var(--hue)" }}
-              >
+              <span className="flex items-center gap-2 font-display text-base font-semibold">
+                <span aria-hidden className="size-2 rounded-full" style={{ background: "var(--hue)" }} />
                 {category(row.category)}
               </span>
               <span className="readout text-sm text-ink-dim">{row.items.length}</span>
@@ -70,7 +68,7 @@ export function Spectrum({ rows }: { rows: MapRow[] }) {
               {row.items.map((item, index) => (
                 <li
                   key={`${item.name}-${index}`}
-                  className="relative overflow-hidden bg-well"
+                  className="relative overflow-hidden rounded-md"
                   title={`${item.name}: affinity ${Math.round(item.affinity * 100)}`}
                 >
                   <span
@@ -123,7 +121,6 @@ export function FanAges({ stats }: { stats: Stats }) {
                     vertical
                     value={1}
                     color="var(--love)"
-                    segments={Math.max(stats.ages[age] * 2, 1)}
                     order={index}
                     className="h-full w-full"
                   />
@@ -160,7 +157,7 @@ export function CommonGround({ guests }: { guests: Guest[] }) {
       {top.length ? (
         <ol className="flex flex-col gap-1.5 p-4">
           {top.map(([taste, n], index) => (
-            <li key={taste} className="relative overflow-hidden bg-well" style={hue("var(--fit)")}>
+            <li key={taste} className="relative overflow-hidden rounded-md bg-well" style={hue("var(--fit)")}>
               <span
                 aria-hidden
                 className="bar absolute inset-y-0 left-0"

@@ -180,7 +180,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
       <div className={`${FRAME} flex-1 pt-4 pb-24`}>
         <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
+            <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 xl:col-span-8">
               <Scope
                 key={`scope-${analysis.id}`}
                 guests={guests}
@@ -199,7 +199,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
                 onHighlight={setHighlighted}
               />
             </div>
-            <aside id="dossier-panel" aria-label="Selected guest" className="min-w-0 scroll-mt-28 lg:col-span-5">
+            <aside id="dossier-panel" aria-label="Selected guest" className="min-w-0 scroll-mt-28 lg:col-span-5 xl:col-span-4">
               <div className="lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12.5rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]">
                 {selected && (
                   <Dossier
@@ -280,13 +280,13 @@ function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => 
   }
 
   return (
-    <div className="sticky top-12 z-20 mt-4 border-y border-steel bg-void/90 backdrop-blur-md">
+    <div className="sticky top-14 z-20 mt-4 bg-void/85 backdrop-blur-md">
       <div className={FRAME}>
         <div
           role="tablist"
           aria-label="Analysis"
           onKeyDown={keys}
-          className="-mx-2.5 flex overflow-x-auto [scrollbar-width:none] sm:mx-0"
+          className="flex gap-1 overflow-x-auto py-2 [scrollbar-width:none]"
         >
           {TABS.map((name) => {
             const on = tab === name;
@@ -303,20 +303,15 @@ function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => 
                 aria-controls={`panel-${name}`}
                 tabIndex={on ? 0 : -1}
                 onClick={() => onTab(name)}
-                className={`group relative flex shrink-0 items-baseline gap-1.5 px-2.5 py-3.5 transition-colors sm:gap-2.5 sm:px-6 ${
-                  on ? "text-ink" : "text-ink-dim hover:text-ink-soft"
+                className={`flex shrink-0 items-baseline gap-1.5 rounded-full px-4 py-2 transition-colors sm:gap-2 sm:px-5 ${
+                  on ? "bg-deck text-ink shadow-[inset_0_0_0_1px_var(--steel)]" : "text-ink-dim hover:bg-deck/60 hover:text-ink-soft"
                 }`}
               >
                 <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">{TAB_NAMES[name]}</span>
-                <span className={`readout text-xs sm:text-sm ${on ? "text-fit" : ""}`}>
+                <span className={`readout text-xs sm:text-sm ${on ? "text-accent" : ""}`}>
                   {counts[name]}
                   <span className="sr-only"> {units[name]}</span>
                 </span>
-                <span
-                  aria-hidden
-                  className={`absolute inset-x-3 bottom-0 h-0.5 transition-opacity ${on ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
-                  style={{ background: "var(--fit)" }}
-                />
               </button>
             );
           })}
@@ -364,13 +359,13 @@ export function ConsoleSkeleton() {
     <div aria-busy className={`${FRAME} grid grid-cols-1 gap-4 py-4 lg:grid-cols-12`}>
       <span className="sr-only">Loading the analysis</span>
       <div className="zone h-52 lg:col-span-12" />
-      <div className="zone h-96 lg:col-span-7" />
-      <div className="zone h-96 lg:col-span-5" />
+      <div className="zone h-96 lg:col-span-7 xl:col-span-8" />
+      <div className="zone h-96 lg:col-span-5 xl:col-span-4" />
     </div>
   );
 }
 
-// The run's six steps beside a radar sweeping while Echo works. Fixed heights, so polling never moves
+// The run's six steps beside echo rings sounding while Echo works. Fixed heights, so polling never moves
 // the page.
 function Rundown({ steps }: { steps: Step[] }) {
   const current = steps.findIndex((step) => !step.done);
@@ -378,7 +373,7 @@ function Rundown({ steps }: { steps: Step[] }) {
   return (
     <section aria-labelledby="running" className="zone flex flex-col">
       <ZoneHead id="running" title="Echo is running">
-        <span className="text-fit">
+        <span className="text-accent">
           {done} / {steps.length}
         </span>
       </ZoneHead>
@@ -390,13 +385,13 @@ function Rundown({ steps }: { steps: Step[] }) {
               <li
                 key={step.key}
                 aria-current={on ? "step" : undefined}
-                className={`flex h-12 items-center gap-4 border-b border-steel ${step.done || on ? "text-ink" : "text-ink-dim"}`}
+                className={`flex h-12 items-center gap-4 border-b border-steel last:border-b-0 ${step.done || on ? "text-ink" : "text-ink-dim"}`}
               >
                 <span className="readout w-6 text-sm text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
                 <Lamp
-                  color={step.done ? "var(--sweet)" : "var(--fit)"}
+                  color={step.done ? "var(--ink-soft)" : "var(--accent)"}
                   on={step.done || on}
-                  className={`h-2 w-5 ${on ? "blink" : ""}`}
+                  className={`size-2.5 ${on ? "pulse" : ""}`}
                 />
                 <span className={on ? "font-semibold" : ""}>{step.label}</span>
                 <span className="sr-only">{step.done ? "(done)" : on ? "(running)" : "(waiting)"}</span>
@@ -414,81 +409,43 @@ function Rundown({ steps }: { steps: Step[] }) {
   );
 }
 
-// A radar sweeping for guests: range rings, a rotating beam, and the steps done as an arc around it.
+// Echo rings sounding from the show while it works, and the steps done as an arc around them.
 function Radar({ label, done, total }: { label: string; done: number; total: number }) {
   const r = 120;
   const arc = 2 * Math.PI * (r + 14);
   return (
     <div aria-hidden className="relative mx-auto size-72 shrink-0">
       <svg viewBox="-150 -150 300 300" className="absolute inset-0 size-full overflow-visible">
-        <defs>
-          <radialGradient id="radar-glow">
-            <stop offset="0" stopColor="var(--fit)" stopOpacity="0.12" />
-            <stop offset="1" stopColor="var(--fit)" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="radar-beam" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="var(--fit)" stopOpacity="0" />
-            <stop offset="1" stopColor="var(--fit)" stopOpacity="0.45" />
-          </linearGradient>
-        </defs>
-        <circle r={r} fill="url(#radar-glow)" />
         {[0.33, 0.66, 1].map((t) => (
-          <circle
-            key={t}
-            r={r * t}
-            fill="none"
-            stroke="var(--steel-hi)"
-            strokeDasharray={t === 1 ? undefined : "2 4"}
-          />
+          <circle key={t} r={r * t} fill="none" stroke="var(--steel)" />
         ))}
-        <line x1={-r} x2={r} stroke="var(--steel)" />
-        <line y1={-r} y2={r} stroke="var(--steel)" />
-        {Array.from({ length: 72 }, (_, i) => {
-          const a = (i / 72) * Math.PI * 2;
-          const inner = i % 6 === 0 ? r - 8 : r - 4;
-          return (
-            <line
-              key={i}
-              x1={Math.cos(a) * inner}
-              y1={Math.sin(a) * inner}
-              x2={Math.cos(a) * r}
-              y2={Math.sin(a) * r}
-              stroke="var(--steel-hi)"
-            />
-          );
-        })}
-        <g className="sweep">
-          <path
-            d={`M 0 0 L ${r} 0 A ${r} ${r} 0 0 0 ${Math.cos(-0.6) * r} ${Math.sin(-0.6) * r} Z`}
-            fill="url(#radar-beam)"
-          />
-          <line x1="0" y1="0" x2={r} y2="0" stroke="var(--fit)" strokeWidth="1.5" />
-        </g>
         {[0, 1, 2].map((i) => (
           <circle
             key={i}
             className="ring"
-            r="9"
+            r="12"
             fill="none"
-            stroke="var(--fit)"
+            stroke="var(--accent)"
+            strokeWidth="1.5"
             vectorEffect="non-scaling-stroke"
             style={{ animationDelay: `${i * 0.93}s` }}
           />
         ))}
-        <circle r="5" fill="var(--fit)" />
-        <circle r={r + 14} fill="none" stroke="var(--fit)" strokeOpacity="0.15" strokeWidth="3" />
+        <circle r="7" fill="var(--accent)" />
+        <circle r={r + 14} fill="none" stroke="var(--sweet)" strokeOpacity="0.16" strokeWidth="5" />
         <circle
           r={r + 14}
           fill="none"
           stroke="var(--sweet)"
-          strokeWidth="3"
+          strokeWidth="5"
+          strokeLinecap="round"
           strokeDasharray={`${(arc * done) / Math.max(total, 1)} ${arc}`}
           transform="rotate(-90)"
           style={{ transition: "stroke-dasharray 600ms var(--ease-out)" }}
         />
       </svg>
       <div className="absolute inset-x-0 -bottom-2 flex flex-col items-center">
-        <span className="tag text-fit">{label}</span>
+        <span className="tag text-accent">{label}</span>
       </div>
     </div>
   );

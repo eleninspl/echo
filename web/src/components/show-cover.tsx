@@ -12,7 +12,7 @@ export function ShowCover({ show, size }: { show: Show; size: number }) {
         width={size}
         height={size}
         unoptimized
-        className="shrink-0 rounded-[2px] bg-well object-cover shadow-[0_0_0_1px_var(--steel)]"
+        className="shrink-0 rounded-xl bg-well object-cover shadow-[0_0_0_1px_var(--steel)]"
         style={{ width: size, height: size }}
       />
     );
@@ -20,7 +20,7 @@ export function ShowCover({ show, size }: { show: Show; size: number }) {
   return (
     <span
       aria-hidden
-      className="screen flex shrink-0 items-center justify-center rounded-[2px] font-display font-medium text-ink-soft uppercase shadow-[0_0_0_1px_var(--steel)]"
+      className="screen flex shrink-0 items-center justify-center rounded-xl font-display font-medium text-ink-soft uppercase"
       style={{ width: size, height: size, fontSize: size * 0.45 }}
     >
       {show.title.trim().charAt(0)}
