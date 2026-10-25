@@ -40,7 +40,7 @@ export function ShowLock({ analysis, children }: { analysis: Analysis; children?
         )}
         {unused && (
           <p className="text-sm text-ink-soft">
-            Qloo couldn&apos;t use &ldquo;{filters.episode_about?.query}&rdquo;, so these guests don&apos;t account for
+            Echo couldn&apos;t use &ldquo;{filters.episode_about?.query}&rdquo;, so these guests don&apos;t account for
             it.
           </p>
         )}
@@ -69,24 +69,11 @@ export function LockHeader({ analysis, stats, line }: { analysis: Analysis; stat
         <LockDial stats={stats} line={line} />
         <div className="flex min-w-0 flex-col gap-5">
           <LabelSpectrum stats={stats} />
-          <dl className="grid grid-cols-3 gap-px bg-steel">
+          <dl className="grid grid-cols-2 gap-px bg-steel">
             <Instrument name="Tastes" value={stats.tastes} note={`${stats.categories} categories`}>
               <span aria-hidden className="flex h-1.5 gap-[2px]">
                 {stats.bands.map((band) => (
                   <span key={band.category} style={{ flexGrow: band.n, background: categoryHue(band.category) }} />
-                ))}
-              </span>
-            </Instrument>
-            <Instrument name="Qloo calls" value={stats.calls} note={`${stats.fresh} fresh · ${stats.cached} cached`}>
-              <span aria-hidden className="flex h-1.5 gap-px">
-                {Array.from({ length: stats.calls }, (_, i) => (
-                  <span
-                    key={i}
-                    className="flex-1"
-                    style={{
-                      background: i < stats.fresh ? "var(--fit)" : "color-mix(in srgb, var(--fit) 25%, transparent)",
-                    }}
-                  />
                 ))}
               </span>
             </Instrument>

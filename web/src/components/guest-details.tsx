@@ -134,7 +134,7 @@ function Compare({ showMap, guestMap, adds }: { showMap: MapRow[]; guestMap: Map
   const added = new Set(adds.flatMap((row) => row.items.map((item) => `${row.category}/${item.name}`)));
   const ours = new Map(showMap.map((row) => [row.category, row.items]));
   const rows = guestMap.filter((row) => row.items.length > 0);
-  if (!rows.length) return <p className="text-ink-dim">Qloo has no map for their fans.</p>;
+  if (!rows.length) return <p className="text-ink-dim">There&apos;s no map for their fans yet.</p>;
   return (
     <table className="w-full text-left text-sm">
       <thead>

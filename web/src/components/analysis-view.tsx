@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import type { Analysis, Filters, Guest, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
@@ -18,14 +18,13 @@ import { Chip, FRAME, hue, Lamp, ZoneHead } from "./hud";
 import { Invite, MAX_PICKS } from "./invite";
 import { LockHeader, ShowLock } from "./lock-header";
 import { Problem } from "./problem";
-import { RouterLog } from "./router-log";
 import { Scope } from "./scope";
 import { CommonGround, FanAges, Spectrum } from "./spectrum";
 
 const PREFIX = "/analyses/";
 const NARROW = "(max-width: 1023px)";
 
-const TABS = ["guests", "audience", "invite", "qloo"] as const;
+const TABS = ["guests", "audience", "invite"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (value: string | null): value is Tab => TABS.includes(value as Tab);
 
@@ -98,7 +97,7 @@ type ConsoleProps = {
   onRewrite: (guestRef: string, idea: Idea) => void;
 };
 
-// The finished run: the lock header, four tabs, and the chat docked under them all.
+// The finished run: the lock header, three tabs, and the chat a click away on every one.
 function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
   const { guests } = analysis;
   // Not keyed by the analysis, so the chat and the tab stay across a rerun; what the host selected and
@@ -119,6 +118,9 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
   const { selected: selectedRef, picked, view } = current;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
+
+  // A hidden page never hears the pointer leave, so Back and Forward would bring a guest's tooltip back.
+  useLayoutEffect(() => () => setHighlighted(null), []);
 
   const index = Math.max(
     guests.findIndex((guest) => guest.ref === selectedRef),
@@ -175,7 +177,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
 
       <TabBar tab={tab} onTab={openTab} stats={figures} picked={picked.length} />
 
-      <div className={`${FRAME} flex-1 pt-4 pb-8`}>
+      <div className={`${FRAME} flex-1 pt-4 pb-24`}>
         <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col gap-4 lg:col-span-7">
@@ -232,10 +234,6 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
         <div id="panel-invite" role="tabpanel" aria-labelledby="tab-invite" hidden={tab !== "invite"}>
           <Invite analysis={analysis} picked={picked} onToggle={togglePick} />
         </div>
-
-        <div id="panel-qloo" role="tabpanel" aria-labelledby="tab-qloo" hidden={tab !== "qloo"}>
-          {tab === "qloo" && <RouterLog calls={analysis.qloo_calls} stats={figures} />}
-        </div>
       </div>
 
       <Chat analysis={analysis} onRerun={onRerun} onRewrite={onRewrite} />
@@ -243,7 +241,7 @@ function Console({ analysis, onRerun, onRewrite }: ConsoleProps) {
   );
 }
 
-const TAB_NAMES: Record<Tab, string> = { guests: "Guests", audience: "Audience", invite: "Invite", qloo: "Qloo" };
+const TAB_NAMES: Record<Tab, string> = { guests: "Guests", audience: "Audience", invite: "Invite" };
 
 // The tabs, under the status bar while the page scrolls. Arrow keys move between them.
 function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => void; stats: Stats; picked: number }) {
@@ -251,19 +249,16 @@ function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => 
     guests: null,
     audience: null,
     invite: null,
-    qloo: null,
   });
   const counts: Record<Tab, string> = {
     guests: String(stats.guests),
     audience: String(stats.tastes),
     invite: `${picked}/${MAX_PICKS}`,
-    qloo: String(stats.calls),
   };
   const units: Record<Tab, string> = {
     guests: "guests",
     audience: "tastes",
     invite: "picked",
-    qloo: "calls",
   };
 
   function keys(event: KeyboardEvent<HTMLDivElement>) {
@@ -312,9 +307,7 @@ function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => 
                   on ? "text-ink" : "text-ink-dim hover:text-ink-soft"
                 }`}
               >
-                <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">
-                  {TAB_NAMES[name]}
-                </span>
+                <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">{TAB_NAMES[name]}</span>
                 <span className={`readout text-xs sm:text-sm ${on ? "text-fit" : ""}`}>
                   {counts[name]}
                   <span className="sr-only"> {units[name]}</span>

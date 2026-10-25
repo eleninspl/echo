@@ -63,7 +63,7 @@ def load_example() -> dict[str, Any]:
 
 
 def daily_cap() -> EchoError:
-    return EchoError(429, "daily_cap", "Echo has used today's Qloo calls. Featured shows still open.")
+    return EchoError(429, "daily_cap", "Echo has reached today's limit. Featured shows still open.")
 
 
 class Engine:
@@ -188,7 +188,7 @@ class Engine:
             fail(analysis, error.code, error.message)
         except QlooError:
             log.exception("Qloo failed during %s", analysis.id)
-            fail(analysis, "qloo_error", "Qloo didn't answer. Try again in a minute.")
+            fail(analysis, "qloo_error", "Echo's taste data didn't answer. Try again in a minute.")
         except NotImplementedError:
             fail(analysis, "not_implemented", "This part of the engine isn't built yet.")
         except Exception:
@@ -296,7 +296,9 @@ def create_app(
 
     @app.exception_handler(QlooError)
     async def qloo_error(_: Request, error: QlooError) -> JSONResponse:
-        return JSONResponse({"error": "qloo_error", "message": "Qloo didn't answer. Try again in a minute."}, 502)
+        return JSONResponse(
+            {"error": "qloo_error", "message": "Echo's taste data didn't answer. Try again in a minute."}, 502
+        )
 
     @app.exception_handler(NotImplementedError)
     async def not_implemented(_: Request, error: NotImplementedError) -> JSONResponse:

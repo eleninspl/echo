@@ -50,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <div
             className={`${FRAME} flex flex-col gap-1 py-6 text-sm text-ink-dim sm:flex-row sm:justify-between sm:gap-6`}
           >
-            <p>Echo reads Qloo&apos;s taste data. Results describe audiences as groups, never one listener.</p>
+            <p>Results describe audiences as groups, never one listener.</p>
             <p>Echo sends nothing. Invitations are yours to send.</p>
           </div>
         </footer>

@@ -218,7 +218,7 @@ async def person_list(client: QlooClient, params: dict[str, Any]) -> list[dict]:
         return entities_of(await client.insights(params))
     except QlooError as error:
         if error.status == 400 and "locality" in error.body.lower():
-            raise AnalysisFailed("unknown_country", "Qloo doesn't recognise that country.") from error
+            raise AnalysisFailed("unknown_country", "Echo doesn't recognise that country.") from error
         if error.status == 400:
             raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet.") from error
         raise
@@ -306,12 +306,12 @@ async def lens(client: QlooClient, base: dict[str, Any], ids: Sequence[str]) -> 
 async def usable(client: QlooClient, show_id: str, plain: list[dict]) -> None:
     living = [p for p in plain if not is_dead(p)]
     if len(living) < MIN_LIVING:
-        raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: Qloo knows too few people for it.")
+        raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: too little data on its audience.")
     for person in living[:3]:
         result = await love_back(client, person["entity_id"], show_id)
         if result is not None and result.love is not None:
             return
-    raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: Qloo can't score love back.")
+    raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: it can't score love back for it.")
 
 
 async def optional(work: Awaitable[Any], fallback: Any) -> Any:

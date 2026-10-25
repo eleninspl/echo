@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 
 import { echo, type Analysis, type Idea, type Message } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
 
-import { FRAME, hue, Info, Lamp } from "./hud";
+import { Lamp } from "./hud";
+import { Logo } from "./logo";
 
 // The API takes the last 20 messages (docs/plan.md, API).
 const HISTORY = 20;
@@ -30,22 +31,25 @@ type Props = {
 };
 
 // The agent: the host asks for a change in their own words, and Echo runs again with new filters
-// or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. It's a dock
-// at the bottom of the screen, on every tab; the conversation opens above it and can be folded away.
+// or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. A round
+// button at the bottom right on every tab opens the conversation above it; closing it keeps the conversation.
 export function Chat({ analysis, onRerun, onRewrite }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<HostError | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [folded, setFolded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(0);
   const log = useRef<HTMLOListElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const bubble = useRef<HTMLButtonElement>(null);
 
   const finished = useCallback(
     (next: Analysis) => {
       setRunId(null);
       const phrases = filterPhrases(next.filters);
-      const note = `Done. The gallery shows the new run${phrases.length ? `: ${phrases.join(", ").toLowerCase()}` : ""}.`;
+      const note = `Done. The page shows the new run${phrases.length ? `: ${phrases.join(", ").toLowerCase()}` : ""}.`;
       setEntries((current) => [...current, { role: "assistant", content: note, note: true }]);
       onRerun(next);
     },
@@ -56,14 +60,28 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
 
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
-  }, [entries, running]);
+  }, [entries, running, open]);
+
+  useEffect(() => {
+    if (open) input.current?.focus();
+  }, [open]);
+
+  function toggle() {
+    if (open) setSeen(entries.length);
+    setOpen(!open);
+  }
+
+  function close() {
+    setSeen(entries.length);
+    setOpen(false);
+    bubble.current?.focus();
+  }
 
   async function send(message: string) {
     const content = message.trim();
     if (!content || pending) return;
     const next: Entry[] = [...entries, { role: "user", content }];
     setEntries(next);
-    setFolded(false);
     setText("");
     setPending(true);
     setProblem(null);
@@ -86,6 +104,10 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
     send(text);
   }
 
+  function keys(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") close();
+  }
+
   const failed = runId !== null && run.analysis?.id === runId && run.analysis.status === "failed" ? run.analysis : null;
   const step = running?.steps.findIndex((s) => !s.done) ?? -1;
   // The engine answers "not built yet" while the LLM side isn't deployed: say so once, and stop offering asks.
@@ -94,6 +116,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
     entries.length > 0 || pending || running !== null || failed !== null || (run.error !== null && runId !== null);
 
   const busy = pending || running?.status === "running";
+  const unread = !open && entries.length > seen;
   const status = offline
     ? "Offline"
     : pending
@@ -103,19 +126,79 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
         : "Ready";
 
   return (
-    <section
-      aria-labelledby="ask"
-      className="sticky bottom-0 z-30 mt-auto border-t border-steel-hi bg-void/92 shadow-[0_-18px_40px_-20px_rgb(0_0_0/0.9)] backdrop-blur-md"
-    >
-      <div className={`${FRAME} flex flex-col gap-2 py-2.5`}>
+    <>
+      <section
+        id="ask-panel"
+        role="dialog"
+        aria-labelledby="ask"
+        onKeyDown={keys}
+        className={`zone fixed right-4 bottom-22 z-40 flex max-h-[calc(100dvh-9rem)] w-[calc(100vw-2rem)] max-w-[26rem] origin-bottom-right flex-col shadow-[0_24px_60px_rgb(0_0_0/0.8)] motion-reduce:transition-none sm:right-6 sm:bottom-24 ${
+          open
+            ? "visible translate-y-0 scale-100 opacity-100 [transition:opacity_220ms_var(--ease-out),translate_220ms_var(--ease-out),scale_220ms_var(--ease-out),visibility_0s]"
+            : "invisible translate-y-3 scale-95 opacity-0 [transition:opacity_160ms_ease-in,translate_160ms_ease-in,scale_160ms_ease-in,visibility_0s_160ms]"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-steel py-2 pr-2 pl-4">
+          <h2 id="ask" className="flex items-center gap-2.5 font-display text-[0.9375rem] font-semibold text-ink">
+            <Logo className="size-5 text-fit" />
+            Ask Echo
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="tag flex items-center gap-1.5 text-ink-dim">
+              <Lamp
+                color={offline ? "var(--balanced)" : "var(--fit)"}
+                on={!offline}
+                className={busy ? "blink size-1.5" : "size-1.5"}
+              />
+              {status}
+            </span>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close Ask Echo"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-[2px] text-ink-dim transition-colors hover:bg-deck-hi hover:text-ink"
+            >
+              <Cross />
+            </button>
+          </div>
+        </div>
+
         <ol
           ref={log}
           role="log"
           aria-label="Conversation with Echo"
-          className={
-            talking && !folded ? "screen flex max-h-[38vh] min-h-20 flex-col gap-2 overflow-y-auto p-3" : "sr-only"
-          }
+          className="flex min-h-40 flex-1 flex-col gap-3 overflow-y-auto p-4 [scrollbar-width:thin]"
         >
+          {!talking && (
+            <li className="flex flex-col gap-4">
+              <p className="text-sm leading-relaxed text-ink-soft">
+                Ask for different guests in your own words, or for a new take on one idea. Echo runs again, and these
+                guests stay until the new ones are ready.
+              </p>
+              {!offline && (
+                <div className="flex flex-col gap-2">
+                  <span id="ask-try" className="tag text-ink-dim">
+                    Try
+                  </span>
+                  <ul aria-labelledby="ask-try" className="flex flex-col gap-1.5">
+                    {SUGGESTIONS.map((suggestion) => (
+                      <li key={suggestion}>
+                        <button
+                          type="button"
+                          onClick={() => send(suggestion)}
+                          disabled={pending}
+                          className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-[2px] border border-steel px-3 py-2 text-left text-sm text-ink-soft transition-colors hover:border-fit/50 hover:bg-fit/8 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {suggestion}
+                          <Arrow className="size-3.5 shrink-0 text-fit opacity-50 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          )}
           {entries.map((entry, index) => (
             <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
               {entry.content}
@@ -141,101 +224,74 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
           )}
         </ol>
 
-        {offline ? (
-          <p role="status" className="text-sm text-ink-soft">
-            Asking Echo isn&apos;t available in this demo yet. Everything else on the page works.
-          </p>
-        ) : (
-          problem && (
-            <p role="alert" className="text-sm">
-              <span className="font-semibold text-alert">{problem.title}.</span>{" "}
-              <span className="text-ink-soft">{problem.message}</span>
+        <div className="flex flex-col gap-2 border-t border-steel px-4 py-3">
+          {offline ? (
+            <p role="status" className="text-sm text-ink-soft">
+              Asking Echo isn&apos;t available in this demo yet. Everything else on the page works.
             </p>
-          )
-        )}
-
-        <form onSubmit={submit} className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h2 id="ask" className="tag flex items-center gap-2 text-ink">
-            <Lamp
-              color={offline ? "var(--balanced)" : "var(--fit)"}
-              on={!offline}
-              className={busy ? "blink size-2" : "size-2"}
-            />
-            Ask Echo
-            <span className="sr-only">: {status}</span>
-          </h2>
-          {!talking && !offline && (
-            <ul aria-label="Suggestions" className="hidden flex-wrap gap-1.5 xl:flex">
-              {SUGGESTIONS.map((suggestion) => (
-                <li key={suggestion}>
-                  <button
-                    type="button"
-                    onClick={() => send(suggestion)}
-                    disabled={pending}
-                    className="btn btn-sm"
-                    style={hue("var(--fit)")}
-                  >
-                    {suggestion}
-                  </button>
-                </li>
-              ))}
-            </ul>
+          ) : (
+            problem && (
+              <p role="alert" className="text-sm">
+                <span className="font-semibold text-alert">{problem.title}.</span>{" "}
+                <span className="text-ink-soft">{problem.message}</span>
+              </p>
+            )
           )}
-          <div className="flex min-w-0 flex-[1_1_20rem] gap-2">
-            <label htmlFor="ask-input" className="sr-only">
-              Ask Echo
-            </label>
-            <textarea
-              id="ask-input"
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  send(text);
-                }
-              }}
-              maxLength={2000}
-              rows={1}
-              placeholder="Younger listeners, less famous guests…"
-              disabled={offline}
-              className="field min-h-10 min-w-0 flex-1 resize-none px-3 py-2 disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={offline || pending || !text.trim()}
-              className="btn btn-solid"
-              style={hue("var(--fit)")}
-            >
-              {pending ? "Asking…" : "Send"}
-            </button>
-            {talking && (
+          <form onSubmit={submit} className="flex flex-col gap-1.5">
+            <div className="flex items-end gap-2 rounded-[2px] border border-steel-hi bg-well py-1.5 pr-1.5 pl-3 shadow-[inset_0_2px_6px_rgb(0_0_0/0.6)] transition-[border-color,box-shadow] duration-150 focus-within:border-fit focus-within:shadow-[inset_0_2px_6px_rgb(0_0_0/0.6),0_0_0_3px_color-mix(in_srgb,var(--fit)_18%,transparent)] hover:not-focus-within:border-ink-dim has-[textarea:disabled]:opacity-50">
+              <label htmlFor="ask-input" className="sr-only">
+                Ask Echo
+              </label>
+              <textarea
+                ref={input}
+                id="ask-input"
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    send(text);
+                  }
+                }}
+                maxLength={2000}
+                rows={1}
+                placeholder="Younger listeners, less famous guests…"
+                disabled={offline}
+                className="max-h-32 min-h-8 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink [field-sizing:content] placeholder:text-ink-dim focus-visible:outline-none! disabled:cursor-not-allowed"
+              />
               <button
-                type="button"
-                onClick={() => setFolded(!folded)}
-                aria-expanded={!folded}
-                aria-label={folded ? "Show the conversation" : "Hide the conversation"}
-                className="btn px-2.5"
+                type="submit"
+                disabled={offline || pending || !text.trim()}
+                aria-label={pending ? "Asking" : "Send"}
+                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[2px] bg-fit text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
               >
-                <svg
-                  aria-hidden
-                  viewBox="0 0 12 12"
-                  className={`size-3 transition-transform ${folded ? "rotate-180" : ""}`}
-                >
-                  <path d="M2 4.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                </svg>
+                <Send />
               </button>
-            )}
-            <span className="hidden self-center sm:block">
-              <Info label="What Ask Echo does" up>
-                Ask for different guests in your own words, or for a new take on one idea. Echo runs again with the
-                change, and these guests stay until the new ones are ready.
-              </Info>
-            </span>
-          </div>
-        </form>
-      </div>
-    </section>
+            </div>
+            {!offline && <p className="tag text-[0.6875rem] text-ink-dim">Enter to send, Shift+Enter for a new line</p>}
+          </form>
+        </div>
+      </section>
+
+      <button
+        ref={bubble}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="ask-panel"
+        aria-label={open ? "Close Ask Echo" : `Ask Echo${unread ? ", new reply" : ""}`}
+        title={open ? undefined : "Ask Echo"}
+        className="fixed right-4 bottom-4 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full bg-fit text-on-hue shadow-[0_10px_30px_-6px_color-mix(in_srgb,var(--fit)_55%,transparent)] transition hover:brightness-110 sm:right-6 sm:bottom-6"
+      >
+        {open ? <Cross className="size-4" /> : <Logo className="size-8" />}
+        {!open && (busy || unread) && (
+          <span
+            aria-hidden
+            className={`absolute top-0.5 right-0.5 size-3.5 rounded-full border-2 border-void bg-sweet ${busy ? "blink" : ""}`}
+          />
+        )}
+      </button>
+    </>
   );
 }
 
@@ -250,5 +306,29 @@ function Line({ who, children }: { who: string; children: ReactNode }) {
         {children}
       </p>
     </li>
+  );
+}
+
+function Cross({ className = "size-3" }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 12 12" className={className}>
+      <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function Arrow({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" className={className}>
+      <path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function Send() {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" className="size-4">
+      <path d="M8 13V3.5M3.5 8 8 3.5 12.5 8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }

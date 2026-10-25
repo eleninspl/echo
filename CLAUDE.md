@@ -70,8 +70,10 @@ Update this section whenever something changes.
 - **24 Oct:** W14, the web app redesigned as a film-style broadcast-gallery dashboard (dark only, visual first, every number from real data), PR #34, merged 24 Oct.
 - **24 Oct:** W15, the web app redesigned again as a restrained film-style console: four tabs (Guests, Audience, Invite, Qloo), one view of the guests instead of three, a colour per meaning, plain labels, the chat docked on every tab. The analysis page is about a third shorter. PR #37.
 - **24 Oct:** the LLM chosen (Eleni): a cheap open-weight model, `gpt-oss-120b` on Groq (#38). Not yet tried on a real show.
+- **25 Oct (call, Leonidas and Eleni):** a UI review. Qloo comes out of the UI (the tab, call counts, the quota; it stays in the engine), the chart's axes explain themselves, Ask Echo becomes a round button at the bottom right, Invite asks for the sign-off name once, and the landing's stuck "Opening…" gets fixed. The limit of 5 invitations stays: it caps LLM cost. Open: a 2D/3D chart toggle, the Audience tab as a picture, and maybe a less game-like look (`docs/plan.md`, To agree 6 to 8).
+- **25 Oct:** W16, those changes, merged to `main` on 25 Oct.
 - **25 Oct:** the LLM client (`llm_client.py`, Leonidas): OpenRouter for production and the model comparison, the Claude CLI wrapper for local development. L1 to L6 have a first version on it, run end to end through the wrapper on a real show (an analysis with ideas takes about 27 s that way). OpenRouter waits for a key; without one, production treats L as not built. Moves the LLM off Groq direct, so Eleni to confirm.
-- **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain.
+- **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain, the 3D chart, the Audience picture, the look.
 
 ## Keeping this file current
 

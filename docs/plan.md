@@ -16,7 +16,7 @@ Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both
 8. **Chat:** the LLM turns a request into filters (fame, age group, country, episode about a film, artist or brand) and runs again, or rewrites one idea.
 9. **Invite:** drafts for the picked guests, revisable ("shorter"), shown with a copy button.
 10. **Briefing** before recording.
-11. **What Qloo saw:** every Qloo call of the analysis.
+11. **Qloo stays under the hood.** The UI doesn't name Qloo (25 Oct call, which cut the What Qloo saw tab); the analysis still returns `qloo_calls`.
 
 3 or 4 featured shows, precomputed, open instantly from the landing page.
 
@@ -121,6 +121,7 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 | W13 | Walkthrough as a judge: phone width, keyboard, screen reader, slow engine, every error below | 0.5 | done |
 | W14 | Redesign as a broadcast-gallery dashboard, dark only and visual first: desk readout, meter bridge, fit-by-reach scope, multiviewer wall, preview monitor, audience spectrum, Qloo call timeline. Every number comes from the analysis or `/health`. Replaces W1's light and dark poster look | 1 | done |
 | W15 | Redesign as a film-style targeting console with four tabs (Guests, Audience, Invite, Qloo) under a header with the show and the sweet-spot count. One view of the guests (the fit-by-reach scope and a ranked list, with the selected guest beside them) in place of W14's wall, bridge and scope. A colour per meaning, plain labels, the chat docked on every tab, the landing redone to match. Replaces W14 | 1 | done |
+| W16 | From the 25 Oct call: the Qloo tab and every mention of Qloo out of the UI (the quota too, kept in `/health` for us); bigger fit and reach axis names, centred on their axes, that explain themselves on hover or tap, and the guests without a reach score in a lane inside the chart; Ask Echo as a round button at the bottom right that opens the chat; the sign-off name remembered in the browser, so Invite asks for it once; the landing no longer stuck on "Opening…" after Back | 0.5 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
@@ -155,6 +156,9 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots. A shortlist of 13 checked shows is with Eleni; music is the weakest genre.
 4. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
 5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
+6. **A 3D chart** (25 Oct call). Fit, love back and reach are three axes, so a 2D/3D toggle on the chart, if the 3D view isn't harder to read. After the UX pass; the tool is open.
+7. **The Audience tab as a picture** (25 Oct call). It's lists and numbers now. Ideas: a map coloured by strength, clicking a weak area to ask for guests who grow it. Names (shows, films) have no coordinates, so it needs a layout first, at most 2 or 3 dimensions. Leonidas.
+8. **The look** (25 Oct call). The console reads a bit like a game. Consider another design once the UX is settled.
 
 ## The LLM
 

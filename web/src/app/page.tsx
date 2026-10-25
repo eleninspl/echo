@@ -12,8 +12,8 @@ export default function Home() {
             Find the guest who carries your voice to <span className="text-fit">new ears</span>
           </h1>
           <p className="max-w-[52ch] text-lg text-ink-soft">
-            Echo maps what your listeners love on Qloo, then finds guests they&apos;ll love whose own fans will love
-            your show back.
+            Echo maps what your listeners love, then finds guests they&apos;ll love whose own fans will love your show
+            back.
           </p>
           <ShowFinder />
           <ScoreKey />
