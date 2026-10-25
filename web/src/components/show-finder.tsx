@@ -229,20 +229,22 @@ function SidePanel({ search, children }: { search: Search; children: ReactNode }
   const searching = search.state === "searching";
   return (
     <section aria-labelledby="show-results-title" className="fade flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4 pr-3 pl-1">
-        <h2 id="show-results-title" className="tag flex min-w-0 items-center gap-3 text-ink-soft">
+      <div className="flex items-center justify-between gap-4 pr-1 pl-3">
+        <h2 id="show-results-title" className="tag min-w-0 truncate text-ink-soft">
+          {searching ? `Listening for “${search.query}”…` : "Which one is yours?"}
+        </h2>
+        <span className="flex shrink-0 items-center gap-3">
+          {count !== null && count > 0 && (
+            <span className="tag text-ink-dim">
+              {count} {count === 1 ? "match" : "matches"}
+            </span>
+          )}
           {searching ? (
             <Equalizer />
           ) : (
             <span aria-hidden className="size-4 shrink-0 bg-linear-to-br from-fit via-love to-reach" style={MARK} />
           )}
-          <span className="truncate">{searching ? `Listening for “${search.query}”…` : "Which one is yours?"}</span>
-        </h2>
-        {count !== null && count > 0 && (
-          <span className="tag shrink-0 text-ink-dim">
-            {count} {count === 1 ? "match" : "matches"}
-          </span>
-        )}
+        </span>
       </div>
       {searching ? <Placeholders /> : <div className="flex flex-col gap-4">{children}</div>}
     </section>
@@ -258,10 +260,10 @@ function along(index: number, total: number): string {
 
 function Matches({ shows, pending, onRun }: { shows: Show[]; pending: string | null; onRun: (id: string) => void }) {
   return (
-    <ol className="relative flex flex-col gap-1.5 pl-7">
+    <ol className="relative flex flex-col gap-1.5 pr-7">
       <span
         aria-hidden
-        className="rail absolute top-0 bottom-8 left-[11px] w-0.5 rounded-full bg-linear-to-b from-fit via-love to-reach opacity-50"
+        className="rail absolute top-0 bottom-8 right-[11px] w-0.5 rounded-full bg-linear-to-b from-fit via-love to-reach opacity-50"
       />
       {shows.map((show, index) => {
         const top = index === 0;
@@ -280,7 +282,7 @@ function Matches({ shows, pending, onRun }: { shows: Show[]; pending: string | n
             >
               <span
                 aria-hidden
-                className={`absolute top-1/2 -left-[21px] size-2.5 -translate-y-1/2 rounded-full border-2 border-[var(--dot)] transition-[background-color,box-shadow] duration-300 group-hover:bg-[var(--dot)] group-hover:shadow-[0_0_14px_var(--dot)] group-focus-visible:bg-[var(--dot)] ${
+                className={`absolute top-1/2 -right-[21px] size-2.5 -translate-y-1/2 rounded-full border-2 border-[var(--dot)] transition-[background-color,box-shadow] duration-300 group-hover:bg-[var(--dot)] group-hover:shadow-[0_0_14px_var(--dot)] group-focus-visible:bg-[var(--dot)] ${
                   opening ? "bg-[var(--dot)] shadow-[0_0_14px_var(--dot)]" : "bg-void"
                 }`}
               />
@@ -361,7 +363,7 @@ function Equalizer() {
 
 function Placeholders() {
   return (
-    <ul aria-hidden className="flex flex-col gap-1.5 pl-7">
+    <ul aria-hidden className="flex flex-col gap-1.5 pr-7">
       {[0, 1, 2, 3, 4].map((index) => (
         <li
           key={index}
