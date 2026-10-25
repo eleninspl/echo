@@ -8,7 +8,7 @@ export default function Home() {
   return (
     <>
       <section
-        className={`${FRAME} grid grid-cols-1 items-center gap-10 pt-8 pb-12 lg:min-h-[calc(100dvh-8.75rem)] lg:grid-cols-[minmax(0,1.12fr)_minmax(0,1fr)] lg:gap-x-6 lg:py-[3vh]`}
+        className={`${FRAME} grid grid-cols-1 items-center gap-10 pt-8 pb-12 lg:min-h-[calc(100dvh-11.5rem)] lg:grid-cols-[minmax(0,1.12fr)_minmax(0,1fr)] lg:gap-x-6 lg:py-[3vh]`}
       >
         <div className="relative z-10 flex flex-col gap-6 lg:gap-[3.2vh]">
           <h1 className="font-display text-[length:clamp(2.75rem,min(5.6vw,10vh),6.5rem)] leading-[0.95] font-semibold tracking-[-0.02em] text-balance">
@@ -23,7 +23,7 @@ export default function Home() {
             <FeaturedShows />
           </div>
         </div>
-        <Ripples className="mx-auto w-full max-w-[34rem] lg:max-w-[min(100%,calc(100dvh-11rem))]" />
+        <Ripples className="mx-auto w-full max-w-[34rem] lg:max-w-[min(100%,calc(100dvh-14.25rem))]" />
       </section>
       <ScoreKey />
     </>
