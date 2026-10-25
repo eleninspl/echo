@@ -22,7 +22,7 @@
   --on-hue: #2a0f1f;
 
   --accent: #fff4ec;
-  --brand: #f5c451;
+  --brand: #a370ff;
 
   --fit: #ff9a52;
   --love: #ff5c93;
@@ -68,7 +68,7 @@
   --on-hue: #fffbf8;
 
   --accent: #2a0f1f;
-  --brand: #9a6a00;
+  --brand: #6a3fd4;
   --sweet: #0f7f70;
 
   --fit: #d96a32;
@@ -128,9 +128,13 @@
 
 html {
   background: var(--void);
-  scrollbar-color: var(--steel-hi) var(--void);
+  scrollbar-width: none;
   /* Clears the sticky status bar and tabs when a link jumps inside the page. */
   scroll-padding-top: 7rem;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 body {
