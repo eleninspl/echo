@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f3f5f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1120" },
+    { media: "(prefers-color-scheme: light)", color: "#fdf6f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b1020" },
   ],
 };
 
@@ -50,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="sticky top-0 z-40 bg-void/85 backdrop-blur-md">
           <div className={`${FRAME} flex h-14 items-center justify-between gap-4`}>
             <Link href="/" className="group flex items-center gap-3 rounded-full">
-              <Logo className="size-7 text-ink" />
+              <Logo className="size-7 text-brand" />
               <span className="font-display text-lg font-semibold tracking-[0.2em] text-ink">ECHO</span>
               <span className="tag hidden border-l border-steel-hi pl-3 text-ink-dim sm:inline">Guest finder</span>
             </Link>
@@ -63,9 +63,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main id="main" className="flex flex-1 flex-col">
           {children}
         </main>
-        <footer className="mt-8 border-t border-steel">
+        <footer className="border-t border-steel">
           <div
-            className={`${FRAME} flex flex-col gap-1 py-6 text-sm text-ink-dim sm:flex-row sm:justify-between sm:gap-6`}
+            className={`${FRAME} flex flex-col gap-1 py-4 text-sm text-ink-dim sm:flex-row sm:justify-between sm:gap-6 lg:py-3`}
           >
             <p>Results describe audiences as groups, never one listener.</p>
             <p>Echo sends nothing. Invitations are yours to send.</p>

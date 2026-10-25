@@ -4,36 +4,37 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Neutral greys carry the page; a blue accent marks what to act on (buttons, links, focus) and an orange
- * marks the sweet spot, the result Echo exists to find. Colour otherwise lives only inside the charts: a hue per score (fit blue,
- * love back pink, reach gold; checked for colour blindness), quiet tones for the other labels and the audience categories, red only for
- * alerts. Hues are lighter in the dark theme and deeper in the light one, so each reads on its own ground.
+ * Warm plum and cream carry the page, and actions are drawn in the page's ink (buttons, links, focus). Each score
+ * has a hue, fit orange, love back pink and reach violet, and teal marks the sweet spot, the result Echo exists to
+ * find. Colour otherwise lives only inside the charts: quiet tones for the other labels and the audience categories,
+ * red only for alerts. Hues are lighter in the dark theme and deeper in the light one, so each reads on its own ground.
  */
 :root {
-  --void: #0c0c0d;
-  --deck: #161618;
-  --deck-hi: #1f1f22;
-  --well: #111113;
-  --steel: #27272b;
-  --steel-hi: #38383d;
-  --ink: #f4f4f5;
-  --ink-soft: #ababb1;
-  --ink-dim: #88888f;
-  --on-hue: #0c0c0d;
+  --void: #1b1020;
+  --deck: #25162b;
+  --deck-hi: #321e39;
+  --well: #1f1325;
+  --steel: #3a2741;
+  --steel-hi: #4d3654;
+  --ink: #fff4ec;
+  --ink-soft: #dcc7cc;
+  --ink-dim: #ab92a0;
+  --on-hue: #2a0f1f;
 
-  --accent: #5b8dff;
+  --accent: #fff4ec;
+  --brand: #f5c451;
 
-  --fit: #5b9bff;
-  --love: #f0629f;
-  --reach: #e5c04a;
+  --fit: #ff9a52;
+  --love: #ff5c93;
+  --reach: #b48aff;
 
-  /* The sweet spot is orange, the one warm thing on the page; the other labels are quiet, told apart by tone
+  /* The sweet spot is teal, the one cool thing on the page; the other labels are quiet, told apart by tone
      and always named. */
-  --sweet: #ff8a3d;
-  --safe: #a4b8dc;
-  --far: #9479c0;
-  --long-shot: #c99a6e;
-  --balanced: #7a7a81;
+  --sweet: #4fd1b9;
+  --safe: #a3b2d8;
+  --far: #bba7dc;
+  --long-shot: #c9a68c;
+  --balanced: #8f7d89;
 
   --alert: #f2555a;
 
@@ -55,28 +56,29 @@
 }
 
 [data-theme="light"] {
-  --void: #f5f5f4;
-  --deck: #ffffff;
-  --deck-hi: #efefee;
-  --well: #fafaf9;
-  --steel: #e5e5e2;
-  --steel-hi: #d1d1cd;
-  --ink: #111112;
-  --ink-soft: #4b4b50;
-  --ink-dim: #6b6b71;
-  --on-hue: #ffffff;
+  --void: #fdf6f2;
+  --deck: #fffbf8;
+  --deck-hi: #f6ebe5;
+  --well: #faf1ec;
+  --steel: #eddcd3;
+  --steel-hi: #dfc9be;
+  --ink: #2a0f1f;
+  --ink-soft: #5c4652;
+  --ink-dim: #7f6873;
+  --on-hue: #fffbf8;
 
-  --accent: #2a64e8;
-  --sweet: #c2410c;
+  --accent: #2a0f1f;
+  --brand: #9a6a00;
+  --sweet: #0f7f70;
 
-  --fit: #2563eb;
-  --love: #c02a72;
-  --reach: #a87a00;
+  --fit: #d96a32;
+  --love: #c94563;
+  --reach: #754fe1;
 
-  --safe: #6f8ccc;
-  --far: #64408f;
-  --long-shot: #9a6a3a;
-  --balanced: #85858b;
+  --safe: #7787ab;
+  --far: #9b86b5;
+  --long-shot: #a5826a;
+  --balanced: #988a93;
 
   --alert: #d0262c;
 
@@ -88,10 +90,10 @@
   --podcasts: #a5628a;
   --places: #74747a;
 
-  --shadow-zone: 0 1px 2px rgb(17 17 18 / 0.04), 0 4px 16px -8px rgb(17 17 18 / 0.07);
-  --shadow-pop: 0 18px 44px -16px rgb(17 17 18 / 0.22), 0 2px 6px rgb(17 17 18 / 0.06);
-  --shadow-float: 0 24px 60px -20px rgb(17 17 18 / 0.28), 0 2px 8px rgb(17 17 18 / 0.06);
-  --shadow-drop: 0 20px 36px rgb(17 17 18 / 0.18);
+  --shadow-zone: 0 1px 2px rgb(42 15 31 / 0.04), 0 4px 16px -8px rgb(42 15 31 / 0.07);
+  --shadow-pop: 0 18px 44px -16px rgb(42 15 31 / 0.22), 0 2px 6px rgb(42 15 31 / 0.06);
+  --shadow-float: 0 24px 60px -20px rgb(42 15 31 / 0.28), 0 2px 8px rgb(42 15 31 / 0.06);
+  --shadow-drop: 0 20px 36px rgb(42 15 31 / 0.18);
   color-scheme: light;
 }
 
@@ -107,6 +109,7 @@
   --color-ink-dim: var(--ink-dim);
   --color-on-hue: var(--on-hue);
   --color-accent: var(--accent);
+  --color-brand: var(--brand);
   --color-fit: var(--fit);
   --color-love: var(--love);
   --color-reach: var(--reach);
@@ -316,15 +319,54 @@ a {
     animation: ring 2.8s var(--ease-out) infinite;
   }
 
-  @keyframes flow {
-    to {
-      stroke-dashoffset: -28;
+  .ripple {
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+    animation: ripple var(--ring-duration, 7s) cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+    animation-delay: var(--ring-delay, 0s);
+  }
+
+  @keyframes ripple {
+    0% {
+      transform: scale(0.12);
+      opacity: 0;
+    }
+    14% {
+      opacity: var(--ring-peak, 0.7);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
     }
   }
 
-  .flow {
-    stroke-dasharray: 10 4;
-    animation: flow 1.2s linear infinite;
+  .carry {
+    stroke-dasharray: 2 7;
+    animation: carry 1.4s linear infinite;
+  }
+
+  @keyframes carry {
+    to {
+      stroke-dashoffset: -18;
+    }
+  }
+
+  .glow {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: glow 3.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from {
+      transform: scale(0.85);
+      opacity: 0.55;
+    }
+    to {
+      transform: scale(1.15);
+      opacity: 1;
+    }
   }
 
   /* Something running breathes softly. */
@@ -488,6 +530,17 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ripple {
+    animation: none;
+    opacity: var(--still-opacity, 0.3);
+    transform: scale(var(--still-scale, 1));
+  }
+
+  .carry,
+  .glow {
+    animation: none;
+  }
+
   .meter > .lit,
   .arc,
   .bar,
@@ -499,10 +552,6 @@ a {
 
   .ring {
     display: none;
-  }
-
-  .flow {
-    animation: none;
   }
 
   .ask-dock,

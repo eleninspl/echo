@@ -32,7 +32,7 @@ export function lockLine(guests: Guest[]): string {
 }
 
 // Every guest, best Echo score first: rank, portrait, name, label, the three scores as a voiceprint and the
-// Echo score. A row selects its guest; the scope above and the dossier beside follow it.
+// Echo score. A row selects its guest; the scope above and the overview beside follow it.
 export function GuestList({ guests, selected, highlighted, picked, onSelect, onHighlight }: Props) {
   return (
     <section aria-labelledby="guests" className="zone @container">
@@ -86,7 +86,7 @@ function Row({
   const sweet = guest.label === "sweet_spot";
   const { fit, love_back, reach } = guest.scores;
   return (
-    <li className="rise px-2" style={{ "--order": index } as CSSProperties}>
+    <li id={`guest-${guest.ref}`} className="rise scroll-mt-32 px-2" style={{ "--order": index } as CSSProperties}>
       <button
         type="button"
         aria-pressed={selected}

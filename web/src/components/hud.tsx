@@ -117,7 +117,9 @@ export function Chip({
     );
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap text-ink-soft ${className}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap text-ink-soft ${className}`}
+    >
       <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: color }} />
       {children}
     </span>
@@ -156,13 +158,13 @@ const LOBES = [1 / 6, 1 / 2, 5 / 6];
 const SPREAD = 0.13;
 
 // The same fixed texture for every guest, so two voiceprints differ only by their scores.
-const texture = (index: number) => {
+export const texture = (index: number) => {
   const value = Math.sin(index * 12.9898 + 4.1) * 43758.5453;
   return value - Math.floor(value);
 };
 
 // A bar's hue: fit's at the first lobe, love back's at the second, reach's at the third, blended between.
-function voiceHue(position: number) {
+export function voiceHue(position: number) {
   if (position <= LOBES[0]) return SCORE_HUE.fit;
   if (position <= LOBES[1]) {
     const love = Math.round(((position - LOBES[0]) / (LOBES[1] - LOBES[0])) * 100);
@@ -173,6 +175,27 @@ function voiceHue(position: number) {
     return `color-mix(in oklab, ${SCORE_HUE.reach} ${reach}%, ${SCORE_HUE.love_back})`;
   }
   return SCORE_HUE.reach;
+}
+
+export const VOICE_STEP = 4;
+export const VOICE_THICK = VOICE_STEP * 0.55;
+
+export function voiceBars(fit: number, love: number, reach: number | null, bars: number, height: number) {
+  const levels = [fit, love, reach ?? 0];
+  return Array.from({ length: bars }, (_, index) => {
+    const position = (index + 0.5) / bars;
+    const envelope = levels.reduce(
+      (sum, level, at) => sum + Math.max(level, 0) * Math.exp(-(((position - LOBES[at]) / SPREAD) ** 2)),
+      0,
+    );
+    const amplitude = Math.max(0.1, Math.min(envelope, 1) * (0.7 + 0.3 * texture(index)));
+    return {
+      x: index * VOICE_STEP + (VOICE_STEP - VOICE_THICK) / 2,
+      height: Math.round(Math.max(VOICE_THICK, amplitude * (height - 2)) * 100) / 100,
+      color: voiceHue(position),
+      silent: reach === null && position > 2 / 3,
+    };
+  });
 }
 
 // A guest's three scores as one voiceprint: a lobe each for fit, love back and reach, as tall as the score.
@@ -192,32 +215,16 @@ export function Voiceprint({
   height?: number;
   className?: string;
 }) {
-  const step = 4;
-  const width = bars * step;
-  const thick = step * 0.55;
-  const levels = [fit, love, reach ?? 0];
   const middle = height / 2;
   return (
-    <svg
-      aria-hidden
-      viewBox={`0 0 ${width} ${height}`}
-      className={`block h-auto ${className}`}
-    >
-      {Array.from({ length: bars }, (_, index) => {
-        const position = (index + 0.5) / bars;
-        const x = index * step + (step - thick) / 2;
-        const color = voiceHue(position);
-        if (reach === null && position > 2 / 3) {
-          return <circle key={index} cx={x + thick / 2} cy={middle} r={thick / 2.4} fill={color} opacity="0.55" />;
-        }
-        const envelope = levels.reduce(
-          (sum, level, at) => sum + Math.max(level, 0) * Math.exp(-(((position - LOBES[at]) / SPREAD) ** 2)),
-          0,
-        );
-        const amplitude = Math.max(0.1, Math.min(envelope, 1) * (0.7 + 0.3 * texture(index)));
-        const h = Math.max(thick, amplitude * (height - 2));
-        return <rect key={index} x={x} y={middle - h / 2} width={thick} height={h} rx={thick / 2} fill={color} />;
-      })}
+    <svg aria-hidden viewBox={`0 0 ${bars * VOICE_STEP} ${height}`} className={`block h-auto ${className}`}>
+      {voiceBars(fit, love, reach, bars, height).map(({ x, height: h, color, silent }, index) =>
+        silent ? (
+          <circle key={index} cx={x + VOICE_THICK / 2} cy={middle} r={VOICE_THICK / 2.4} fill={color} opacity="0.55" />
+        ) : (
+          <rect key={index} x={x} y={middle - h / 2} width={VOICE_THICK} height={h} rx={VOICE_THICK / 2} fill={color} />
+        ),
+      )}
     </svg>
   );
 }

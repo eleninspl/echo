@@ -122,7 +122,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
         </Hint>
         <Info>
           Up is how much your listeners over-index on a guest beyond their fame; right, how new the guest&apos;s fans
-          are to you. Bigger dots: their fans over-index on your show. The orange corner is the sweet spot, high on all
+          are to you. Bigger dots: their fans over-index on your show. The teal corner is the sweet spot, high on all
           three; the shaded regions are the labels fit and reach decide on their own.
         </Info>
       </ZoneHead>
