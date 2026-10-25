@@ -6,6 +6,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,7 +16,8 @@ import {
 
 import type { Analysis, Filters, Guest, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
-import { analysisPath, readPath } from "@/lib/paths";
+import { analysisPath, guestPath, readPath } from "@/lib/paths";
+import { readPicks, savePicks } from "@/lib/picks";
 import { stats as computeStats, type Stats } from "@/lib/stats";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
@@ -43,7 +45,10 @@ type OpenAnalysis = {
   onSelect: (guestRef: string) => void;
   picked: string[];
   onPick: (guestRef: string) => void;
+  rewritten: Rewrite | null;
 };
+
+type Rewrite = { id: string; ref: string; idea: Idea };
 
 type Choice<T> = { id: string | null; value: T };
 
@@ -66,7 +71,10 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   const [picks, setPicks] = useState<Choice<string[]>>({ id: null, value: [] });
   const openId = analysis?.id ?? null;
   const selected = selection.id === openId ? selection.value : null;
-  const picked = picks.id === openId ? picks.value : [];
+  const picked = (picks.id === openId ? picks.value : openId ? readPicks(openId) : []).filter((ref) =>
+    analysis?.guests.some((guest) => guest.ref === ref),
+  );
+  const [rewritten, setRewritten] = useState<Rewrite | null>(null);
 
   if (guestRef && openId === id && selected !== guestRef) setSelection({ id: openId, value: guestRef });
 
@@ -76,21 +84,27 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     [router, onGuestPage],
   );
   const rewrite = useCallback(
-    (ref: string, idea: Idea) =>
+    (ref: string, idea: Idea) => {
       update((current) => ({
         ...current,
         guests: current.guests.map((guest) => (guest.ref === ref ? { ...guest, idea } : guest)),
-      })),
-    [update],
+      }));
+      if (!openId) return;
+      setSelection({ id: openId, value: ref });
+      setRewritten({ id: openId, ref, idea });
+      if (onGuestPage && ref !== guestRef) router.push(guestPath(openId, ref));
+    },
+    [update, openId, onGuestPage, guestRef, router],
   );
   const onSelect = useCallback((ref: string) => setSelection({ id: openId, value: ref }), [openId]);
   const onPick = useCallback(
-    (ref: string) =>
-      setPicks((state) => {
-        const refs = state.id === openId ? state.value : [];
-        return { id: openId, value: refs.includes(ref) ? refs.filter((other) => other !== ref) : [...refs, ref] };
-      }),
-    [openId],
+    (ref: string) => {
+      if (!openId) return;
+      const value = picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref];
+      setPicks({ id: openId, value });
+      savePicks(openId, value);
+    },
+    [openId, picked],
   );
 
   if (!analysis) {
@@ -127,7 +141,7 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <OpenAnalysisContext value={{ analysis, selected, onSelect, picked, onPick }}>
+    <OpenAnalysisContext value={{ analysis, selected, onSelect, picked, onPick, rewritten }}>
       {children}
       <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
     </OpenAnalysisContext>
@@ -135,14 +149,27 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
 }
 
 export function Console() {
-  const { analysis, selected: selectedRef, onSelect, picked, onPick } = useOpenAnalysis();
+  const { analysis, selected: selectedRef, onSelect, picked, onPick, rewritten } = useOpenAnalysis();
   const { guests } = analysis;
   const [tab, setTab] = useState<Tab>(() => {
     const value = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
     return isTab(value) ? value : "guests";
   });
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(rewritten);
+  if (rewritten !== revealed) {
+    setRevealed(rewritten);
+    if (rewritten) setTab("guests");
+  }
   const figures = computeStats(analysis);
+
+  const shownRewrite = useRef(rewritten);
+  useEffect(() => {
+    if (!rewritten || rewritten === shownRewrite.current) return;
+    shownRewrite.current = rewritten;
+    window.history.replaceState(null, "", `${window.location.pathname}#guest-${rewritten.ref}`);
+    document.getElementById("dossier-idea")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [rewritten]);
 
   useLayoutEffect(() => () => setHighlighted(null), []);
 
@@ -167,6 +194,8 @@ export function Console() {
     setTab(next);
     const search = next === "guests" ? "" : `?tab=${next}`;
     window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+    const panels = document.getElementById("tab-panels");
+    if (panels && panels.getBoundingClientRect().top < 0) panels.scrollIntoView({ block: "start" });
   };
 
   if (!guests.length) {
@@ -195,7 +224,7 @@ export function Console() {
 
       <TabBar tab={tab} onTab={openTab} stats={figures} picked={picked.length} />
 
-      <div className={`${FRAME} flex-1 pt-4 pb-24`}>
+      <div id="tab-panels" className={`${FRAME} flex-1 scroll-mt-28 pt-4 pb-24`}>
         <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 xl:col-span-8">
@@ -233,6 +262,7 @@ export function Console() {
                     index={index}
                     picked={picked.includes(selected.ref)}
                     full={picked.length >= MAX_PICKS}
+                    rewritten={rewritten?.id === analysis.id && rewritten.ref === selected.ref}
                     onPick={() => onPick(selected.ref)}
                   />
                 )}
