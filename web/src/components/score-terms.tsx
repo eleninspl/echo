@@ -81,7 +81,7 @@ export function ScoreTerms() {
         aria-hidden
         viewBox={`0 0 ${BARS * VOICE_STEP} ${HEIGHT}`}
         preserveAspectRatio="none"
-        className="block h-20 w-full md:h-36"
+        className="block h-24 w-full md:h-48"
         onPointerMove={follow}
         onPointerLeave={leave}
         onPointerCancel={leave}

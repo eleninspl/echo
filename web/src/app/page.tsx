@@ -9,7 +9,7 @@ export default function Home() {
     <>
       <Backdrop>
         <div
-          className={`${FRAME} flex flex-col justify-center pt-10 pb-14 lg:h-[calc(100dvh-11.5rem)] lg:min-h-fit lg:py-[3vh]`}
+          className={`${FRAME} flex flex-col justify-center pt-10 pb-14 lg:h-[calc(100dvh-13rem)] lg:min-h-fit lg:py-[3vh]`}
         >
           <div className="flex flex-col gap-6 lg:gap-[3.2vh]">
             <h1 className="font-display text-[length:clamp(2.75rem,min(6.4vw,11.5vh),7.25rem)] leading-[0.95] font-semibold tracking-[-0.02em] text-balance">
