@@ -179,7 +179,7 @@ export function ShowFinder() {
                           {show.title}
                         </span>
                         {show.description && (
-                          <span className="mt-0.5 line-clamp-2 block text-sm leading-snug text-ink-soft">
+                          <span className="mt-0.5 line-clamp-2 text-sm leading-snug text-ink-soft">
                             {show.description}
                           </span>
                         )}
