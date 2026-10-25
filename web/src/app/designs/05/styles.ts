@@ -1,0 +1,18 @@
+export const styles = {
+  root: "d5-root",
+  onInk: "d5-on-ink",
+  display: "d5-display",
+  mono: "d5-mono",
+  dots: "d5-dots",
+  press: "d5-press",
+  pressed: "d5-pressed",
+  lift: "d5-lift",
+  hatch: "d5-hatch",
+  loadingDark: "d5-loading-dark",
+  loading: "d5-loading",
+  pop: "d5-pop",
+  patDots: "d5-pat-dots",
+  patStripes: "d5-pat-stripes",
+  patGrid: "d5-pat-grid",
+  patRings: "d5-pat-rings",
+};
