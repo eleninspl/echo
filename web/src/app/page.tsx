@@ -9,7 +9,7 @@ export default function Home() {
     <>
       <Backdrop>
         <div
-          className={`${FRAME} flex flex-col justify-center pt-10 pb-14 lg:h-[calc(100dvh-13rem)] lg:min-h-fit lg:py-[3vh] xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:gap-12`}
+          className={`${FRAME} flex flex-col justify-center pt-10 pb-14 lg:h-[calc(100dvh-13rem)] lg:min-h-fit lg:py-[3vh] xl:grid xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] xl:gap-10`}
         >
           <div className="flex flex-col gap-6 lg:gap-[3.2vh] xl:self-center">
             <h1 className="font-display text-[length:clamp(2.75rem,min(6.4vw,11.5vh),7.25rem)] leading-[0.95] xl:text-[length:clamp(2.75rem,min(4.6vw,11.5vh),5.25rem)] font-semibold tracking-[-0.02em] text-balance">
@@ -24,7 +24,7 @@ export default function Home() {
               <FeaturedShows />
             </div>
           </div>
-          <div id={RESULTS_SLOT} className="hidden xl:block xl:self-center" />
+          <div id={RESULTS_SLOT} className="hidden xl:block xl:translate-y-12 xl:self-center xl:pr-6" />
         </div>
       </Backdrop>
       <ScoreKey />
