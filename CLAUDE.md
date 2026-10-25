@@ -70,6 +70,7 @@ Update this section whenever something changes.
 - **24 Oct:** W14, the web app redesigned as a film-style broadcast-gallery dashboard (dark only, visual first, every number from real data), PR #34, merged 24 Oct.
 - **24 Oct:** W15, the web app redesigned again as a restrained film-style console: four tabs (Guests, Audience, Invite, Qloo), one view of the guests instead of three, a colour per meaning, plain labels, the chat docked on every tab. The analysis page is about a third shorter. PR #37.
 - **24 Oct:** the LLM chosen (Eleni): a cheap open-weight model, `gpt-oss-120b` on Groq (#38). Not yet tried on a real show.
+- **25 Oct:** ten home page directions, one per subagent, each a working page at `/designs/01` to `/designs/10` on branch `web/home-designs` (index at `/designs`), built against mock mode. Screenshots and a pick per teammate in a private claude.ai artifact. The team picks one, then it replaces the home page and the `/designs` routes go.
 - **Next:** the open points in `docs/plan.md`, "To agree": who builds L, the four featured shows, politicians among the guests, the web app's domain.
 
 ## Keeping this file current

@@ -1,0 +1,15 @@
+export const styles = {
+  root: "e9-root",
+  display: "e9-display",
+  gradientText: "e9-gradient-text",
+  gradientFill: "e9-gradient-fill",
+  gradientEdge: "e9-gradient-edge",
+  ring: "e9-ring",
+  flow: "e9-flow",
+  bar: "e9-bar",
+  glow: "e9-glow",
+  rise: "e9-rise",
+  eq: "e9-eq",
+  waiting: "e9-waiting",
+  traveler: "e9-traveler",
+};

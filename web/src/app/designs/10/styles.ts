@@ -1,0 +1,17 @@
+export const styles = {
+  arrive: "e10-arrive",
+  display: "e10-display",
+  dots: "e10-dots",
+  dotsCream: "e10-dots-cream",
+  float: "e10-float",
+  floatLate: "e10-float-late",
+  hand: "e10-hand",
+  lift: "e10-lift",
+  onInk: "e10-on-ink",
+  page: "e10-page",
+  pulse: "e10-pulse",
+  search: "e10-search",
+  typing: "e10-typing",
+  wave: "e10-wave",
+  waveLeft: "e10-wave-left",
+} as const;
