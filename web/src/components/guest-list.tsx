@@ -122,9 +122,7 @@ function Row({
           )}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-display text-base leading-tight font-semibold ">
-            {guest.name}
-          </span>
+          <span className="block truncate font-display text-base leading-tight font-semibold ">{guest.name}</span>
           {guest.description && <span className="mt-0.5 block truncate text-xs text-ink-dim">{guest.description}</span>}
         </span>
         {/* Narrow: the label and the voiceprint on a second line under the name. Wide: their own columns. */}
@@ -183,12 +181,11 @@ export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: 
       />
     );
   }
-  const initials = guest.name
+  const letters = guest.name
     .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("");
+    .map((part) => part.match(/[\p{L}\p{N}]/u)?.[0])
+    .filter((letter): letter is string => Boolean(letter));
+  const initials = letters.length > 1 ? `${letters[0]}${letters[letters.length - 1]}` : letters.join("");
   return (
     <span aria-hidden className="absolute inset-0 flex items-center justify-center" style={hue(LABEL_HUE[guest.label])}>
       <span className="absolute inset-0" style={{ background: "color-mix(in srgb, var(--hue) 16%, transparent)" }} />

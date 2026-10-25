@@ -29,15 +29,18 @@ RULES = """You write for Echo, a tool that helps a podcast host find guests thei
 Rules for everything you write:
 - Use only the facts in the input. A person's one-line description is all you know about them: add no books, shows, \
 roles, quotes, awards or life events that aren't given, even if you think you know them.
-- Tastes describe groups of listeners, never one person. Write "your listeners tend to love" or "their fans tend to", \
-never that a listener will do something.
+- Tastes describe groups of listeners, never one person. Say it the way a person would: "your listeners tend to love", \
+"their fans tend to like". Never use analytics words like over-index, affinity, skew, overlap, percentile or audience \
+data, and never say that a listener will do something.
+- Shared tastes are listed strongest first. Build on the first ones and on named shows, films, artists and podcasts. \
+A broad tag such as humor, dance or celebrity culture is not a reason on its own: leave it out rather than build on it.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
 - Never quote scores or numbers, and never say where the data comes from.
 - Plain, warm, specific English. No hype words and no em dashes."""
 
 LABELS = {
     "sweet_spot": "sweet spot: your listeners like them, their fans would like the show, their audience is new to you",
-    "safe": "safe: your listeners like them, but their audience mostly overlaps with yours already",
+    "safe": "safe: your listeners like them, but their fans mostly listen to you already",
     "far": "far: their audience is new to you, but less likely to enjoy the show",
     "long_shot": "long shot: a weaker fit with your listeners",
     "balanced": "balanced: in between on fit, love back and reach",
@@ -49,8 +52,8 @@ SCORES = (
 )
 
 IDEAS_TASK = f"""For each guest below, write:
-- reason: one sentence to the host on why this guest suits the show, naming one or two of the shared tastes, \
-new podcasts or age groups given.
+- reason: one sentence to the host on why this guest suits the show, naming one or two of the strongest shared \
+tastes, new podcasts or age groups given.
 - title: an episode title, under 70 characters.
 - pitch: two short sentences on the episode, built on what the two audiences share.
 Give every guest a different angle, and answer for every ref. {SCORES}"""
@@ -60,7 +63,7 @@ EPISODE_TASK = """Plan one episode of the show with this guest:
 - summary: two or three sentences on the episode and why both audiences would care.
 - segments: three or four, each with a title and two or three talking points.
 - questions: five questions the host could ask, about the guest's work and tastes in general terms.
-Build on the shared tastes and on what the guest's audience adds to the show's."""
+Build each segment on a strong shared taste or on something specific the guest's fans bring, never on a broad tag."""
 
 CHAT_TASK = f"""You are Echo, talking with the host about this list of guests. Pick one action:
 - rerun: the host wants different guests. Give the complete filters to use: start from the current filters and \
@@ -78,7 +81,8 @@ DRAFTS_TASK = """Write an invitation email from the host to each guest below, on
 - body: 100 to 160 words. Who the host is and what the show is, from its description; why this guest, through what \
 the two audiences share, in plain words; the episode idea; a clear ask; a sign-off with the host's name, or \
 "[Your name]" if it isn't given. Use the host's note if there is one.
-Never mention data, scores or tools, and don't flatter beyond the facts."""
+Write as the host, to the guest. Mention one or two shared tastes the way a person would ("our listeners are big \
+Kids in the Hall fans too"), with no talk of audiences, data, scores or tools, and don't flatter beyond the facts."""
 
 REVISE_TASK = """Rewrite this invitation email as the host asks. Keep everything the instruction doesn't touch, \
 and keep the same rules."""
@@ -151,7 +155,7 @@ def show_facts(analysis: Analysis) -> dict[str, Any]:
     facts: dict[str, Any] = {
         "show": analysis.show.title,
         "description": analysis.show.description,
-        "what_your_listeners_over_index_on": names_by_category(analysis.audience_map),
+        "what_your_listeners_love": names_by_category(analysis.audience_map),
     }
     about = analysis.filters.episode_about
     if about and about.used:
@@ -169,9 +173,9 @@ def guest_facts(guest: Guest) -> dict[str, Any]:
         "fit": percent(guest.scores.fit),
         "love_back": percent(guest.scores.love_back),
         "reach": percent(guest.scores.reach),
-        "shared_tastes": evidence.shared_tastes,
+        "shared_tastes_strongest_first": evidence.shared_tastes,
         "new_podcasts_their_fans_bring": evidence.new_podcasts,
-        "age_groups_their_fans_over_index_in": [age.replace("_", " ") for age in evidence.ages],
+        "age_groups_where_their_fans_stand_out": [age.replace("_", " ") for age in evidence.ages],
     }
 
 
@@ -179,8 +183,8 @@ def guest_with_maps(guest: Guest, maps: GuestMaps) -> dict[str, Any]:
     return {
         **guest_facts(guest),
         "idea": guest.idea.model_dump() if guest.idea else None,
-        "what_their_fans_over_index_on": names_by_category(maps.audience_map),
-        "what_their_fans_add_to_your_listeners": names_by_category(maps.adds),
+        "what_their_fans_love": names_by_category(maps.audience_map),
+        "what_their_fans_love_that_is_new_to_your_listeners": names_by_category(maps.adds),
     }
 
 

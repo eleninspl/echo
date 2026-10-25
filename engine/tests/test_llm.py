@@ -99,9 +99,9 @@ def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
         "fit",
         "love_back",
         "reach",
-        "shared_tastes",
+        "shared_tastes_strongest_first",
         "new_podcasts_their_fans_bring",
-        "age_groups_their_fans_over_index_in",
+        "age_groups_where_their_fans_stand_out",
     }
     assert "Use only the facts in the input" in call["system"]
 
@@ -155,8 +155,8 @@ def test_the_episode_uses_both_audience_maps(fake, analysis):
     result = asyncio.run(llm.write_episode(analysis, analysis.guests[0], maps()))
     assert result.segments[0].points == ["One", "Two"]
     guest = facts_of(llm_fake.calls[0])["guest"]
-    assert guest["what_their_fans_over_index_on"] == {"music": ["Example Band"]}
-    assert guest["what_their_fans_add_to_your_listeners"] == {"film": ["Example Western"]}
+    assert guest["what_their_fans_love"] == {"music": ["Example Band"]}
+    assert guest["what_their_fans_love_that_is_new_to_your_listeners"] == {"film": ["Example Western"]}
 
 
 def decision(**fields) -> dict:

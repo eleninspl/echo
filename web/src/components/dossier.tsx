@@ -17,10 +17,11 @@ type Props = {
   index: number;
   picked: boolean;
   full: boolean;
+  rewritten: boolean;
   onPick: () => void;
 };
 
-export function Dossier({ analysisId, guest, index, picked, full, onPick }: Props) {
+export function Dossier({ analysisId, guest, index, picked, full, rewritten, onPick }: Props) {
   const { scores, idea, evidence } = guest;
   const color = LABEL_HUE[guest.label];
   const href = guestPath(analysisId, guest.ref);
@@ -60,8 +61,15 @@ export function Dossier({ analysisId, guest, index, picked, full, onPick }: Prop
 
         <div className="flex flex-col gap-4 border-t border-steel pt-4 @xl:border-t-0 @xl:pt-0">
           {idea ? (
-            <div className="flex flex-col gap-1.5">
-              <p className="tag text-ink-dim">Episode idea</p>
+            <div id="dossier-idea" className="flex scroll-mt-4 flex-col gap-1.5">
+              <p className="flex items-center justify-between gap-3">
+                <span className="tag text-ink-dim">Episode idea</span>
+                {rewritten && (
+                  <Chip color="var(--accent)" plain>
+                    Rewritten by Echo
+                  </Chip>
+                )}
+              </p>
               <p className="font-display text-lg leading-tight font-semibold text-balance">{idea.title}</p>
               <p className="line-clamp-3 text-sm text-ink-soft">{idea.pitch}</p>
             </div>
@@ -211,9 +219,10 @@ export function TasteChips({ names, color }: { names: string[]; color: string })
 }
 
 export function AgeLamps({ ages }: { ages: AgeBucket[] }) {
+  if (!ages.length) return <span className="text-sm text-ink-dim">No age group stands out.</span>;
   return (
     <>
-      <span className="sr-only">{ages.length ? ages.map((age) => AGES[age]).join(", ") : "No age data yet"}</span>
+      <span className="sr-only">{ages.map((age) => AGES[age]).join(", ")}</span>
       <span aria-hidden className="grid grid-cols-6 gap-1">
         {AGE_ORDER.map((age) => {
           const on = ages.includes(age);

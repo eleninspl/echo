@@ -50,6 +50,14 @@ def test_screen_keeps_ordinary_culture_and_drops_sensitive_signals():
     assert not clean_name("Example Politics Hour") and not clean_name("A Book About Example Trump's Years")
     assert not clean_entity(genre("Politics")) and not clean_entity(genre("Religion & Spirituality"))
     assert clean_entity(genre("Comedy")) and clean_entity(genre("Progressive Rock"))
+
+
+def test_screen_drops_hardship_tags_but_keeps_their_neighbours():
+    for name in ("Suffering", "Inner Struggle", "Social Alienation", "Grief", "Drug Use", "Not Applicable", "N/A"):
+        assert not clean_tag_name(name), name
+    for name in ("Friendship", "Dance", "Youth Rebellion", "Television Production"):
+        assert clean_tag_name(name), name
+    assert clean_name("Example Struggle Band")
     keyword = {"name": "Example Film", "tags": [{"name": "Pregnancy", "type": "urn:tag:keyword:media"}]}
     assert clean_entity(keyword)
     news = {"name": "Example Hour", "tags": [{"name": n, "type": "urn:tag:genre:media"} for n in ("Podcasts", "News")]}

@@ -474,14 +474,15 @@ function Hint({
           </svg>
         )}
         <span className={axis === "y" ? "rotate-180 [writing-mode:vertical-rl]" : ""}>{name}</span>
-        {axis && (
-          <span
-            aria-hidden
-            className="flex size-4 items-center justify-center rounded-full border text-[0.625rem] leading-none tracking-normal"
-            style={{ borderColor: `color-mix(in srgb, ${color} 55%, transparent)` }}
-          >
-            ?
-          </span>
+        {axis === "x" && (
+          <svg aria-hidden viewBox="0 0 30 10" className="h-2.5 w-7.5">
+            <path d="M1 5h27M23 1l5 4-5 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        )}
+        {axis === "y" && (
+          <svg aria-hidden viewBox="0 0 10 30" className="h-7.5 w-2.5">
+            <path d="M5 29V2M1 7l4-5 4 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
         )}
       </button>
       <span

@@ -1,0 +1,16 @@
+export const styles = {
+  root: "v9a-root",
+  brand: "v9a-brand",
+  headline: "v9a-headline",
+  title: "v9a-title",
+  figure: "v9a-figure",
+  gradientText: "v9a-gradient-text",
+  gradientFill: "v9a-gradient-fill",
+  gradientEdge: "v9a-gradient-edge",
+  ring: "v9a-ring",
+  bar: "v9a-bar",
+  grow: "v9a-grow",
+  rise: "v9a-rise",
+  eq: "v9a-eq",
+  waiting: "v9a-waiting",
+};

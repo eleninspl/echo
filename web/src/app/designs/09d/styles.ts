@@ -1,0 +1,18 @@
+export const styles = {
+  root: "v9d-root",
+  display: "v9d-display",
+  headline: "v9d-headline",
+  gradientText: "v9d-gradient-text",
+  gradientFill: "v9d-gradient-fill",
+  gradientEdge: "v9d-gradient-edge",
+  player: "v9d-player",
+  scrub: "v9d-scrub",
+  head: "v9d-head",
+  slider: "v9d-slider",
+  ring: "v9d-ring",
+  glow: "v9d-glow",
+  rise: "v9d-rise",
+  spin: "v9d-spin",
+  waiting: "v9d-waiting",
+  traveler: "v9d-traveler",
+};

@@ -1,0 +1,216 @@
+.w2-root {
+  --w2-paper: #f8e6da;
+  --w2-paper-deep: #f0d5c5;
+  --w2-paper-lift: #fcf1e9;
+  --w2-rule: #dcbaa9;
+  --w2-ink: #2a1030;
+  --w2-ink-press: #46204e;
+  --w2-soft: #563b5a;
+  --w2-dim: #745a70;
+  --w2-fit: #b23f0c;
+  --w2-love: #b0174c;
+  --w2-reach: #5b2fbf;
+
+  color: var(--w2-ink);
+  background-color: var(--w2-paper);
+  font-family: var(--font-w2-text), Georgia, "Times New Roman", serif;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+.w2-root ::selection {
+  background: var(--w2-ink);
+  color: var(--w2-paper);
+}
+
+.w2-root :focus-visible {
+  outline: 2px solid var(--w2-ink);
+  outline-offset: 3px;
+}
+
+.w2-root input:focus-visible {
+  outline: none;
+}
+
+.w2-display {
+  font-family: var(--font-w2-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+}
+
+.w2-italic {
+  font-family: var(--font-w2-text), Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+.w2-sans {
+  font-family: var(--font-w2-sans), ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+}
+
+.w2-narrow {
+  font-variation-settings: "wdth" 84;
+}
+
+.w2-figures {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.w2-mark {
+  margin-left: 0.15em;
+  font-family: var(--font-w2-text), Georgia, serif;
+  font-size: 0.72em;
+  font-weight: 400;
+  line-height: 0;
+  vertical-align: 0.62em;
+  color: var(--w2-soft);
+  text-decoration: none;
+}
+
+.w2-mark:hover {
+  color: var(--w2-ink);
+  text-decoration: underline;
+}
+
+.w2-field {
+  border-bottom: 2px solid var(--w2-ink);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.w2-field:focus-within {
+  background-color: var(--w2-paper-lift);
+  box-shadow: 0 2px 0 0 var(--w2-ink);
+}
+
+.w2-press {
+  background-color: var(--w2-ink);
+  color: var(--w2-paper);
+  transition: background-color 120ms ease;
+}
+
+.w2-press:hover {
+  background-color: var(--w2-ink-press);
+}
+
+.w2-press:disabled {
+  background-color: var(--w2-ink-press);
+}
+
+.w2-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.28em;
+}
+
+.w2-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.w2-link-quiet:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.w2-progress {
+  position: relative;
+  display: block;
+  height: 2px;
+  margin-top: -2px;
+  overflow: hidden;
+}
+
+.w2-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 22%;
+  background: var(--w2-paper);
+  animation: w2-scan 1.2s linear infinite;
+}
+
+@keyframes w2-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(460%);
+  }
+}
+
+.w2-spoke {
+  animation: w2-ink-in 0.6s ease-out both;
+  animation-delay: calc(var(--order, 0) * 35ms);
+}
+
+@keyframes w2-ink-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.w2-rise {
+  animation: w2-rise 0.45s ease-out both;
+  animation-delay: calc(var(--order, 0) * 70ms);
+}
+
+@keyframes w2-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.w2-wait {
+  animation: w2-wait 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes w2-wait {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w2-spoke,
+  .w2-rise,
+  .w2-wait,
+  .w2-progress::before {
+    animation: none;
+  }
+
+  .w2-progress::before {
+    left: 39%;
+  }
+}
+
+.w2-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-right: 0.25rem;
+  cursor: pointer;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 1l10 10M11 1 1 11' stroke='%232a1030' stroke-width='1.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  filter: none;
+}
+
+.w2-row {
+  transition: background-color 120ms ease;
+}
+
+.w2-row:hover:not(:disabled) {
+  background-color: var(--w2-paper-lift);
+}
+
+.w2-root .w2-row:focus-visible {
+  outline: none;
+  background-color: var(--w2-paper-lift);
+  box-shadow: inset 3px 0 0 var(--w2-ink);
+}
