@@ -42,6 +42,8 @@ HARDSHIP = terms(
     "suffering struggle trauma traumatic grief grieving bereavement loss loneliness lonely alienation despair abuse "
     "misery pain drug drugs violence violent"
 )
+# Tags only: in names these words are also films and bands.
+SOCIETY = terms("inequality injustice poverty patriotism patriotic nationalism femininity feminine masculine")
 PLACEHOLDER_TAGS = {"not applicable", "n a", "none", "unknown", "other"}
 PHRASES = (
     "mental health",
@@ -51,9 +53,12 @@ PHRASES = (
     "asian american",
     "native american",
     "religion and spirituality",
+    "social justice",
 )
 
-TAG_TERMS = RELIGION | SEXUALITY | SEX | GENDER | ETHNICITY | HEALTH | WELLBEING | POLITICS | MONEY_TROUBLE | HARDSHIP
+TAG_TERMS = (
+    RELIGION | SEXUALITY | SEX | GENDER | ETHNICITY | HEALTH | WELLBEING | POLITICS | MONEY_TROUBLE | HARDSHIP | SOCIETY
+)
 GENRE_TERMS = RELIGION | SEXUALITY | HEALTH | POLITICS | MONEY_TROUBLE
 NAME_TERMS = (
     terms(

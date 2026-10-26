@@ -66,6 +66,12 @@ def test_screen_drops_hardship_tags_but_keeps_their_neighbours():
     for name in ("Friendship", "Dance", "Youth Rebellion", "Television Production"):
         assert clean_tag_name(name), name
     assert clean_name("Example Struggle Band")
+
+
+def test_screen_drops_social_and_gender_tags_but_not_names_with_those_words():
+    for name in ("Social Justice", "Social Inequality", "Poverty", "Patriotism", "Femininity", "Violence"):
+        assert not clean_tag_name(name), name
+    assert clean_name("Example Justice Band") and clean_name("Poverty Example Film")
     keyword = {"name": "Example Film", "tags": [{"name": "Pregnancy", "type": "urn:tag:keyword:media"}]}
     assert clean_entity(keyword)
     news = {"name": "Example Hour", "tags": [{"name": n, "type": "urn:tag:genre:media"} for n in ("Podcasts", "News")]}
