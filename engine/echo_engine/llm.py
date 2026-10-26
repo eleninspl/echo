@@ -87,6 +87,8 @@ DRAFTS_TASK = """Write an invitation email from the host to each guest below, on
 the two audiences share, in plain words; the episode idea; a clear ask; a sign-off with the host's name, or \
 "[Your name]" if it isn't given. Use the host's note if there is one, in every email. A guest may also \
 have their own note from the host (note_for_this_guest): use it in that guest's email only, as the host's own angle.
+- A note can be something to say or a way to write (a length, a tone, a style). Say what it gives; write the way it \
+asks, over the length and style above, keeping the idea, the ask, the sign-off and the practical details.
 - practical_details, when a guest has them: state each one plainly in that guest's email, in a sentence or two near \
 the ask, with dates, fees and lengths exactly as given (the rule on numbers doesn't apply to them). Never invent a \
 date, fee, format, place, length, release or deadline that isn't given: leave out what's missing.

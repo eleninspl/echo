@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 
 import type { Analysis, Guest } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
+import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
 import { Briefing } from "./briefing";
@@ -224,10 +225,23 @@ function GuestBody({
         </Part>
       )}
 
-      <GuestDetails id={analysis.id} guestRef={guest.ref} showMap={analysis.audience_map} />
+      {/* Keyed by the idea: a rewrite brings its own episode and briefing. */}
+      <GuestDetails
+        key={`episode-${guest.idea?.title}`}
+        id={analysis.id}
+        guestRef={guest.ref}
+        idea={rewrittenIdea(guest)}
+        showMap={analysis.audience_map}
+      />
 
       <Part id="sheet-brief" title="Before you record">
-        <Briefing id={analysis.id} guestRef={guest.ref} guestName={guest.name} />
+        <Briefing
+          key={`brief-${guest.idea?.title}`}
+          id={analysis.id}
+          guestRef={guest.ref}
+          guestName={guest.name}
+          idea={rewrittenIdea(guest)}
+        />
       </Part>
     </div>
   );

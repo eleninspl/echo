@@ -80,6 +80,14 @@ class Idea(BaseModel):
     pitch: str
 
 
+class RewrittenIdea(Idea):
+    """An idea the chat rewrote, sent back by the web app, which keeps it: the analysis is shared, so it isn't saved."""
+
+    reason: str = Field(min_length=1, max_length=1000)
+    title: str = Field(min_length=1, max_length=200)
+    pitch: str = Field(min_length=1, max_length=1000)
+
+
 class Guest(BaseModel):
     ref: str
     id: str
@@ -285,6 +293,8 @@ class DraftRequest(BaseModel):
     notes: dict[str, Annotated[str, Field(max_length=300)]] = {}
     details: InviteDetails = InviteDetails()
     details_by_ref: dict[str, InviteDetails] = {}
+    # A guest's idea as the chat rewrote it, in place of the analysis's own.
+    ideas: dict[str, RewrittenIdea] = {}
     previous: DraftText | None = None
     instruction: str | None = Field(default=None, max_length=300)
 
@@ -298,6 +308,8 @@ class DraftRequest(BaseModel):
             raise ValueError("a note is for a guest who isn't in guest_refs")
         if set(self.details_by_ref) - set(self.guest_refs):
             raise ValueError("details are for a guest who isn't in guest_refs")
+        if set(self.ideas) - set(self.guest_refs):
+            raise ValueError("an idea is for a guest who isn't in guest_refs")
         self.notes = {ref: note.strip() for ref, note in self.notes.items() if note.strip()}
         self.details_by_ref = {ref: own for ref, own in self.details_by_ref.items() if not own.empty}
         return self
@@ -317,6 +329,7 @@ class DraftList(BaseModel):
 class BriefingRequest(BaseModel):
     analysis_id: str
     guest_ref: str
+    idea: RewrittenIdea | None = None
 
 
 class Briefing(BaseModel):

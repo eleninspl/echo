@@ -23,6 +23,7 @@ import {
   type SavedDraft,
 } from "@/lib/invitations";
 import { analysisPath } from "@/lib/paths";
+import { rewrittenIdea } from "@/lib/rewrites";
 
 import { Briefing } from "./briefing";
 import { CopyButton } from "./copy-button";
@@ -102,6 +103,12 @@ export function Invite({
             guest_refs.flatMap((ref) => {
               const own = ownDetails(ref);
               return own ? [[ref, own]] : [];
+            }),
+          ),
+          ideas: Object.fromEntries(
+            guests.flatMap((guest) => {
+              const idea = guest_refs.includes(guest.ref) ? rewrittenIdea(guest) : undefined;
+              return idea ? [[guest.ref, idea]] : [];
             }),
           ),
         }),
@@ -228,7 +235,7 @@ export function Invite({
                 }))
               }
               maxLength={SHARED_NOTE_LIMIT}
-              placeholder="A recent episode, why now…"
+              placeholder="A recent episode, why now, or how to write: shorter, warmer…"
               className={input}
             />
           </label>
@@ -495,7 +502,13 @@ function GuestCard({
       {draft && !writing && (
         <div className="flex flex-col gap-3 border-t border-steel pt-5">
           <span className="tag text-ink-dim">Then prepare</span>
-          <Briefing id={analysisId} guestRef={guest.ref} guestName={guest.name} />
+          <Briefing
+            key={guest.idea?.title}
+            id={analysisId}
+            guestRef={guest.ref}
+            guestName={guest.name}
+            idea={rewrittenIdea(guest)}
+          />
         </div>
       )}
     </li>
@@ -526,6 +539,7 @@ function DraftBody({
     if (!instruction.trim()) return;
     setPending(true);
     setProblem(null);
+    const idea = rewrittenIdea(guest);
     try {
       const { drafts } = await echo.drafts({
         analysis_id: analysisId,
@@ -535,6 +549,7 @@ function DraftBody({
         notes: revise.guestNote ? { [guest.ref]: revise.guestNote } : undefined,
         details: revise.details,
         details_by_ref: revise.guestDetails ? { [guest.ref]: revise.guestDetails } : undefined,
+        ideas: idea && { [guest.ref]: idea },
         previous: { subject: draft.subject, body: draft.body },
         instruction: instruction.trim(),
       });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-import { echo, type Episode, type GuestDetails as Details, type MapRow } from "@/lib/echo";
+import { echo, type Episode, type GuestDetails as Details, type Idea, type MapRow } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { category } from "@/lib/format";
 
@@ -14,10 +14,11 @@ const loaded = new Map<string, Details>();
 
 const SETTLE = 600;
 
-type Props = { id: string; guestRef: string; showMap: MapRow[] };
+// `idea`: the guest's idea when the chat rewrote it, so the episode is written for it.
+type Props = { id: string; guestRef: string; idea?: Idea; showMap: MapRow[] };
 
-export function GuestDetails({ id, guestRef, showMap }: Props) {
-  const key = `${id}/${guestRef}`;
+export function GuestDetails({ id, guestRef, idea, showMap }: Props) {
+  const key = idea ? `${id}/${guestRef}/${idea.title}/${idea.pitch}` : `${id}/${guestRef}`;
   const [load, setLoad] = useState<Load>(() => {
     const details = loaded.get(key);
     return details ? { state: "done", details } : { state: "loading" };
@@ -29,7 +30,7 @@ export function GuestDetails({ id, guestRef, showMap }: Props) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       echo
-        .guest(id, guestRef, controller.signal)
+        .guest(id, guestRef, idea, controller.signal)
         .then((details) => {
           loaded.set(key, details);
           setLoad({ state: "done", details });
@@ -42,7 +43,7 @@ export function GuestDetails({ id, guestRef, showMap }: Props) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [id, guestRef, key, attempt]);
+  }, [id, guestRef, idea, key, attempt]);
 
   if (load.state === "failed") {
     const { problem } = load;
