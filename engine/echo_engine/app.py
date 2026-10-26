@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import llm, pipeline
+from . import mock as mocked
 from .config import get_settings
 from .llm_client import LlmError
 from .models import (
@@ -22,7 +23,6 @@ from .models import (
     AnalysisStarted,
     Briefing,
     BriefingRequest,
-    ChatDecision,
     ChatReply,
     ChatRequest,
     Draft,
@@ -208,8 +208,13 @@ class Engine:
             await asyncio.sleep(delay)
             step.done = True
         example = Analysis.model_validate(self.example["analysis"])
+        guests = mocked.guests_for(example.guests, analysis.filters)
+        if len(guests) < mocked.MIN_GUESTS:
+            fail(analysis, "filters_too_narrow", "No guests match those filters. Try a broader one.")
+            await self.analyses.put(analysis)
+            return
         analysis.audience_map = example.audience_map
-        analysis.guests = example.guests
+        analysis.guests = guests
         analysis.left_out = example.left_out
         analysis.qloo_calls = example.qloo_calls
         if analysis.filters.episode_about:
@@ -367,16 +372,18 @@ def create_app(
     @app.post("/chat")
     async def chat(body: ChatRequest, tasks: BackgroundTasks) -> ChatReply:
         analysis = await engine.done(body.analysis_id)
+        engine.mock_fails(analysis.show.id, "chat")
         if engine.mock:
-            decision = ChatDecision.model_validate(engine.example["chat"])
+            decision = mocked.decide(analysis.guests, analysis.filters, body.messages)
         else:
             decision = await llm.chat(analysis, body.messages)
         if decision.action == "rerun":
             rerun = await engine.start(analysis.show.id, decision.filters or analysis.filters, tasks)
             return ChatReply(reply=decision.reply, action="rerun", analysis_id=rerun.id)
         if decision.action == "rewrite" and decision.guest_ref and decision.idea:
-            engine.guest(analysis, decision.guest_ref).idea = decision.idea
-            await engine.analyses.put(analysis)
+            # Not saved: an analysis is shared by everyone who runs the same show and filters, featured shows by
+            # every visitor. The web app keeps the visitor's own rewrites.
+            engine.guest(analysis, decision.guest_ref)
             return ChatReply(reply=decision.reply, action="rewrite", guest_ref=decision.guest_ref, idea=decision.idea)
         return ChatReply(reply=decision.reply, action="none")
 

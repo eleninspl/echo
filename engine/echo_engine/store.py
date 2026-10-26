@@ -42,7 +42,11 @@ def today() -> str:
 
 
 def request_key(show_id: str, filters: Filters) -> str:
-    return json.dumps([show_id.upper(), filters.model_dump(exclude={"episode_about": {"used"}})], sort_keys=True)
+    """Without a theme, the key is the same as before themes existed, so earlier runs are still found."""
+    exclude: dict[str, Any] = {"episode_about": {"used"}}
+    if filters.theme is None:
+        exclude["theme"] = True
+    return json.dumps([show_id.upper(), filters.model_dump(exclude=exclude)], sort_keys=True)
 
 
 def key_of(analysis: Analysis) -> str:

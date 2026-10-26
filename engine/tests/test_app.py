@@ -6,10 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from echo_engine import app as app_module
-from echo_engine import config, pipeline
+from echo_engine import config, llm, pipeline
 from echo_engine.app import create_app, load_example
 from echo_engine.config import Settings
-from echo_engine.models import Analysis, ChatDecision, Filters, GuestDetails, Show, ShowList
+from echo_engine.models import Analysis, Filters, GuestDetails, Show, ShowList
 
 SHOW_ID = "00000000-0000-0000-0000-000000000001"
 STEP_KEYS = [key for key, _ in pipeline.STEPS]
@@ -31,7 +31,6 @@ def test_example_matches_the_contract():
     ShowList.model_validate({"shows": example["shows"]})
     analysis = Analysis.model_validate(example["analysis"])
     GuestDetails.model_validate({**example["guest_details"], "ref": "g1"})
-    ChatDecision.model_validate(example["chat"])
     assert all(guest.idea for guest in analysis.guests[:10])
     assert [g.scores.echo for g in analysis.guests] == sorted((g.scores.echo for g in analysis.guests), reverse=True)
 
@@ -87,6 +86,50 @@ def test_chat_reruns(mock):
     assert mock.get(f"/analyses/{body['analysis_id']}").json()["filters"]["age"] == "25_to_29"
 
 
+def ask(mock: TestClient, content: str, analysis_id: str = "an_example") -> dict:
+    messages = [{"role": "user", "content": content}]
+    return mock.post("/chat", json={"analysis_id": analysis_id, "messages": messages}).json()
+
+
+def test_a_mock_rerun_changes_the_guests(mock):
+    example = mock.get("/analyses/an_example").json()["guests"]
+    body = ask(mock, "Less famous guests, please")
+    assert body["action"] == "rerun"
+    rerun = mock.get(f"/analyses/{body['analysis_id']}").json()
+    assert rerun["filters"]["fame"] == "less_famous"
+    assert 5 <= len(rerun["guests"]) < len(example)
+    assert [g["ref"] for g in rerun["guests"]] == [f"g{i}" for i in range(1, len(rerun["guests"]) + 1)]
+    assert [g["name"] for g in rerun["guests"]] != [g["name"] for g in example]
+
+
+def test_a_mock_rewrite_answers_with_the_idea_and_leaves_the_shared_analysis_alone(mock):
+    before = mock.get("/analyses/an_example").json()
+    body = ask(mock, "Make the first idea funnier")
+    assert (body["action"], body["guest_ref"]) == ("rewrite", "g1")
+    assert body["idea"]["title"] != before["guests"][0]["idea"]["title"]
+    assert mock.get("/analyses/an_example").json() == before
+
+
+def test_a_theme_reaches_the_run_and_its_ideas(mock):
+    body = ask(mock, "An episode about burnout")
+    assert body["action"] == "rerun"
+    rerun = mock.get(f"/analyses/{body['analysis_id']}").json()
+    assert rerun["filters"]["theme"] == "burnout"
+    assert all("burnout" in g["idea"]["pitch"] for g in rerun["guests"] if g["idea"])
+    started = mock.post("/analyses", json={"show_id": SHOW_ID, "filters": {"theme": "  road   trips "}}).json()
+    assert mock.get(f"/analyses/{started['id']}").json()["filters"]["theme"] == "road trips"
+    too_long = {"show_id": SHOW_ID, "filters": {"theme": "x" * 121}}
+    assert mock.post("/analyses", json=too_long).status_code == 400
+
+
+def test_the_chat_says_when_there_is_no_writing_model(mock):
+    failure = failing("chat")
+    started = mock.post("/analyses", json={"show_id": failure["show"]["id"]}).json()
+    response = mock.post("/chat", json={"analysis_id": started["id"], "messages": [{"role": "user", "content": "hi"}]})
+    assert response.status_code == 501
+    assert response.json() == {"error": "not_implemented", "message": failure["message"]}
+
+
 def test_drafts_and_revise_rules(mock):
     drafts = mock.post("/drafts", json={"analysis_id": "an_example", "guest_refs": ["g1", "g3"], "host_name": "Sam"})
     assert [d["guest_ref"] for d in drafts.json()["drafts"]] == ["g1", "g3"]
@@ -128,8 +171,9 @@ def test_mock_failures_cover_every_failure_with_the_real_message():
         "qloo_error",
         "llm_error",
         "engine_error",
+        "not_implemented",
     }
-    source = inspect.getsource(pipeline) + inspect.getsource(app_module)
+    source = inspect.getsource(pipeline) + inspect.getsource(app_module) + inspect.getsource(llm)
 
     async def llm_message(what: str) -> str:
         async def broken() -> None:
@@ -143,7 +187,7 @@ def test_mock_failures_cover_every_failure_with_the_real_message():
     for failure in FAILURES:
         Show.model_validate(failure["show"])
         if "error" in failure:
-            assert failure["at"] in [*STEP_KEYS, "start", "guest_details"]
+            assert failure["at"] in [*STEP_KEYS, "start", "guest_details", "chat"]
             assert failure["message"] in llm_messages or f'"{failure["message"]}"' in source, failure["message"]
 
 
