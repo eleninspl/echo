@@ -189,7 +189,11 @@ function GuestBody({
           </div>
         ) : (
           <p className="text-sm text-ink-dim">
-            {evidence ? "No episode idea yet." : "Echo writes ideas and evidence for the top 10."}
+            {!analysis.guests.some((other) => other.idea)
+              ? "Episode ideas are off in this demo."
+              : evidence
+                ? "No episode idea yet."
+                : "Echo writes ideas and evidence for the top 10."}
           </p>
         )}
       </Part>
@@ -211,7 +215,7 @@ function GuestBody({
                 <span className="text-sm text-ink-dim">None new to you.</span>
               )}
             </Fact>
-            <Fact term="Their fans skew" className="sm:col-span-2">
+            <Fact term="Their fans' age groups" className="sm:col-span-2">
               <AgeLamps ages={evidence.ages} />
             </Fact>
           </dl>

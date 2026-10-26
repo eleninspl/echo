@@ -15,6 +15,7 @@ const SHAPES = [
   },
   { label: "safe", name: "Safe", means: "Loved both ways, few new listeners.", fit: 0.85, love: 0.85, reach: 0.08 },
   { label: "far", name: "Far", means: "New listeners who may not stay.", fit: 0.55, love: 0.12, reach: 0.9 },
+  { label: "balanced", name: "Balanced", means: "Decent on each, not top on any.", fit: 0.55, love: 0.45, reach: 0.5 },
   {
     label: "long_shot",
     name: "Long shot",
@@ -39,7 +40,7 @@ export function ScoreKey() {
       <Reveal className={FRAME}>
         <ul
           aria-label="What each label looks like"
-          className={`mt-10 grid grid-cols-1 gap-x-8 gap-y-4 rounded-2xl bg-deck p-5 sm:grid-cols-2 xl:grid-cols-4 ${REVEAL}`}
+          className={`mt-10 grid grid-cols-1 gap-x-8 gap-y-4 rounded-2xl bg-deck p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 ${REVEAL}`}
         >
           {SHAPES.map(({ label, name, means, fit, love, reach }, index) => (
             <li

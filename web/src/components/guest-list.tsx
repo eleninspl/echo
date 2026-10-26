@@ -12,6 +12,8 @@ import { Voiceprint } from "./voiceprint";
 type Props = {
   analysisId: string;
   guests: Guest[];
+  // Whether this run came with episode ideas.
+  ideas: boolean;
   open: string | null;
   highlighted: string | null;
   picked: string[];
@@ -22,7 +24,17 @@ type Props = {
 
 // Every guest, best Echo score first: rank, portrait, name, label, the three scores as a voiceprint and the
 // Echo score. A row opens its guest beside the list and lights its dot on the chart; the button at the end picks it.
-export function GuestList({ analysisId, guests, open, highlighted, picked, onOpen, onPick, onHighlight }: Props) {
+export function GuestList({
+  analysisId,
+  guests,
+  ideas,
+  open,
+  highlighted,
+  picked,
+  onOpen,
+  onPick,
+  onHighlight,
+}: Props) {
   return (
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
       <SectionHead id="guests" title={`All ${guests.length} guests, ranked`}>
@@ -33,7 +45,7 @@ export function GuestList({ analysisId, guests, open, highlighted, picked, onOpe
         </span>
         <Info>
           Ranked by the Echo score, which weighs fit, love back and reach together. Each score is out of 100, ranked
-          within these guests. The top 10 come with an episode idea and evidence.
+          within these guests. The top 10 come with {ideas ? "an episode idea and evidence" : "evidence"}.
         </Info>
       </SectionHead>
       <div

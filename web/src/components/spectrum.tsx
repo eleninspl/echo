@@ -20,7 +20,7 @@ export function Track({ share, order }: { share: number; order: number }) {
   );
 }
 
-// Which age groups the guests' audiences skew to, counted over the guests Qloo had age data for.
+// Which age groups the guests' audiences lean to, counted over the guests Qloo had age data for.
 export function FanAges({ stats }: { stats: Stats }) {
   const peak = Math.max(1, ...AGE_ORDER.map((age) => stats.ages[age]));
   return (
@@ -28,7 +28,7 @@ export function FanAges({ stats }: { stats: Stats }) {
       <SectionHead id="ages" title="Guests' fans by age" small>
         <span>{stats.withAges} guests</span>
         <Info>
-          For each age group, how many guests&apos; fans skew to it. A guest&apos;s fans can skew to more than one.
+          For each age group, how many guests&apos; fans lean to it. A guest&apos;s fans can lean to more than one.
         </Info>
       </SectionHead>
       {stats.withAges === 0 ? (
