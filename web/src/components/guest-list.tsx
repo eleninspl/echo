@@ -27,7 +27,7 @@ export function GuestList({ analysisId, guests, open, highlighted, picked, full,
   return (
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
       <SectionHead id="guests" title={`All ${guests.length} guests, ranked`}>
-        <span className="hidden items-center gap-3 sm:flex">
+        <span className="flex items-center gap-3 @2xl:hidden">
           <span className="text-fit">Fit</span>
           <span className="text-love">Love back</span>
           <span className="text-reach">Reach</span>
@@ -37,6 +37,17 @@ export function GuestList({ analysisId, guests, open, highlighted, picked, full,
           within these guests. The top 10 come with an episode idea and evidence.
         </Info>
       </SectionHead>
+      <div
+        aria-hidden
+        className="tag -mb-1.5 hidden grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] gap-x-5 px-2 whitespace-nowrap text-ink-dim @2xl:grid"
+      >
+        <span className="col-start-5 grid grid-cols-3 text-center">
+          <span className="text-fit">Fit</span>
+          <span className="text-love">Love back</span>
+          <span className="text-reach">Reach</span>
+        </span>
+        <span className="text-right">Echo score</span>
+      </div>
       <ol className="flex flex-col border-t border-steel">
         {guests.map((guest, index) => (
           <Row
