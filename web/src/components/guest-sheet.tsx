@@ -100,7 +100,7 @@ export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOp
             key={guest.ref}
             analysis={analysis}
             guest={guest}
-            rewritten={rewritten?.id === analysis.id && rewritten.ref === guest.ref}
+            rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
           />
         ) : (

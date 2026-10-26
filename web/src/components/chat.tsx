@@ -44,12 +44,12 @@ const SUGGESTIONS: { ask: string; note: string; icon: ReactNode }[] = [
     ),
   },
   {
-    ask: "An episode about a film",
-    note: "An episode built around one film",
+    ask: "An episode about road trips",
+    note: "New ideas around one theme",
     icon: (
       <>
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4" />
+        <path d="M5 21 9 3M19 21 15 3" />
+        <path d="M12 5v2M12 11v2M12 17v2" />
       </>
     ),
   },
@@ -67,6 +67,50 @@ const SUGGESTIONS: { ask: string; note: string; icon: ReactNode }[] = [
 
 // A note is shown in the transcript but never sent: Echo's own word on a run it started.
 type Entry = Message & { note?: boolean };
+
+// The conversation per show, so it survives a reload, another page and a rerun. Kept short.
+const KEPT = 60;
+const historyKey = (showId: string) => `echo.chat.${showId}`;
+// Once the engine says it has no writing model, for the rest of this visit.
+const NO_WRITER = "echo.chat.no-writer";
+
+function readHistory(showId: string): Entry[] {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(historyKey(showId)) ?? "[]");
+    if (!Array.isArray(saved)) return [];
+    return saved.filter(
+      (entry): entry is Entry =>
+        (entry?.role === "user" || entry?.role === "assistant") && typeof entry.content === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(showId: string, entries: Entry[]) {
+  try {
+    if (entries.length) window.localStorage.setItem(historyKey(showId), JSON.stringify(entries.slice(-KEPT)));
+    else window.localStorage.removeItem(historyKey(showId));
+  } catch {
+    return;
+  }
+}
+
+function readNoWriter(): boolean {
+  try {
+    return window.sessionStorage.getItem(NO_WRITER) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveNoWriter() {
+  try {
+    window.sessionStorage.setItem(NO_WRITER, "1");
+  } catch {
+    return;
+  }
+}
 
 type Props = {
   analysis: Analysis;
@@ -86,13 +130,22 @@ const REDUCED = "(prefers-reduced-motion: reduce)";
 // button at the bottom right on every page, left of an open guest; the panel opens out of it, and closing it keeps the conversation.
 // Scrolled down to the page's Ask Echo section, the button flies into it and the conversation opens there.
 export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null }: Props) {
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const showId = analysis.show.id;
+  const [history, setHistory] = useState(() => ({ showId, entries: readHistory(showId) }));
+  if (history.showId !== showId) setHistory({ showId, entries: readHistory(showId) });
+  const entries = history.entries;
+  const setEntries = useCallback(
+    (change: (current: Entry[]) => Entry[]) =>
+      setHistory((current) => ({ ...current, entries: change(current.entries) })),
+    [],
+  );
+  const [noWriter, setNoWriter] = useState(readNoWriter);
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<HostError | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [seen, setSeen] = useState(0);
+  const [seen, setSeen] = useState(() => entries.length);
   const log = useRef<HTMLOListElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const bubble = useRef<HTMLButtonElement>(null);
@@ -102,6 +155,8 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
   const wasLanded = useRef(false);
   const [near, setNear] = useState(false);
   const landed = slot !== null && near;
+
+  useEffect(() => saveHistory(history.showId, history.entries), [history]);
   if (landed && open) setOpen(false);
   if (landed && seen !== entries.length) setSeen(entries.length);
 
@@ -158,7 +213,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
       setEntries((current) => [...current, { role: "assistant", content: note, note: true }]);
       onRerun(next);
     },
-    [onRerun],
+    [onRerun, setEntries],
   );
   const run = useAnalysis(runId, finished);
   const running = runId !== null && run.analysis?.id === runId ? run.analysis : null;
@@ -182,11 +237,19 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
     bubble.current?.focus();
   }
 
+  function restart() {
+    setEntries(() => []);
+    setProblem(null);
+    setRunId(null);
+    setSeen(0);
+    input.current?.focus();
+  }
+
   async function send(message: string) {
     const content = message.trim();
-    if (!content || pending) return;
+    if (!content || pending || noWriter) return;
     const next: Entry[] = [...entries, { role: "user", content }];
-    setEntries(next);
+    setEntries(() => next);
     setText("");
     setPending(true);
     setProblem(null);
@@ -202,7 +265,13 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
         close();
       }
     } catch (error) {
-      setProblem(describe(error));
+      const problem = describe(error);
+      if (problem.code === "not_implemented") {
+        saveNoWriter();
+        setNoWriter(true);
+        // Unanswered, so it isn't worth keeping.
+        setEntries((current) => current.slice(0, -1));
+      } else setProblem(problem);
     }
     setPending(false);
   }
@@ -218,8 +287,8 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
 
   const failed = runId !== null && run.analysis?.id === runId && run.analysis.status === "failed" ? run.analysis : null;
   const step = running?.steps.findIndex((s) => !s.done) ?? -1;
-  // The engine answers "not built yet" while the LLM side isn't deployed: say so once, and stop offering asks.
-  const offline = problem?.code === "not_implemented";
+  // The engine answers "not built yet" when the server has no writing model: say so, and stop offering asks.
+  const offline = noWriter;
   const talking =
     entries.length > 0 || pending || running !== null || failed !== null || (run.error !== null && runId !== null);
 
@@ -236,8 +305,8 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
       >
         {!talking && (
           <li className="my-auto flex flex-col items-center gap-7 py-2 text-center">
-            {docked ? (
-              <Logo className="size-11 text-brand" />
+            {docked || offline ? (
+              <Logo className={`size-11 ${offline ? "text-ink-dim" : "text-brand"}`} />
             ) : (
               <div className="flex flex-col items-center gap-3">
                 <Logo className="mb-2 size-14 text-brand" />
@@ -306,51 +375,70 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
         )}
       </ol>
 
-      {offline ? (
-        <p role="status" className="px-6 pb-1 text-sm text-ink-soft">
-          Asking Echo isn&apos;t available in this demo yet. Everything else on the page works.
+      {problem && !offline && (
+        <p role="alert" className="px-6 pb-1 text-sm">
+          <span className="font-semibold text-alert">{problem.title}.</span>{" "}
+          <span className="text-ink-soft">{problem.message}</span>
         </p>
-      ) : (
-        problem && (
-          <p role="alert" className="px-6 pb-1 text-sm">
-            <span className="font-semibold text-alert">{problem.title}.</span>{" "}
-            <span className="text-ink-soft">{problem.message}</span>
-          </p>
-        )
       )}
 
-      <form onSubmit={submit} className="flex py-2 pr-[4.5rem] pl-2">
-        <div className="flex min-h-14 flex-1 items-end gap-2 rounded-[1.75rem] bg-deck-hi py-2 pr-2 pl-5 shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)] has-[textarea:disabled]:opacity-50">
-          <label htmlFor="ask-input" className="sr-only">
-            Ask Echo
-          </label>
-          <textarea
-            ref={input}
-            id="ask-input"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                send(text);
-              }
-            }}
-            maxLength={2000}
-            rows={1}
-            placeholder="Ask Echo something…"
-            disabled={offline}
-            className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-[0.9375rem] text-ink [field-sizing:content] placeholder:text-ink-dim focus-visible:outline-none! disabled:cursor-not-allowed"
-          />
-          <button
-            type="submit"
-            disabled={offline || pending || !text.trim()}
-            aria-label={pending ? "Asking" : "Send"}
-            className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
+      {offline ? (
+        <div className="py-2 pr-[4.5rem] pl-2">
+          <p
+            role="status"
+            className="flex min-h-14 items-center gap-3 rounded-[1.75rem] border border-dashed border-steel-hi px-5 py-3 text-sm leading-snug text-ink-soft"
           >
-            <Send />
-          </button>
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              className="size-5 shrink-0 text-ink-dim"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8 16 16 8" />
+            </svg>
+            <span>
+              <span className="font-semibold text-ink">Ask Echo is off on this server.</span> It needs a writing model,
+              and none is set up here. Everything else on the page works.
+            </span>
+          </p>
         </div>
-      </form>
+      ) : (
+        <form onSubmit={submit} className="flex py-2 pr-[4.5rem] pl-2">
+          <div className="flex min-h-14 flex-1 items-end gap-2 rounded-[1.75rem] bg-deck-hi py-2 pr-2 pl-5 shadow-[inset_0_0_0_1px_var(--steel)] transition-shadow duration-150 focus-within:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
+            <label htmlFor="ask-input" className="sr-only">
+              Ask Echo
+            </label>
+            <textarea
+              ref={input}
+              id="ask-input"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  send(text);
+                }
+              }}
+              maxLength={2000}
+              rows={1}
+              placeholder="Ask Echo something…"
+              className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-[0.9375rem] text-ink [field-sizing:content] placeholder:text-ink-dim focus-visible:outline-none!"
+            />
+            <button
+              type="submit"
+              disabled={pending || !text.trim()}
+              aria-label={pending ? "Asking" : "Send"}
+              className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-hue transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:bg-steel disabled:text-ink-dim"
+            >
+              <Send />
+            </button>
+          </div>
+        </form>
+      )}
     </>
   );
 
@@ -371,7 +459,18 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
               onKeyDown={keys}
               className="ask-body flex min-h-0 flex-1 flex-col"
             >
-              <div className="flex justify-end p-3">
+              <div className="flex justify-end gap-1 p-3">
+                {entries.length > 0 && !busy && (
+                  <button
+                    type="button"
+                    onClick={restart}
+                    aria-label="Start a new conversation"
+                    title="New conversation"
+                    className="flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-deck-hi hover:text-ink"
+                  >
+                    <Restart />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={close}
@@ -415,7 +514,22 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
               aria-label="Ask Echo"
               className="absolute inset-0 flex flex-col rounded-[1.75rem] bg-deck shadow-[inset_0_0_0_1px_var(--steel)]"
             >
-              <div className="dock-body flex min-h-0 flex-1 flex-col pt-5">{conversation(true)}</div>
+              <div className="dock-body flex min-h-0 flex-1 flex-col pt-5">
+                {entries.length > 0 && !busy && (
+                  <div className="-mt-2 flex justify-end px-3">
+                    <button
+                      type="button"
+                      onClick={restart}
+                      aria-label="Start a new conversation"
+                      title="New conversation"
+                      className="flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-deck-hi hover:text-ink"
+                    >
+                      <Restart />
+                    </button>
+                  </div>
+                )}
+                {conversation(true)}
+              </div>
             </section>
             <span
               ref={landedBubble}
@@ -462,6 +576,23 @@ function Collapse() {
   );
 }
 
+function Restart() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-5"
+    >
+      <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" />
+    </svg>
+  );
+}
+
 function Send() {
   return (
     <svg aria-hidden viewBox="0 0 16 16" className="size-4">
@@ -472,7 +603,7 @@ function Send() {
 
 const ASKS = [
   { what: "Different guests", how: "Younger listeners, less famous names, guests from one country." },
-  { what: "An episode about something", how: "A film, a show, an artist or a brand your listeners love." },
+  { what: "An episode about something", how: "A theme like road trips, or a film, show, artist or brand by name." },
   { what: "A new take on one idea", how: "Echo rewrites a guest's episode idea the way you describe." },
 ];
 

@@ -12,7 +12,7 @@ import {
 import Image from "next/image";
 import { createPortal } from "react-dom";
 
-import { echo, type Show } from "@/lib/echo";
+import { echo, THEME_LENGTH, type EchoError, type Show } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { useStart } from "@/lib/use-start";
 
@@ -23,6 +23,8 @@ import { ShowCover } from "./show-cover";
 
 export const RESULTS_SLOT = "show-results";
 const WIDE = "(min-width: 1280px)";
+// Themes to click, for a host who hasn't thought of one.
+const THEMES = ["road trips", "first jobs", "a film you both love"];
 
 type Search =
   | { state: "idle" }
@@ -57,7 +59,12 @@ export function ShowFinder() {
   const [search, setSearch] = useState<Search>({ state: "idle" });
   const inFlight = useRef<AbortController | null>(null);
   const results = useRef<HTMLDivElement>(null);
-  const { start, pending, error: startError } = useStart();
+  const [theme, setTheme] = useState("");
+  const { start, pending, error } = useStart();
+  // The show last started, to start again after an error; a new search clears that error.
+  const [started, setStarted] = useState<string | null>(null);
+  const [cleared, setCleared] = useState<EchoError | null>(null);
+  const startError = error !== cleared ? error : null;
   const wide = useWide();
   const slot = useSlot();
   const beside = wide && slot !== null;
@@ -78,7 +85,14 @@ export function ShowFinder() {
     return () => window.removeEventListener("resize", fit);
   }, [search.state, beside]);
 
+  function run(showId: string) {
+    setStarted(showId);
+    const topic = theme.trim();
+    start(showId, topic ? { theme: topic } : undefined);
+  }
+
   async function find(text: string) {
+    setCleared(error);
     inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
@@ -105,7 +119,7 @@ export function ShowFinder() {
   const shows = search.state === "found" ? search.shows : [];
   const problems = (
     <>
-      {startError && <StartProblem problem={describe(startError)} />}
+      {startError && <StartProblem problem={describe(startError)} onRetry={started ? () => run(started) : undefined} />}
       {search.state === "found" && shows.length === 0 && (
         <StartProblem
           problem={{
@@ -153,6 +167,7 @@ export function ShowFinder() {
             {hint}
           </p>
         )}
+        <ThemeField theme={theme} onTheme={setTheme} />
       </form>
 
       <p aria-live="polite" className="sr-only">
@@ -164,7 +179,7 @@ export function ShowFinder() {
         (search.state !== "idle" || startError) &&
         createPortal(
           <SidePanel key={search.state === "idle" ? "idle" : search.query} search={search}>
-            {shows.length > 0 && <Matches shows={shows} pending={pending} onRun={start} />}
+            {shows.length > 0 && <Matches shows={shows} pending={pending} onRun={run} />}
             {problems}
           </SidePanel>,
           slot,
@@ -190,7 +205,7 @@ export function ShowFinder() {
                   >
                     <button
                       type="button"
-                      onClick={() => start(show.id)}
+                      onClick={() => run(show.id)}
                       disabled={pending !== null}
                       className="group flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-deck-hi/70 disabled:cursor-wait"
                     >
@@ -217,6 +232,67 @@ export function ShowFinder() {
           {/* Below the list, next to the show the host just picked. */}
           {problems}
         </div>
+      )}
+    </div>
+  );
+}
+
+// An optional topic for the episode. It shapes the ideas Echo writes, not which guests come back.
+function ThemeField({ theme, onTheme }: { theme: string; onTheme: (theme: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="relative flex min-w-0 flex-1 basis-56 items-center">
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          className="pointer-events-none absolute left-3.5 size-4 text-ink-dim"
+        >
+          <path d="M4 6h16M4 12h10M4 18h7" />
+        </svg>
+        <label htmlFor="theme" className="sr-only">
+          Episode theme, optional
+        </label>
+        <input
+          id="theme"
+          type="text"
+          value={theme}
+          onChange={(event) => onTheme(event.target.value)}
+          maxLength={THEME_LENGTH}
+          autoComplete="off"
+          placeholder="Episode theme, optional"
+          className="field min-h-10 w-full py-2 pr-9 pl-10 text-sm"
+        />
+        {theme && (
+          <button
+            type="button"
+            onClick={() => onTheme("")}
+            aria-label="Clear the theme"
+            className="absolute right-1.5 flex size-7 cursor-pointer items-center justify-center rounded-full text-ink-dim hover:bg-deck-hi hover:text-ink"
+          >
+            <svg aria-hidden viewBox="0 0 12 12" className="size-3">
+              <path d="M3 3l6 6M9 3 3 9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {!theme.trim() && (
+        <ul aria-label="Theme examples" className="flex flex-wrap gap-1.5">
+          {THEMES.map((example) => (
+            <li key={example}>
+              <button
+                type="button"
+                onClick={() => onTheme(example)}
+                className="cursor-pointer rounded-full px-3 py-1 text-sm text-ink-soft ring-1 ring-ink/12 transition-colors hover:bg-deck-hi hover:text-ink"
+              >
+                {example}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
