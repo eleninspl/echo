@@ -8,12 +8,8 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HACKATHON_BASE_URL = "https://hackathon.api.qloo.com"
-LLM_BACKENDS = ("openrouter", "groq", "claude-cli")
-DEFAULT_LLM_MODELS = {
-    "openrouter": "openai/gpt-oss-120b",
-    "groq": "openai/gpt-oss-120b",
-    "claude-cli": "claude-sonnet-5-5",
-}
+LLM_BACKENDS = ("openrouter", "claude-cli")
+DEFAULT_LLM_MODELS = {"openrouter": "openai/gpt-oss-120b", "claude-cli": "claude-sonnet-5-5"}
 
 
 def env(*names: str) -> str:
@@ -34,9 +30,8 @@ class Settings:
         load_dotenv(REPO_ROOT / ".env")
         self.qloo_api_key = os.environ.get("QLOO_API_KEY", "").strip()
         self.qloo_base_url = os.environ.get("QLOO_BASE_URL", HACKATHON_BASE_URL).rstrip("/")
+        self.llm_backend = os.environ.get("ECHO_LLM", "").strip() or "openrouter"
         self.openrouter_api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-        self.groq_api_key = os.environ.get("GROQ_API_KEY", "").strip()
-        self.llm_backend = os.environ.get("ECHO_LLM", "").strip() or self.default_llm_backend()
         self.llm_url = os.environ.get("ECHO_LLM_URL", "").strip().rstrip("/")
         self.cache_dir = Path(os.environ.get("ECHO_CACHE_DIR", REPO_ROOT / ".cache"))
         self.cache_ttl_days = float(os.environ.get("ECHO_CACHE_TTL_DAYS", "7"))
@@ -54,16 +49,6 @@ class Settings:
         self.daily_qloo_calls = int(os.environ.get("ECHO_DAILY_QLOO_CALLS", "3000"))
         self.featured = [show.strip() for show in os.environ.get("ECHO_FEATURED", "").split(",") if show.strip()]
         self.on_vercel = os.environ.get("VERCEL") == "1"
-
-    def default_llm_backend(self) -> str:
-        """OpenRouter if its key is set, else Groq if its key is set. With neither, openrouter, which the LLM side
-        reads as not set up."""
-        if not self.openrouter_api_key and self.groq_api_key:
-            return "groq"
-        return "openrouter"
-
-    def api_key(self, backend: str) -> str:
-        return {"openrouter": self.openrouter_api_key, "groq": self.groq_api_key}.get(backend, "")
 
     def missing_on_vercel(self) -> list[str]:
         """What a deployed engine can't run without: an instance there has no disk to fall back to."""
