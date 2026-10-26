@@ -10,50 +10,44 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type KeyboardEvent,
   type ReactNode,
 } from "react";
 
-import type { Analysis, Filters, Guest, Idea, Step } from "@/lib/echo";
+import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks } from "@/lib/picks";
-import { stats as computeStats, type Stats } from "@/lib/stats";
+import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
+import { Backdrop } from "./backdrop";
 import { Chat } from "./chat";
-import { Dossier } from "./dossier";
 import { FeaturedFallback } from "./featured";
-import { GuestList, lockLine } from "./guest-list";
-import { Chip, FRAME, hue, Lamp, ZoneHead } from "./hud";
-import { Invite, MAX_PICKS } from "./invite";
-import { LockHeader, ShowLock } from "./lock-header";
+import { GuestList } from "./guest-list";
+import { GuestSheet } from "./guest-sheet";
+import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM } from "./hud";
+import { MAX_PICKS } from "./invite";
+import { LabelSpectrum, LockHeader, ShowLock } from "./lock-header";
+import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
 import { CommonGround, FanAges, Spectrum } from "./spectrum";
-
-const NARROW = "(max-width: 1023px)";
-
-const TABS = ["guests", "audience", "invite"] as const;
-type Tab = (typeof TABS)[number];
-const isTab = (value: string | null): value is Tab => TABS.includes(value as Tab);
+import { TopPicks } from "./top-picks";
 
 type OpenAnalysis = {
   analysis: Analysis;
-  selected: string | null;
-  onSelect: (guestRef: string) => void;
+  openGuest: string | null;
+  onOpen: (guestRef: string) => void;
+  onClose: () => void;
   picked: string[];
   onPick: (guestRef: string) => void;
   rewritten: Rewrite | null;
 };
 
-type Rewrite = { id: string; ref: string; idea: Idea };
+export type Rewrite = { id: string; ref: string; idea: Idea };
 
 type Choice<T> = { id: string | null; value: T };
-
-const hashGuest = () =>
-  typeof window === "undefined" ? null : (window.location.hash.match(/^#guest-(.+)$/)?.[1] ?? null);
 
 const OpenAnalysisContext = createContext<OpenAnalysis | null>(null);
 
@@ -65,24 +59,43 @@ export function useOpenAnalysis(): OpenAnalysis {
 
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { id, guestRef } = readPath(usePathname());
+  const { id, guestRef, inviting } = readPath(usePathname());
   const { analysis, error, retry, update } = useAnalysis(id);
-  const [selection, setSelection] = useState<Choice<string | null>>(() => ({ id, value: hashGuest() }));
   const [picks, setPicks] = useState<Choice<string[]>>({ id: null, value: [] });
   const openId = analysis?.id ?? null;
-  const selected = selection.id === openId ? selection.value : null;
   const picked = (picks.id === openId ? picks.value : openId ? readPicks(openId) : []).filter((ref) =>
     analysis?.guests.some((guest) => guest.ref === ref),
   );
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
+  const openedHere = useRef(false);
+  const openGuest = openId === id ? guestRef : null;
 
-  if (guestRef && openId === id && selected !== guestRef) setSelection({ id: openId, value: guestRef });
+  useEffect(() => {
+    if (!guestRef) openedHere.current = false;
+  }, [guestRef]);
 
-  const onGuestPage = guestRef !== null;
   const rerun = useCallback(
-    (next: Analysis) => router.push(`${analysisPath(next.id)}${window.location.search}`, { scroll: onGuestPage }),
-    [router, onGuestPage],
+    (next: Analysis) => router.push(analysisPath(next.id), { scroll: inviting }),
+    [router, inviting],
   );
+  const onOpen = useCallback(
+    (ref: string) => {
+      if (!openId || ref === guestRef) return;
+      if (guestRef) {
+        router.replace(guestPath(openId, ref), { scroll: false });
+        return;
+      }
+      openedHere.current = true;
+      router.push(guestPath(openId, ref), { scroll: false });
+    },
+    [openId, guestRef, router],
+  );
+  const onClose = useCallback(() => {
+    if (!openId) return;
+    if (openedHere.current) router.back();
+    else router.replace(analysisPath(openId), { scroll: false });
+    openedHere.current = false;
+  }, [openId, router]);
   const rewrite = useCallback(
     (ref: string, idea: Idea) => {
       update((current) => ({
@@ -90,13 +103,11 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         guests: current.guests.map((guest) => (guest.ref === ref ? { ...guest, idea } : guest)),
       }));
       if (!openId) return;
-      setSelection({ id: openId, value: ref });
       setRewritten({ id: openId, ref, idea });
-      if (onGuestPage && ref !== guestRef) router.push(guestPath(openId, ref));
+      onOpen(ref);
     },
-    [update, openId, onGuestPage, guestRef, router],
+    [update, openId, onOpen],
   );
-  const onSelect = useCallback((ref: string) => setSelection({ id: openId, value: ref }), [openId]);
   const onPick = useCallback(
     (ref: string) => {
       if (!openId) return;
@@ -122,8 +133,8 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     return (
       <>
         <title>{`${analysis.show.title} · Echo`}</title>
-        <div className={`${FRAME} flex flex-col gap-4 py-4`}>
-          <section aria-label="Your show" className="zone p-4 sm:p-5">
+        <div className={`${FRAME} flex flex-col gap-8 pt-10 pb-16`}>
+          <section aria-label="Your show">
             <ShowLock analysis={analysis} />
           </section>
           {error ? (
@@ -141,71 +152,31 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <OpenAnalysisContext value={{ analysis, selected, onSelect, picked, onPick, rewritten }}>
+    <OpenAnalysisContext value={{ analysis, openGuest, onOpen, onClose, picked, onPick, rewritten }}>
       {children}
-      <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} />
+      <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} beside={openGuest !== null} />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, selected: selectedRef, onSelect, picked, onPick, rewritten } = useOpenAnalysis();
+  const { analysis, openGuest, onOpen, onClose, picked, onPick, rewritten } = useOpenAnalysis();
   const { guests } = analysis;
-  const [tab, setTab] = useState<Tab>(() => {
-    const value = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
-    return isTab(value) ? value : "guests";
-  });
   const [highlighted, setHighlighted] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState(rewritten);
-  if (rewritten !== revealed) {
-    setRevealed(rewritten);
-    if (rewritten) setTab("guests");
-  }
   const figures = computeStats(analysis);
-
-  const shownRewrite = useRef(rewritten);
-  useEffect(() => {
-    if (!rewritten || rewritten === shownRewrite.current) return;
-    shownRewrite.current = rewritten;
-    window.history.replaceState(null, "", `${window.location.pathname}#guest-${rewritten.ref}`);
-    document.getElementById("dossier-idea")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [rewritten]);
+  const open = guests.find((guest) => guest.ref === openGuest);
+  const beside = openGuest !== null;
 
   useLayoutEffect(() => () => setHighlighted(null), []);
 
-  const index = Math.max(
-    guests.findIndex((guest) => guest.ref === selectedRef),
-    0,
-  );
-  const selected: Guest | undefined = guests[index];
-
-  const select = useCallback(
-    (ref: string) => {
-      onSelect(ref);
-      window.history.replaceState(null, "", `#guest-${ref}`);
-      if (window.matchMedia(NARROW).matches) {
-        document.getElementById("dossier-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    },
-    [onSelect],
-  );
-
-  const openTab = (next: Tab) => {
-    setTab(next);
-    const search = next === "guests" ? "" : `?tab=${next}`;
-    window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
-    const panels = document.getElementById("tab-panels");
-    if (panels && panels.getBoundingClientRect().top < 0) panels.scrollIntoView({ block: "start" });
-  };
-
   if (!guests.length) {
     return (
-      <div className={`${FRAME} flex flex-col gap-4 py-4`}>
+      <div className={`${FRAME} flex flex-col gap-10 pt-10 pb-16`}>
         <title>{`${analysis.show.title} · Echo`}</title>
-        <section aria-label="Your show" className="zone p-4 sm:p-5">
+        <section aria-label="Your show">
           <ShowLock analysis={analysis} />
         </section>
-        <div className="zone p-6">
+        <div>
           <p className="font-display text-2xl font-semibold">No guests came back for this show.</p>
           <Link href="/" className="btn mt-4">
             Find another show
@@ -216,171 +187,89 @@ export function Console() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <title>{`${analysis.show.title} · Echo`}</title>
-      <div className={`${FRAME} pt-4`}>
-        <LockHeader key={`lock-${analysis.id}`} analysis={analysis} stats={figures} line={lockLine(guests)} />
-      </div>
-
-      <TabBar tab={tab} onTab={openTab} stats={figures} picked={picked.length} />
-
-      <div id="tab-panels" className={`${FRAME} flex-1 scroll-mt-28 pt-4 pb-24`}>
-        <div id="panel-guests" role="tabpanel" aria-labelledby="tab-guests" hidden={tab !== "guests"}>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 xl:col-span-8">
-              <Scope
-                key={`scope-${analysis.id}`}
-                guests={guests}
-                selected={selected?.ref ?? null}
-                highlighted={highlighted}
-                onSelect={select}
-                onHighlight={setHighlighted}
-              />
-              <GuestList
-                key={`list-${analysis.id}`}
-                guests={guests}
-                selected={selected?.ref ?? null}
-                highlighted={highlighted}
-                picked={picked}
-                onSelect={select}
-                onHighlight={setHighlighted}
-              />
-            </div>
-            <aside
-              id="dossier-panel"
-              aria-label="Selected guest"
-              className="min-w-0 scroll-mt-28 lg:col-span-5 xl:col-span-4"
-            >
-              <div
-                key={selected?.ref}
-                className="lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12.5rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
-              >
-                {selected && (
-                  <Dossier
-                    analysisId={analysis.id}
-                    guest={selected}
-                    index={index}
-                    picked={picked.includes(selected.ref)}
-                    full={picked.length >= MAX_PICKS}
-                    rewritten={rewritten?.id === analysis.id && rewritten.ref === selected.ref}
-                    onPick={() => onPick(selected.ref)}
-                  />
-                )}
-              </div>
-            </aside>
-          </div>
+    <div
+      className={`flex flex-1 flex-col transition-[padding] duration-500 ease-(--ease-out) motion-reduce:transition-none ${beside ? SHEET_ROOM : ""}`}
+    >
+      <title>{open ? `${open.name} · ${analysis.show.title} · Echo` : `${analysis.show.title} · Echo`}</title>
+      <Backdrop>
+        <div className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
+          <LockHeader key={`lock-${analysis.id}`} analysis={analysis} stats={figures} />
         </div>
+      </Backdrop>
 
-        <div id="panel-audience" role="tabpanel" aria-labelledby="tab-audience" hidden={tab !== "audience"}>
-          {tab === "audience" && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="md:col-span-3">
-                <Spectrum rows={analysis.audience_map} />
-              </div>
-              <FanAges stats={figures} />
-              <CommonGround guests={guests} />
-              <LeftOut analysis={analysis} />
-            </div>
-          )}
-        </div>
-
-        <div id="panel-invite" role="tabpanel" aria-labelledby="tab-invite" hidden={tab !== "invite"}>
-          <Invite analysis={analysis} picked={picked} onToggle={onPick} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const TAB_NAMES: Record<Tab, string> = { guests: "Guests", audience: "Audience", invite: "Invite" };
-
-// The tabs, under the status bar while the page scrolls. Arrow keys move between them.
-function TabBar({ tab, onTab, stats, picked }: { tab: Tab; onTab: (tab: Tab) => void; stats: Stats; picked: number }) {
-  const refs = useRef<Record<Tab, HTMLButtonElement | null>>({
-    guests: null,
-    audience: null,
-    invite: null,
-  });
-  const counts: Record<Tab, string> = {
-    guests: String(stats.guests),
-    audience: String(stats.tastes),
-    invite: `${picked}/${MAX_PICKS}`,
-  };
-  const units: Record<Tab, string> = {
-    guests: "guests",
-    audience: "tastes",
-    invite: "picked",
-  };
-
-  function keys(event: KeyboardEvent<HTMLDivElement>) {
-    const at = TABS.indexOf(tab);
-    const next =
-      event.key === "ArrowRight"
-        ? TABS[(at + 1) % TABS.length]
-        : event.key === "ArrowLeft"
-          ? TABS[(at - 1 + TABS.length) % TABS.length]
-          : event.key === "Home"
-            ? TABS[0]
-            : event.key === "End"
-              ? TABS[TABS.length - 1]
-              : null;
-    if (!next) return;
-    event.preventDefault();
-    onTab(next);
-    refs.current[next]?.focus();
-  }
-
-  return (
-    <div className="sticky top-14 z-20 mt-4 bg-void/85 backdrop-blur-md">
-      <div className={FRAME}>
-        <div
-          role="tablist"
-          aria-label="Analysis"
-          onKeyDown={keys}
-          className="flex gap-1 overflow-x-auto py-2 [scrollbar-width:none]"
+      <div className={`${FRAME} @container flex flex-1 flex-col gap-20 pb-36`}>
+        <TopPicks
+          key={`picks-${analysis.id}`}
+          guests={guests}
+          picked={picked}
+          full={picked.length >= MAX_PICKS}
+          onPick={onPick}
+          onOpen={onOpen}
+        />
+        <Scope
+          key={`scope-${analysis.id}`}
+          title={`How all ${guests.length} compare`}
+          guests={guests}
+          selected={openGuest}
+          highlighted={highlighted}
+          onSelect={onOpen}
+          onHighlight={setHighlighted}
         >
-          {TABS.map((name) => {
-            const on = tab === name;
-            return (
-              <button
-                key={name}
-                ref={(element) => {
-                  refs.current[name] = element;
-                }}
-                id={`tab-${name}`}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                aria-controls={`panel-${name}`}
-                tabIndex={on ? 0 : -1}
-                onClick={() => onTab(name)}
-                className={`flex shrink-0 items-baseline gap-1.5 rounded-full px-4 py-2 transition-colors sm:gap-2 sm:px-5 ${
-                  on
-                    ? "bg-deck text-ink shadow-[inset_0_0_0_1px_var(--steel)]"
-                    : "text-ink-dim hover:bg-deck/60 hover:text-ink-soft"
-                }`}
-              >
-                <span className="font-display text-sm font-semibold sm:text-[0.9375rem]">{TAB_NAMES[name]}</span>
-                <span className={`readout text-xs sm:text-sm ${on ? "text-accent" : ""}`}>
-                  {counts[name]}
-                  <span className="sr-only"> {units[name]}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          <div className="flex flex-col gap-5 @4xl:flex-row @4xl:items-end @4xl:justify-between @4xl:gap-12">
+            <p className="max-w-[62ch] text-ink-soft">
+              Each dot is a guest. Higher up, your listeners like them more. Further right, more of their fans are new
+              to you. A bigger dot means their fans are likelier to enjoy your show. The shaded box at the top right is
+              the sweet spot.
+            </p>
+            <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
+          </div>
+        </Scope>
+        <GuestList
+          key={`list-${analysis.id}`}
+          analysisId={analysis.id}
+          guests={guests}
+          open={openGuest}
+          highlighted={highlighted}
+          picked={picked}
+          full={picked.length >= MAX_PICKS}
+          onOpen={onOpen}
+          onPick={onPick}
+          onHighlight={setHighlighted}
+        />
+        <section
+          aria-label="Your listeners"
+          className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
+        >
+          <div className="@3xl:col-span-3">
+            <Spectrum rows={analysis.audience_map} />
+          </div>
+          <FanAges stats={figures} />
+          <CommonGround guests={guests} />
+          <LeftOut analysis={analysis} />
+        </section>
       </div>
+
+      <GuestSheet
+        analysis={analysis}
+        guestRef={openGuest}
+        picked={picked}
+        rewritten={rewritten}
+        onPick={onPick}
+        onOpen={onOpen}
+        onClose={onClose}
+      />
+      <PickBar analysis={analysis} picked={picked} beside={beside} />
     </div>
   );
 }
 
 function LeftOut({ analysis }: { analysis: Analysis }) {
   return (
-    <section aria-labelledby="left-out" className="zone flex flex-col">
-      <ZoneHead id="left-out" title="Left out">
+    <section aria-labelledby="left-out" className="flex flex-col gap-4">
+      <SectionHead id="left-out" title="Left out" small>
         <span>{analysis.left_out.length}</span>
-      </ZoneHead>
-      <div className="flex flex-col gap-3 p-4">
+      </SectionHead>
+      <div className="flex flex-col gap-3">
         {analysis.left_out.length ? (
           <ul className="flex flex-col gap-1.5">
             {analysis.left_out.map(({ name, why }) => (
@@ -409,12 +298,22 @@ function LeftOut({ analysis }: { analysis: Analysis }) {
 // Holds the console's place while the page loads, so nothing jumps when it arrives.
 export function ConsoleSkeleton() {
   return (
-    <div aria-busy className={`${FRAME} grid grid-cols-1 gap-4 py-4 lg:grid-cols-12`}>
+    <div aria-busy className={`${FRAME} flex flex-col gap-12 pt-10 pb-16`}>
       <title>Echo</title>
       <span className="sr-only">Loading the analysis</span>
-      <div className="zone h-52 lg:col-span-12" />
-      <div className="zone h-96 lg:col-span-7 xl:col-span-8" />
-      <div className="zone h-96 lg:col-span-5 xl:col-span-4" />
+      <div className="flex items-center gap-6">
+        <div className="size-20 shrink-0 animate-pulse rounded-2xl bg-deck sm:size-28" />
+        <div className="flex flex-1 flex-col gap-3">
+          <div className="h-10 w-2/3 max-w-xl animate-pulse rounded-lg bg-deck" />
+          <div className="h-4 w-1/2 max-w-md animate-pulse rounded bg-deck" />
+        </div>
+      </div>
+      <div className="h-[28rem] animate-pulse rounded-2xl bg-deck/60" />
+      <div className="flex flex-col gap-2">
+        {[0, 1, 2, 3].map((row) => (
+          <div key={row} className="h-14 animate-pulse rounded-xl bg-deck/60" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -425,13 +324,13 @@ function Rundown({ steps }: { steps: Step[] }) {
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
   return (
-    <section aria-labelledby="running" className="zone flex flex-col">
-      <ZoneHead id="running" title="Echo is running">
+    <section aria-labelledby="running" className="flex flex-col gap-4">
+      <SectionHead id="running" title="Echo is running">
         <span className="text-accent">
           {done} / {steps.length}
         </span>
-      </ZoneHead>
-      <div className="grid gap-6 p-5 md:grid-cols-[1fr_auto] md:items-center">
+      </SectionHead>
+      <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
         <ol className="flex flex-col">
           {steps.map((step, index) => {
             const on = index === current;
@@ -455,7 +354,7 @@ function Rundown({ steps }: { steps: Step[] }) {
         </ol>
         <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
       </div>
-      <p className="px-5 pb-5 text-sm text-ink-soft">It usually takes a few seconds.</p>
+      <p className="text-sm text-ink-soft">It usually takes a few seconds.</p>
       <p aria-live="polite" className="sr-only">
         {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
       </p>

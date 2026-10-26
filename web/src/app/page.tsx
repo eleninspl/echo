@@ -7,7 +7,7 @@ import { ScoreKey } from "@/components/signal";
 export default function Home() {
   return (
     <>
-      <Backdrop>
+      <Backdrop field>
         <div
           className={`${FRAME} flex flex-col justify-center pt-10 pb-14 lg:h-[calc(100dvh-13rem)] lg:min-h-fit lg:py-[3vh] xl:grid xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] xl:gap-10`}
         >

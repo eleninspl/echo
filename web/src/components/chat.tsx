@@ -7,6 +7,7 @@ import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
 
+import { SHEET_CLEAR } from "./hud";
 import { Logo } from "./logo";
 
 // The API takes the last 20 messages (docs/plan.md, API).
@@ -60,12 +61,13 @@ type Props = {
   // Called when a run the chat started is done, to show it in place of the current one.
   onRerun: (analysis: Analysis) => void;
   onRewrite: (guestRef: string, idea: Idea) => void;
+  beside?: boolean;
 };
 
 // The agent: the host asks for a change in their own words, and Echo runs again with new filters
 // or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. A round
-// button at the bottom right on every tab; the panel opens out of it, and closing it keeps the conversation.
-export function Chat({ analysis, onRerun, onRewrite }: Props) {
+// button at the bottom right on every page, left of an open guest; the panel opens out of it, and closing it keeps the conversation.
+export function Chat({ analysis, onRerun, onRewrite, beside = false }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
@@ -156,7 +158,7 @@ export function Chat({ analysis, onRerun, onRewrite }: Props) {
   return (
     <div
       data-open={open || undefined}
-      className="ask-dock pointer-events-none fixed right-2 bottom-2 z-40 sm:right-4 sm:bottom-4"
+      className={`ask-dock pointer-events-none fixed right-2 bottom-2 z-40 sm:right-4 sm:bottom-4 ${beside ? SHEET_CLEAR : ""}`}
     >
       <div className="ask-shell pointer-events-auto relative flex h-[min(42rem,calc(100dvh-1rem))] w-[calc(100vw-1rem)] max-w-[28rem] flex-col rounded-[1.75rem] bg-deck shadow-[inset_0_0_0_1px_var(--steel)]">
         <section

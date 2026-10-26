@@ -15,7 +15,15 @@ const GLOWS = [
   },
 ];
 
-export function Backdrop({ className = "", children }: { className?: string; children: ReactNode }) {
+export function Backdrop({
+  className = "",
+  field = false,
+  children,
+}: {
+  className?: string;
+  field?: boolean;
+  children: ReactNode;
+}) {
   return (
     <section className={`relative isolate ${className}`}>
       <div
@@ -38,7 +46,7 @@ export function Backdrop({ className = "", children }: { className?: string; chi
           />
         ))}
       </div>
-      <EchoField />
+      {field && <EchoField />}
       {children}
     </section>
   );

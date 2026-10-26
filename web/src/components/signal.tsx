@@ -1,6 +1,7 @@
-import { FRAME, LABEL_HUE, Voiceprint } from "./hud";
+import { FRAME, LABEL_HUE } from "./hud";
 import { Reveal } from "./reveal";
 import { ScoreTerms } from "./score-terms";
+import { Voiceprint } from "./voiceprint";
 
 // What each label's voiceprint looks like: illustrative shapes for the key, not any guest's scores.
 const SHAPES = [
