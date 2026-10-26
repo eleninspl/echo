@@ -74,8 +74,12 @@ export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
                   <span className="mt-1 block font-display text-2xl leading-tight font-semibold text-balance decoration-1 underline-offset-4 group-hover:underline">
                     {guest.name}
                   </span>
-                  {guest.description && (
-                    <span className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{guest.description}</span>
+                  {guest.bio ? (
+                    <span className="mt-1 line-clamp-3 text-sm text-pretty text-ink-soft">{guest.bio}</span>
+                  ) : (
+                    guest.description && (
+                      <span className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{guest.description}</span>
+                    )
                   )}
                 </span>
               </button>

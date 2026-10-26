@@ -76,6 +76,13 @@ LINKS = {
     "spotify": ("spotify_artist_id", "https://open.spotify.com/artist/{}"),
     "musicbrainz": ("musicbrainz_artist_id", "https://musicbrainz.org/artist/{}"),
 }
+WEBSITE = re.compile(r"^https?://[^\s/?#]+\.[^\s]+$", re.IGNORECASE)
+# The bio: the description, then up to this many fact sentences. A listed name longer than this is left out.
+BIO_FACTS = 3
+BIO_NAME_LENGTH = 80
+# Instruments that only say the person sings, and a birth year in the description ("Ann Example (born 1970)").
+NOT_INSTRUMENTS = frozenset({"voice", "vocals", "singing"})
+BORN = re.compile(r"\s*\((?:born|b\.)[^)]*\)", re.IGNORECASE)
 
 STEPS = [
     ("map", "Mapping your audience"),
@@ -368,7 +375,72 @@ def links_of(person: dict) -> dict[str, str]:
         values = external.get(key) or []
         if values and values[0].get("id"):
             links[name] = template.format(values[0]["id"])
+    sites = properties(person).get("official_website") or []
+    site = sites[0].strip() if sites and isinstance(sites[0], str) else ""
+    if WEBSITE.match(site):
+        links["website"] = site
     return links
+
+
+def fact_names(person: dict, key: str, most: int, skip: frozenset[str] = frozenset()) -> list[str]:
+    values = properties(person).get(key)
+    if not isinstance(values, list):
+        return []
+    own = normalize(person.get("name") or "")
+    names: list[str] = []
+    for value in values:
+        name = " ".join(value.split()) if isinstance(value, str) else ""
+        if not name or len(name) > BIO_NAME_LENGTH or not clean_name(name) or normalize(name) in skip | {own}:
+            continue
+        if normalize(name) not in {normalize(n) for n in names}:
+            names.append(name)
+        if len(names) == most:
+            break
+    return names
+
+
+def joined(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def sentence(text: str) -> str:
+    text = " ".join(text.split()).rstrip(" .")
+    return f"{text[0].upper()}{text[1:]}." if text else ""
+
+
+def since_year(person: dict, today: datetime) -> int | None:
+    match = re.match(r"(\d{4})-", str(properties(person).get("work_period_start") or ""))
+    year = int(match.group(1)) if match else None
+    return year if year and 1900 <= year <= today.year else None
+
+
+def known_facts(person: dict, today: datetime | None = None) -> list[str]:
+    """Public, work-only facts about a person as plain sentences, best first. Never gender, birth date,
+    citizenship, family, partners, lifestyle or political office: only the keys read here."""
+    works = fact_names(person, "notable_work", 3)
+    awards = fact_names(person, "award_received", 2)
+    nominations = [] if awards else fact_names(person, "nominated_for", 2)
+    employers = fact_names(person, "employer", 2)
+    teams = [] if employers else fact_names(person, "member_of_sports_team", 3)
+    instruments = [name.removesuffix(" instrument") for name in fact_names(person, "instrument", 2, NOT_INSTRUMENTS)]
+    year = since_year(person, today or datetime.now(UTC))
+    facts = [
+        works and f"Known for {joined(works)}.",
+        awards and f"Received {joined(awards)}.",
+        nominations and f"Nominated for {joined(nominations)}.",
+        employers and f"Has worked for {joined(employers)}.",
+        teams and f"Has played for {joined(teams)}.",
+        year and f"Active since {year}.",
+        instruments and f"Plays {joined(instruments)}.",
+    ]
+    return [fact for fact in facts if fact][:BIO_FACTS]
+
+
+def bio_of(person: dict, description: str | None, today: datetime | None = None) -> str | None:
+    facts = known_facts(person, today)
+    if not facts:
+        return None
+    return " ".join(part for part in [sentence(BORN.sub("", description or "")), *facts] if part)
 
 
 def score(scored: list[Scored]) -> list[Scored]:
@@ -393,11 +465,13 @@ def score(scored: list[Scored]) -> list[Scored]:
 
 def guest_of(item: Scored, ref: str) -> Guest:
     props = properties(item.person)
+    description = english(props.get("short_descriptions")) or props.get("short_description")
     return Guest(
         ref=ref,
         id=item.person["entity_id"],
         name=item.person["name"],
-        description=english(props.get("short_descriptions")) or props.get("short_description"),
+        description=description,
+        bio=bio_of(item.person, description),
         image_url=image_of(item.person),
         links=links_of(item.person),
         label=scoring.label(item.fit_pct, item.love_pct, item.reach_pct),

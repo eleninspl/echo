@@ -1,10 +1,13 @@
 from collections import Counter
-from datetime import date
+from datetime import UTC, date, datetime
 
 from echo_engine import scoring
 from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure, normalize
 from echo_engine.pipeline import (
     LoveBack,
+    bio_of,
+    known_facts,
+    links_of,
     new_podcasts,
     past_guest_ids,
     reach_width,
@@ -13,6 +16,8 @@ from echo_engine.pipeline import (
     shared_tastes,
 )
 from echo_engine.screen import clean_entity, clean_name, clean_tag_name
+
+TODAY = datetime(2026, 10, 26, tzinfo=UTC)
 
 
 def test_normalize_handles_accents_quotes_and_ampersands():
@@ -171,3 +176,69 @@ def test_past_guests_skip_trailers_and_cross_promotions():
         "Introductions: a talk about Bo Sample",
     ]
     assert past_guest_ids(titles, pool) == {"p1", "p2"}
+
+
+def invented_person(**props) -> dict:
+    return {"entity_id": "p1", "name": "Ann Example", "properties": props, "external": {}}
+
+
+def test_the_bio_is_built_from_work_facts_only():
+    person = invented_person(
+        notable_work=["Example Film", "Example Series", "Example Album", "Example Fourth Work"],
+        award_received=["Example Prize", "Example Medal", "Example Third Award"],
+        nominated_for=["Example Nomination"],
+        employer=["Example Broadcasting"],
+        work_period_start="1984-01-01",
+    )
+    assert bio_of(person, "comedian and actor", TODAY) == (
+        "Comedian and actor. Known for Example Film, Example Series and Example Album. "
+        "Received Example Prize and Example Medal. Has worked for Example Broadcasting."
+    )
+    nominated = invented_person(nominated_for=["Example Nomination"], work_period_start="1984-01-01")
+    assert known_facts(nominated, TODAY) == ["Nominated for Example Nomination.", "Active since 1984."]
+    teams = invented_person(
+        member_of_sports_team=["Example United", "Example City"], instrument=["voice", "guitar", "keyboard instrument"]
+    )
+    assert known_facts(teams, TODAY) == [
+        "Has played for Example United and Example City.",
+        "Plays guitar and keyboard.",
+    ]
+    assert known_facts(invented_person(instrument=["voice"]), TODAY) == []
+
+
+def test_the_bio_leaves_out_sensitive_facts_and_screened_names():
+    person = invented_person(
+        gender="female",
+        date_of_birth="1970-02-03",
+        citizenship=["Exampleland"],
+        spouse=["Bo Spouse"],
+        child=["Cy Child"],
+        father=["Dee Father"],
+        sibling=["Eli Sibling"],
+        unmarried_partner=["Fay Partner"],
+        lifestyle=["Example Lifestyle"],
+        position_held=["Example Minister"],
+        notable_work=["Example Politics Hour", "Example Film", "Ann Example", " ", "x" * 81, "example  film"],
+    )
+    bio = bio_of(person, "Writer (born 1970)", TODAY)
+    assert bio == "Writer. Known for Example Film."
+    for value in ("female", "1970", "Exampleland", "Bo", "Cy", "Dee", "Eli", "Fay", "Lifestyle", "Minister"):
+        assert value not in bio
+    # Only sensitive facts left: nothing beyond the description, so no bio.
+    del person["properties"]["notable_work"]
+    assert bio_of(person, "Writer", TODAY) is None
+
+
+def test_the_bio_skips_odd_values():
+    person = invented_person(notable_work="Example Film", employer=[None, 3], work_period_start="2999-01-01")
+    assert bio_of(person, "Writer", TODAY) is None
+    assert bio_of(invented_person(notable_work=["Example Film"]), None, TODAY) == "Known for Example Film."
+
+
+def test_the_website_is_an_http_link_only():
+    assert links_of(invented_person(official_website=["https://example.com/ann"])) == {
+        "website": "https://example.com/ann"
+    }
+    assert links_of(invented_person(official_website=["http://example.com"])) == {"website": "http://example.com"}
+    for bad in (["javascript:alert(1)"], ["example.com"], ["https://"], ["https://exa mple.com"], [], None, [3]):
+        assert "website" not in links_of(invented_person(official_website=bad))

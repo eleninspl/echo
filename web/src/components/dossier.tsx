@@ -9,7 +9,12 @@ import { AGE_ORDER } from "@/lib/stats";
 import { Chip, hue, out100, SCORE_HUE } from "./hud";
 import { Voiceprint } from "./voiceprint";
 
-const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
+const SITES: Record<string, string> = {
+  imdb: "IMDb",
+  spotify: "Spotify",
+  musicbrainz: "MusicBrainz",
+  website: "Website",
+};
 
 export function Scores({
   scores,

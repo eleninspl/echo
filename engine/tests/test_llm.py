@@ -96,6 +96,7 @@ def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
         "ref",
         "name",
         "description",
+        "known_facts",
         "label",
         "fit",
         "love_back",
@@ -104,7 +105,8 @@ def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
         "new_podcasts_their_fans_bring",
         "age_groups_where_their_fans_stand_out",
     }
-    assert "Use only the facts in the input" in call["system"]
+    assert facts["guests"][0]["known_facts"] == analysis.guests[0].bio
+    assert "description and known_facts are all you know" in call["system"]
 
 
 def test_ideas_ignore_refs_that_were_not_asked_for(fake, analysis):

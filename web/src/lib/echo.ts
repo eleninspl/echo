@@ -33,7 +33,10 @@ export type Guest = {
   id: string;
   name: string;
   description: string | null;
+  // A few plain sentences from the guest's public facts, the description first. Null when there's nothing more.
+  bio: string | null;
   image_url: string | null;
+  // Keys: imdb, spotify, musicbrainz, website.
   links: Record<string, string>;
   label: Label;
   scores: Scores;

@@ -83,6 +83,10 @@ def test_full_analysis(engine):
     assert [g["ref"] for g in guests] == [f"g{i}" for i in range(1, 21)]
     assert not names & {"Person 00", "Sam Host", "Person 02", "Person 03", "Person 07", "Pat Before"}
     assert sum(1 for g in guests if g["name"] == "Person 04") == 1
+    with_facts = next(g for g in guests if g["name"] == "Person 04")
+    assert with_facts["bio"] == "Invented person 4. Known for Invented Film."
+    assert with_facts["links"]["website"] == "https://example.com/p4"
+    assert all(g["bio"] is None for g in guests if g["name"] != "Person 04")
     assert {"name": "Sam Host", "why": "host"} in analysis["left_out"]
     assert {"name": "Pat Before", "why": "past_guest"} in analysis["left_out"]
 

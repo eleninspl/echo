@@ -144,7 +144,9 @@ function GuestBody({
             >
               {guest.name}
             </h2>
-            {guest.description && <p className="mt-1.5 text-ink-soft">{guest.description}</p>}
+            {(guest.bio || guest.description) && (
+              <p className="mt-1.5 text-pretty text-ink-soft">{guest.bio || guest.description}</p>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-3">

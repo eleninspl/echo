@@ -51,6 +51,12 @@ def person(i: int, affinity: float) -> dict:
         entity["name"] = "Person 04"
     if i == 6:
         entity["name"] = "Pat Before"
+    if i == 4:
+        entity["properties"] |= {
+            "notable_work": ["Invented Film"],
+            "spouse": ["Invented Spouse"],
+            "official_website": ["https://example.com/p4"],
+        }
     return entity
 
 
