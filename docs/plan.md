@@ -98,7 +98,7 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 | L6 | Briefing | 0.25 | first version |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. Next: compare models on OpenRouter and tune the prompts. Without an OpenRouter or Groq key the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
+Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. Next: compare models on OpenRouter and tune the prompts. Without `OPENROUTER_API_KEY` the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
 
 ## Web app tasks
 
@@ -160,7 +160,7 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 ## To agree
 
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
-2. **The LLM in production.** Leonidas built L1 to L6 (25 Oct), and the engine can use Groq (#39). Production still needs a key: `GROQ_API_KEY` from `engine/` with `vercel env add`, then a redeploy and `scripts/warm.py` again so the featured shows get ideas. Then compare models (The LLM, below).
+2. **The LLM in production.** Leonidas built L1 to L6 (25 Oct). Until the demo each of us runs them locally on our own Claude subscription. Before it: fund OpenRouter, `vercel env add OPENROUTER_API_KEY production` on `echo-qloo`, redeploy, then `scripts/warm.py` again so the featured shows get ideas. Compare models on OpenRouter if there's time (The LLM, below).
 3. **Featured shows.** Done 26 Oct (#39): comedy, music, sports and a business interview show, 3 or 4 sweet spots each, warmed to production. Titles are in `ECHO_FEATURED`, never the repo. Music is the weakest: its guests are mostly radio interviewers, not musicians.
 4. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
 5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
@@ -171,11 +171,10 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 
 ## The LLM
 
-24 Oct (Eleni): a cheap open-weight model, **`openai/gpt-oss-120b`**, on Groq (#38). 25 Oct (Leonidas): calls go through **OpenRouter** instead, so one key can try several models and we keep the cheapest that writes well enough. gpt-oss-120b stays the default and the first candidate. Eleni to confirm.
+24 Oct (Eleni): a cheap open-weight model, **`openai/gpt-oss-120b`**, on Groq (#38). 25 Oct (Leonidas): calls go through **OpenRouter** instead, so one key can try several models and we keep the cheapest that writes well enough. gpt-oss-120b stays the default and the first candidate. 26 Oct (Eleni and Leonidas): **no Groq**. For now each of us runs L locally on our own Claude subscription (`claude-cli`, below); before the demo we put money on OpenRouter and set its key on Vercel.
 
 - **Client:** `engine/echo_engine/llm_client.py`. A call is a system prompt, a user prompt and a JSON schema; it returns the parsed object with the model, tokens, cost and time. It retries a 429, a 5xx or an answer that isn't JSON, twice. `ECHO_LLM` picks the backend:
-  - `openrouter`, the default when its key is set: OpenAI-compatible API at `https://openrouter.ai/api/v1` with `OPENROUTER_API_KEY`, `response_format` with a strict JSON schema, and `provider.require_parameters`, so a request only goes to providers that support the schema. The cost comes back in every response.
-  - `groq` (26 Oct, #39): Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1` with `GROQ_API_KEY`, a strict `json_schema`, `reasoning_effort`, and the cost worked out from Groq's prices. Retries a 400 `json_validate_failed`. With `ECHO_LLM` unset and only this key set, the engine uses Groq.
+  - `openrouter`, the default and the only one in production: OpenAI-compatible API at `https://openrouter.ai/api/v1` with `OPENROUTER_API_KEY`, `response_format` with a strict JSON schema, and `provider.require_parameters`, so a request only goes to providers that support the schema. The cost comes back in every response.
   - `claude-cli`, local only: Leonidas's [claude-cli-wrapper](https://github.com/anagnole/claude-cli-wrapper) runs the Claude Code CLI on a Claude subscription behind an Anthropic Messages API at `http://127.0.0.1:4301`. Start it with `cd ~/Projects/claude-api && pnpm dev`. The engine sends the schema, turns the CLI's tools and MCP servers off and runs it in an empty folder outside the repo, so no `CLAUDE.md` is read. Default model `claude-sonnet-5-5`; model names must start with `claude-`. The engine refuses it on Vercel.
 - `ECHO_LLM_MODEL` names the model on either backend and `ECHO_LLM_URL` overrides the URL. `scripts/llm_check.py` (`--backend`, `--model`, `--effort`) sends one small call and prints the time, tokens and cost. Through the wrapper, `claude-haiku-5-5` answered in 5 s on 25 Oct.
 - **Building on Claude isn't testing the model.** Claude can hide what a cheap model gets wrong (broken JSON, facts the evidence doesn't give). Use `claude-cli` for the plumbing and the web app, and judge the prompts on OpenRouter models. Next: a script that runs L2 for 3 cached shows on several models and puts the pitches, cost and time side by side; rerun it after prompt changes.
@@ -217,9 +216,8 @@ Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, s
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | The `echo` database | The same |
 | `ECHO_WEB_ORIGINS` | The web app's URL. CORS takes exact origins, comma-separated. | Not set: `http://localhost:3000` |
 | `ECHO_DAILY_QLOO_CALLS` | Not set: 3000 | |
-| `OPENROUTER_API_KEY` | Not set | |
-| `GROQ_API_KEY` | To set (Eleni, #39) | |
-| `ECHO_LLM` | Not set: OpenRouter if its key is set, else Groq. Never `claude-cli`. | |
+| `OPENROUTER_API_KEY` | Before the demo, once OpenRouter is funded | |
+| `ECHO_LLM` | Not set: `openrouter`. Never `claude-cli`. | |
 | `ECHO_LLM_MODEL` | Not set: `openai/gpt-oss-120b` | |
 
 All of them are Sensitive. Add or change one with `vercel env add NAME production` from `engine/` (linked to the project; `engine/.vercel` is git-ignored), then `vercel redeploy <url> --target production`. Sensitive values can't be pulled back: `vercel env pull` gives placeholders. `ECHO_MOCK`, `ECHO_CACHE_DIR` and `ECHO_FEATURED` aren't used on Vercel.
