@@ -130,6 +130,7 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 | W22 | The invite page complete (26 Oct, #40): a card per guest with their email (kept in the browser only), their own note and "Open in email"; drafts kept in the browser and editable, writing again asks before replacing a changed one; the briefing on each card. Engine: `notes` per guest on `/drafts`, the episode and briefing stored per analysis, guest and idea | 0.5 | done |
 | W23 | Ask Echo and the episode theme (26 Oct, #41): an optional theme on the landing with examples (`filters.theme`, LLM only), a keyword mock chat whose reruns change the guests, rewrites and the conversation kept in the browser, an off state without an LLM, landing start errors that clear and retry | 0.5 | done |
 | W24 | The analysis page agrees with itself (26 Oct, #42): filter controls with clearable chips, reruns in place, picks per show by entity ID, "Start with these" only sweet spots, the chart's count and labels, copy for when there are no ideas, 404 and error pages, the health badge rechecking | 0.5 | done |
+| W25 | Who the guest is, and the practical details (26 Oct, #46 to #48): a short bio under each guest's name on the cards, the guest panel and the invite card, built in code from public work facts, and their official website beside the other links. The invite page asks for dates, fee or unpaid, in person or remote, length, release and a reply-by date, all optional and kept in the browser, with each guest's own dates and fee; the drafts state them and invent none | 0.5 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
@@ -242,7 +243,7 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
 | GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }`. The episode is written once per analysis, guest and idea, then stored. |
 | POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
-| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note?, notes?: { ref: text } }` (each note up to 300 characters, only for refs in `guest_refs`), or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
+| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note?, notes?: { ref: text }, details?, details_by_ref?: { ref: details } }` (each note up to 300 characters; `details` is `{ dates?, fee?, unpaid?, format?: in_person or remote, place?, length?, release?, reply_by? }`, a guest's own on top of the shared ones; notes and details only for refs in `guest_refs`), or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
 | POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }`, written once per analysis, guest and idea, from the stored episode |
 
 `Show` is `{ id, title, description, image_url }`.
@@ -267,8 +268,9 @@ The analysis, when done:
       "id": "00000000-0000-0000-0000-0000000000a1",
       "name": "Guest A",
       "description": "Stand-up comedian and actor",
+      "bio": "Stand-up comedian and actor. Known for Example Comedy and Example Series.",
       "image_url": "https://example.com/a.jpg",
-      "links": { "imdb": "https://www.imdb.com/name/nm0000001/" },
+      "links": { "imdb": "https://www.imdb.com/name/nm0000001/", "website": "https://example.com/a" },
       "label": "sweet_spot",
       "scores": { "fit": 0.74, "love_back": 0.41, "reach": 0.52, "echo": 0.55 },
       "evidence": { "shared_tastes": ["Example tag"], "new_podcasts": ["Example Podcast B"], "ages": ["25_to_29", "30_to_34"] },
@@ -296,4 +298,4 @@ The analysis, when done:
 | 501 | `not_implemented`: a stub that isn't built yet. Gone by the freeze. |
 | 502 | `qloo_error`, `llm_error` |
 
-Analyses are saved as JSON next to the Qloo cache: in Postgres on Vercel, in `.cache/` locally ([Hosting](#hosting)). Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, image and links, never gender, birth date or family.
+Analyses are saved as JSON next to the Qloo cache: in Postgres on Vercel, in `.cache/` locally ([Hosting](#hosting)). Only the search text and filter values reach Qloo; the host's name and notes go to the LLM only. A guest is shown with name, description, a bio built in code from public work facts (notable works, awards, employers, teams, start year, instruments), image and links, never gender, birth date, citizenship, family or political office.
