@@ -28,8 +28,8 @@ TASTES_PER_CATEGORY = 6
 
 RULES = """You write for Echo, a tool that helps a podcast host find guests their audience will love.
 Rules for everything you write:
-- Use only the facts in the input. A person's one-line description is all you know about them: add no books, shows, \
-roles, quotes, awards or life events that aren't given, even if you think you know them.
+- Use only the facts in the input. A person's one-line description and known_facts are all you know about them: add \
+no books, shows, roles, quotes, awards or life events that aren't given there, even if you think you know them.
 - Tastes describe groups of listeners, never one person. Say it the way a person would: "your listeners tend to love", \
 "their fans tend to like". Never use analytics words like over-index, affinity, skew, overlap, percentile or audience \
 data, and never say that a listener will do something.
@@ -96,7 +96,7 @@ including what the host's notes asked for, and keep the same rules."""
 BRIEFING_TASK = """Write a one-page briefing in Markdown for the host to read before recording with this guest, \
 with these sections:
 # <guest name>
-## Who they are (only the description given)
+## Who they are (only the description and known facts given)
 ## Where your audiences meet
 ## What their audience adds
 ## The episode
@@ -178,6 +178,7 @@ def guest_facts(guest: Guest) -> dict[str, Any]:
         "ref": guest.ref,
         "name": guest.name,
         "description": guest.description,
+        "known_facts": guest.bio,
         "label": LABELS[guest.label],
         "fit": percent(guest.scores.fit),
         "love_back": percent(guest.scores.love_back),

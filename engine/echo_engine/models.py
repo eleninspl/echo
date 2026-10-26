@@ -85,6 +85,9 @@ class Guest(BaseModel):
     id: str
     name: str
     description: str | None = None
+    # A few plain sentences built in code from the person's public facts (pipeline.bio_of). None when there's
+    # nothing beyond the description.
+    bio: str | None = None
     image_url: str | None = None
     links: dict[str, str] = {}
     label: Label
