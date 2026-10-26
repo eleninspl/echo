@@ -341,3 +341,50 @@ def test_the_episode_and_briefing_are_written_once_per_guest(engine, monkeypatch
     assert written == ["episode", "briefing"]
     engine.get(f"/analyses/{analysis['id']}/guests/g2")
     assert written == ["episode", "briefing", "episode"]
+
+
+def test_a_rewritten_idea_gets_its_own_episode_briefing_and_draft(engine, monkeypatch):
+    prompts: dict[str, list[str]] = {}
+
+    class Writer:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def json(self, system, prompt, schema, name, **kwargs):
+            prompts.setdefault(name, []).append(prompt)
+            data = {
+                "hosts": {"host_ids": []},
+                "ideas": {"ideas": []},
+                "episode": {"title": "On the road", "summary": "Two.", "segments": [], "questions": ["Why?"]},
+                "briefing": {"markdown": "# Guest"},
+                "drafts": {"drafts": [{"ref": "g1", "subject": "Hello", "body": "Hi"}]},
+            }[name]
+            return Reply(data=data, model="fake", input_tokens=0, output_tokens=0, cost_usd=None, duration_ms=0)
+
+    monkeypatch.setattr(llm, "client", Writer)
+    analysis = run(engine)
+    idea = {"title": "A drive to Indiana", "pitch": "Small towns.", "reason": "Both like road trips."}
+    path = f"/analyses/{analysis['id']}/guests/g1"
+    engine.get(path)
+    for _ in range(2):
+        assert engine.get(path, params=idea).status_code == 200
+        briefing = {"analysis_id": analysis["id"], "guest_ref": "g1", "idea": idea}
+        assert engine.post("/briefings", json=briefing).status_code == 200
+    assert len(prompts["episode"]) == 2 and len(prompts["briefing"]) == 1
+    assert "A drive to Indiana" in prompts["episode"][1] and "A drive to Indiana" not in prompts["episode"][0]
+    assert "A drive to Indiana" in prompts["briefing"][0]
+    drafts = {"analysis_id": analysis["id"], "guest_refs": ["g1"], "ideas": {"g1": idea}}
+    assert engine.post("/drafts", json=drafts).status_code == 200
+    assert "A drive to Indiana" in prompts["drafts"][0]
+
+
+def test_a_rewritten_idea_comes_whole_and_for_a_guest_asked_for(engine):
+    analysis = run(engine)
+    path = f"/analyses/{analysis['id']}/guests/g1"
+    assert engine.get(path, params={"title": "Only a title"}).status_code == 400
+    idea = {"title": "T", "pitch": "P", "reason": "R"}
+    drafts = {"analysis_id": analysis["id"], "guest_refs": ["g1"], "ideas": {"g2": idea}}
+    assert engine.post("/drafts", json=drafts).status_code == 400

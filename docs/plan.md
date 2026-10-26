@@ -242,16 +242,16 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }`, empty until `scripts/warm.py` has run |
 | POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
-| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }`. The episode is written once per analysis, guest and idea, then stored. |
+| GET | `/analyses/{id}/guests/{ref}` | `title`, `pitch`, `reason`: the idea as the chat rewrote it, all three or none | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }`. The episode is written once per analysis, guest and idea, then stored. |
 | POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
-| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note?, notes?: { ref: text }, details?, details_by_ref?: { ref: details } }` (each note up to 300 characters; `details` is `{ dates?, fee?, unpaid?, format?: in_person or remote, place?, length?, release?, reply_by? }`, a guest's own on top of the shared ones; notes and details only for refs in `guest_refs`), or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
-| POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }`, written once per analysis, guest and idea, from the stored episode |
+| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note?, notes?: { ref: text }, details?, details_by_ref?: { ref: details } }` (each note up to 300 characters; `details` is `{ dates?, fee?, unpaid?, format?: in_person or remote, place?, length?, release?, reply_by? }`, a guest's own on top of the shared ones; notes and details only for refs in `guest_refs`; `ideas?: { ref: idea }`, a guest's rewritten idea), or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
+| POST | `/briefings` | `{ analysis_id, guest_ref, idea? }` (`idea`: the rewritten one) | `{ markdown }`, written once per analysis, guest and idea, from the stored episode |
 
 `Show` is `{ id, title, description, image_url }`.
 
 `filters`: `fame` is `any`, `less_famous` or `rising`; `age` is null or a Qloo age bucket (`24_and_younger` to `55_and_older`); `country` is null or an English country name; `episode_about` is null or `{ query, type }` with type `movie`, `tv_show`, `artist`, `brand` or `videogame`. `theme` is null or free text up to 120 characters, for the LLM only (Qloo never sees it); it's part of the request key.
 
-Chat `action`: `rerun` (poll the new `analysis_id`), `rewrite` (`guest_ref` and the new `idea`, not saved in the analysis, which other visitors share: the web app keeps it in the browser) or `none`.
+Chat `action`: `rerun` (poll the new `analysis_id`), `rewrite` (`guest_ref` and the new `idea`, not saved in the analysis, which other visitors share: the web app keeps it in the browser and sends it back with the guest's details, drafts and briefing, so they're written for it) or `none`.
 
 The analysis, when done:
 

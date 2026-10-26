@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { echo } from "@/lib/echo";
+import { echo, type Idea } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
 import { writingProblem } from "@/lib/invitations";
 
@@ -19,7 +19,18 @@ type Load =
 
 // The page to read before recording with one guest, written on request: an LLM call the first time, then kept by
 // the engine with the analysis.
-export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: string; guestName: string }) {
+// `idea`: the guest's idea when the chat rewrote it.
+export function Briefing({
+  id,
+  guestRef,
+  guestName,
+  idea,
+}: {
+  id: string;
+  guestRef: string;
+  guestName: string;
+  idea?: Idea;
+}) {
   const [load, setLoad] = useState<Load>({ state: "idle" });
   const [printing, setPrinting] = useState(false);
 
@@ -35,7 +46,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
   async function write() {
     setLoad({ state: "loading" });
     try {
-      const { markdown } = await echo.briefing(id, guestRef);
+      const { markdown } = await echo.briefing(id, guestRef, idea);
       setLoad({ state: "done", markdown });
     } catch (error) {
       setLoad({ state: "failed", problem: writingProblem(error, "briefings") });

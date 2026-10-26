@@ -111,6 +111,8 @@ export type DraftRequest = {
   // `details` go to every guest; `details_by_ref` to one guest each, on top of the shared ones.
   details?: InviteDetails;
   details_by_ref?: Record<string, InviteDetails>;
+  // A guest's idea as the chat rewrote it (lib/rewrites.ts), in place of the analysis's own.
+  ideas?: Record<string, Idea>;
   previous?: DraftText;
   instruction?: string;
 };
@@ -165,10 +167,24 @@ export const echo = {
     call<{ id: string; status: Status }>("/analyses", { show_id, filters }),
   analysis: (id: string, signal?: AbortSignal) =>
     call<Analysis>(`/analyses/${encodeURIComponent(id)}`, undefined, signal),
-  guest: (id: string, ref: string, signal?: AbortSignal) =>
-    call<GuestDetails>(`/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}`, undefined, signal),
+  // With a rewritten idea, the episode is written for it.
+  guest: (id: string, ref: string, idea?: Idea, signal?: AbortSignal) =>
+    call<GuestDetails>(
+      `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}${idea ? `?${new URLSearchParams(plain(idea))}` : ""}`,
+      undefined,
+      signal,
+    ),
   chat: (analysis_id: string, messages: Message[]) => call<ChatReply>("/chat", { analysis_id, messages }),
-  drafts: (request: DraftRequest) => call<{ drafts: Draft[] }>("/drafts", request),
-  briefing: (analysis_id: string, guest_ref: string) =>
-    call<{ markdown: string }>("/briefings", { analysis_id, guest_ref }),
+  drafts: (request: DraftRequest) =>
+    call<{ drafts: Draft[] }>("/drafts", {
+      ...request,
+      ideas: request.ideas && Object.fromEntries(Object.entries(request.ideas).map(([ref, idea]) => [ref, plain(idea)])),
+    }),
+  briefing: (analysis_id: string, guest_ref: string, idea?: Idea) =>
+    call<{ markdown: string }>("/briefings", { analysis_id, guest_ref, idea: idea && plain(idea) }),
 };
+
+// An idea as the engine takes it, without the web app's own mark.
+function plain({ reason, title, pitch }: Idea) {
+  return { reason, title, pitch };
+}

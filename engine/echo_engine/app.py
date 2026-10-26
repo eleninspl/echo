@@ -40,6 +40,7 @@ from .models import (
     Health,
     InviteDetails,
     QlooCall,
+    RewrittenIdea,
     Show,
     ShowList,
     Step,
@@ -116,10 +117,11 @@ class Engine:
         return analysis
 
     @staticmethod
-    def guest(analysis: Analysis, ref: str) -> Guest:
+    def guest(analysis: Analysis, ref: str, idea: RewrittenIdea | None = None) -> Guest:
+        """The guest, with the idea the chat rewrote for this visitor in place of the analysis's own."""
         for guest in analysis.guests:
             if guest.ref == ref:
-                return guest
+                return guest if idea is None else guest.model_copy(update={"idea": idea})
         raise EchoError(404, "not_found", "There's no guest with that ref in this analysis.")
 
     async def check_cap(self) -> None:
@@ -416,9 +418,20 @@ def create_app(
         return await engine.get(analysis_id)
 
     @app.get("/analyses/{analysis_id}/guests/{ref}")
-    async def guest_details(analysis_id: str, ref: str) -> GuestDetails:
+    async def guest_details(
+        analysis_id: str,
+        ref: str,
+        # The rewritten idea, all three or none: the episode is written for it.
+        title: str | None = Query(None, min_length=1, max_length=200),
+        pitch: str | None = Query(None, min_length=1, max_length=1000),
+        reason: str | None = Query(None, min_length=1, max_length=1000),
+    ) -> GuestDetails:
+        given = [part for part in (title, pitch, reason) if part is not None]
+        if given and len(given) != 3:
+            raise EchoError(400, "bad_request", "A rewritten idea needs its title, pitch and reason.")
+        idea = RewrittenIdea(title=title, pitch=pitch, reason=reason) if given else None
         analysis = await engine.done(analysis_id)
-        guest = engine.guest(analysis, ref)
+        guest = engine.guest(analysis, ref, idea)
         engine.mock_fails(analysis.show.id, "guest_details")
         maps = await engine.guest_maps(analysis, guest)
         if engine.mock:
@@ -453,7 +466,7 @@ def create_app(
     @app.post("/drafts")
     async def drafts(body: DraftRequest) -> DraftList:
         analysis = await engine.done(body.analysis_id)
-        guests = [engine.guest(analysis, ref) for ref in body.guest_refs]
+        guests = [engine.guest(analysis, ref, body.ideas.get(ref)) for ref in body.guest_refs]
         if not engine.mock:
             return DraftList(drafts=await llm.write_drafts(analysis, guests, body))
         return DraftList(drafts=[mock_draft(engine.example["draft"], analysis, guest, body) for guest in guests])
@@ -461,7 +474,7 @@ def create_app(
     @app.post("/briefings")
     async def briefing(body: BriefingRequest) -> Briefing:
         analysis = await engine.done(body.analysis_id)
-        guest = engine.guest(analysis, body.guest_ref)
+        guest = engine.guest(analysis, body.guest_ref, body.idea)
         if engine.mock:
             return Briefing(markdown=fill(engine.example["briefing"], analysis, guest))
         if (saved := await engine.writings.get(analysis, guest, "briefing", Briefing)) is not None:

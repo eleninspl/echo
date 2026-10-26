@@ -1,4 +1,4 @@
-import type { Analysis, Idea } from "./echo";
+import type { Analysis, Guest, Idea } from "./echo";
 
 // Ideas Echo rewrote in the chat, per analysis, in this browser only. The engine doesn't save them: an
 // analysis is shared by everyone who opens it, a featured show by every visitor.
@@ -38,6 +38,11 @@ export function withRewrites(analysis: Analysis, rewrites: Record<string, Idea>)
       rewrites[guest.ref] ? { ...guest, idea: { ...rewrites[guest.ref], rewritten: true } } : guest,
     ),
   };
+}
+
+// The guest's idea when the chat rewrote it here, for the engine to write the episode, briefing and draft from.
+export function rewrittenIdea(guest: Guest): Idea | undefined {
+  return guest.idea?.rewritten ? guest.idea : undefined;
 }
 
 function isIdea(value: unknown): value is Idea {
