@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { echo } from "@/lib/echo";
-import { describe, type HostError } from "@/lib/errors";
+import type { HostError } from "@/lib/errors";
+import { writingProblem } from "@/lib/invitations";
 
 import { CopyButton } from "./copy-button";
 import { hue } from "./hud";
@@ -16,7 +17,8 @@ type Load =
   | { state: "done"; markdown: string }
   | { state: "failed"; problem: HostError };
 
-// The page to read before recording with one guest, written on request: it's an LLM call.
+// The page to read before recording with one guest, written on request: an LLM call the first time, then kept by
+// the engine with the analysis.
 export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: string; guestName: string }) {
   const [load, setLoad] = useState<Load>({ state: "idle" });
   const [printing, setPrinting] = useState(false);
@@ -36,7 +38,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
       const { markdown } = await echo.briefing(id, guestRef);
       setLoad({ state: "done", markdown });
     } catch (error) {
-      setLoad({ state: "failed", problem: describe(error) });
+      setLoad({ state: "failed", problem: writingProblem(error, "briefings") });
     }
   }
 
@@ -64,6 +66,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
     );
   }
 
+  const notSetUp = load.state === "failed" && load.problem.code === "not_implemented";
   return (
     <div className="flex flex-col items-start gap-2">
       <p className="text-sm text-ink-soft">
@@ -72,7 +75,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
       <button
         type="button"
         onClick={write}
-        disabled={load.state === "loading"}
+        disabled={load.state === "loading" || notSetUp}
         className="btn btn-solid"
         style={hue("var(--ink)")}
       >
@@ -81,7 +84,7 @@ export function Briefing({ id, guestRef, guestName }: { id: string; guestRef: st
       </button>
       {load.state === "failed" && (
         <div role="alert" className="text-sm">
-          <p className="font-semibold text-alert">{load.problem.title}</p>
+          <p className={`font-semibold ${notSetUp ? "text-ink" : "text-alert"}`}>{load.problem.title}</p>
           <p className="text-ink-soft">{load.problem.message}</p>
         </div>
       )}

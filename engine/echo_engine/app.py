@@ -28,6 +28,8 @@ from .models import (
     Draft,
     DraftList,
     DraftRequest,
+    DraftText,
+    Episode,
     ErrorBody,
     Featured,
     FeaturedList,
@@ -43,6 +45,7 @@ from .models import (
 )
 from .qloo_client import QlooClient, QlooError
 from .store import AnalysisStore, Counters, LocalCounters, LocalStore, analysis_store, qloo_counters, request_key
+from .writings import Writings, writings_cache
 
 log = logging.getLogger("echo.app")
 # httpx logs every request at INFO: on Vercel about 150 lines a run, mostly Upstash. Qloo calls are in each analysis.
@@ -75,6 +78,7 @@ class Engine:
         analyses: AnalysisStore,
         counters: Counters,
         daily_cap: int,
+        writings: Writings | None = None,
     ) -> None:
         self.mock = mock
         self.step_delay = step_delay
@@ -82,6 +86,7 @@ class Engine:
         self.analyses = analyses
         self.counters = counters
         self.daily_cap = daily_cap
+        self.writings = writings or Writings(None)
         self.example = load_example()
         # Invented shows that fail or stall the way a real run can, for the web app to show each case. Mock only.
         self.failures = {failure["show"]["id"]: failure for failure in self.example["mock_failures"]}
@@ -229,8 +234,39 @@ def fail(analysis: Analysis, code: str, message: str) -> None:
     analysis.error = ErrorBody(error=code, message=message)
 
 
-def fill(template: str, analysis: Analysis, guest: Guest, host_name: str | None = None) -> str:
-    return template.format(name=guest.name, show=analysis.show.title, host=host_name or "")
+def fill(template: str, analysis: Analysis, guest: Guest, **more: str) -> str:
+    return template.format(name=guest.name, show=analysis.show.title, **more)
+
+
+def mock_draft(template: dict[str, str], analysis: Analysis, guest: Guest, body: DraftRequest) -> Draft:
+    """The example's draft with the request's details in it, so the invite flow can be checked without the LLM."""
+    if body.previous is not None and body.instruction is not None:
+        return Draft(guest_ref=guest.ref, **mock_revise(body.previous, body.instruction).model_dump())
+    notes = [note for note in (body.notes.get(guest.ref), body.note and body.note.strip()) if note]
+    return Draft(
+        guest_ref=guest.ref,
+        subject=fill(template["subject"], analysis, guest),
+        body=fill(
+            template["body"],
+            analysis,
+            guest,
+            idea=template["idea"].format(title=guest.idea.title) if guest.idea else "",
+            notes="".join(f"{note}\n\n" for note in notes),
+            host=body.host_name or "[Your name]",
+        ),
+    )
+
+
+def mock_revise(previous: DraftText, instruction: str) -> DraftText:
+    """Asked for shorter, keeps the greeting, the first paragraph less its last sentence, and the sign-off. Any other
+    instruction is noted above the sign-off."""
+    paragraphs = previous.body.split("\n\n")
+    if "short" in instruction.lower() and len(paragraphs) > 2:
+        sentences = paragraphs[1].split(". ")
+        first = ". ".join(sentences[:-1] or sentences).rstrip(".") + "."
+        return DraftText(subject=previous.subject, body="\n\n".join([paragraphs[0], first, paragraphs[-1]]))
+    change = f"Rewritten for the mock: {instruction.strip()}."
+    return DraftText(subject=previous.subject, body="\n\n".join([*paragraphs[:-1], change, paragraphs[-1]]))
 
 
 def create_app(
@@ -267,6 +303,7 @@ def create_app(
         analyses,
         counters,
         settings.daily_qloo_calls if daily_cap is None else daily_cap,
+        Writings(None if mock else writings_cache(store if isinstance(store, Path) else None)),
     )
 
     @asynccontextmanager
@@ -357,11 +394,13 @@ def create_app(
         maps = await engine.guest_maps(analysis, guest)
         if engine.mock:
             episode = GuestDetails.model_validate({**engine.example["guest_details"], "ref": ref}).episode
-        else:
+        elif (episode := await engine.writings.get(analysis, guest, "episode", Episode)) is None:
             try:
                 episode = await pipeline.llm_step(llm.write_episode(analysis, guest, maps), None, "the episode idea")
             except pipeline.AnalysisFailed as error:
                 raise EchoError(502, error.code, error.message) from None
+            if episode is not None:
+                await engine.writings.put(analysis, guest, "episode", episode)
         return GuestDetails(ref=ref, audience_map=maps.audience_map, adds=maps.adds, episode=episode)
 
     @app.post("/chat")
@@ -386,17 +425,7 @@ def create_app(
         guests = [engine.guest(analysis, ref) for ref in body.guest_refs]
         if not engine.mock:
             return DraftList(drafts=await llm.write_drafts(analysis, guests, body))
-        template = engine.example["draft"]
-        return DraftList(
-            drafts=[
-                Draft(
-                    guest_ref=guest.ref,
-                    subject=fill(template["subject"], analysis, guest, body.host_name),
-                    body=fill(template["body"], analysis, guest, body.host_name),
-                )
-                for guest in guests
-            ]
-        )
+        return DraftList(drafts=[mock_draft(engine.example["draft"], analysis, guest, body) for guest in guests])
 
     @app.post("/briefings")
     async def briefing(body: BriefingRequest) -> Briefing:
@@ -404,8 +433,13 @@ def create_app(
         guest = engine.guest(analysis, body.guest_ref)
         if engine.mock:
             return Briefing(markdown=fill(engine.example["briefing"], analysis, guest))
+        if (saved := await engine.writings.get(analysis, guest, "briefing", Briefing)) is not None:
+            return saved
         maps = await engine.guest_maps(analysis, guest)
-        return Briefing(markdown=await llm.write_briefing(analysis, guest, maps))
+        episode = await engine.writings.get(analysis, guest, "episode", Episode)
+        written = Briefing(markdown=await llm.write_briefing(analysis, guest, maps, episode))
+        await engine.writings.put(analysis, guest, "briefing", written)
+        return written
 
     return app
 
