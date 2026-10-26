@@ -209,7 +209,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
     (next: Analysis) => {
       setRunId(null);
       const phrases = filterPhrases(next.filters);
-      const note = `Done. The page shows the new run${phrases.length ? `: ${phrases.join(", ").toLowerCase()}` : ""}.`;
+      const note = `Done. The page shows the new run${phrases.length ? `: ${phrases.map(lowerFirst).join(", ")}` : ""}.`;
       setEntries((current) => [...current, { role: "assistant", content: note, note: true }]);
       onRerun(next);
     },
@@ -543,6 +543,11 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
         )}
     </>
   );
+}
+
+// "In Canada" reads "in Canada" mid-sentence: only the first letter changes.
+function lowerFirst(phrase: string): string {
+  return phrase.charAt(0).toLowerCase() + phrase.slice(1);
 }
 
 function Line({ who, children }: { who: string; children: ReactNode }) {
