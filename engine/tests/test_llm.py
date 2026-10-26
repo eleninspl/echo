@@ -173,7 +173,31 @@ def test_chat_can_ask_for_a_rerun_with_new_filters(fake, analysis):
     assert (result.filters.fame, result.filters.age) == ("less_famous", "25_to_29")
     facts = facts_of(llm_fake.calls[0])
     assert facts["conversation"] == [{"role": "user", "content": "Younger and less famous, please"}]
-    assert facts["current_filters"] == {"fame": "any", "age": None, "country": None, "episode_about": None}
+    assert facts["current_filters"] == {
+        "fame": "any",
+        "age": None,
+        "country": None,
+        "episode_about": None,
+        "theme": None,
+    }
+
+
+def test_the_theme_reaches_every_prompt_through_the_show_facts(fake, analysis):
+    analysis.filters.theme = "road trips"
+    llm_fake = fake(ideas={"ideas": []})
+    asyncio.run(llm.write_ideas(analysis))
+    assert facts_of(llm_fake.calls[0])["episode_theme_from_the_host"] == "road trips"
+    analysis.filters.theme = None
+    assert "episode_theme_from_the_host" not in llm.show_facts(analysis)
+
+
+def test_chat_can_set_a_theme_and_a_long_one_is_cut(fake, analysis):
+    filters = {"fame": "any", "age": None, "country": None, "episode_about": None, "theme": "burnout " * 30}
+    llm_fake = fake(chat_decision=decision(action="rerun", filters=filters))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="An episode about burnout")]))
+    assert result.action == "rerun"
+    assert result.filters.theme.startswith("burnout") and len(result.filters.theme) <= 120
+    assert "theme" in llm_fake.calls[0]["schema"]["properties"]["filters"]["anyOf"][0]["properties"]
 
 
 def test_chat_rewrites_one_idea(fake, analysis):

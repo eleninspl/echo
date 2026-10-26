@@ -1,12 +1,13 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Fame = Literal["any", "less_famous", "rising"]
 AgeBucket = Literal["24_and_younger", "25_to_29", "30_to_34", "35_to_44", "45_to_54", "55_and_older"]
 AnchorType = Literal["movie", "tv_show", "artist", "brand", "videogame"]
 Label = Literal["sweet_spot", "safe", "far", "long_shot", "balanced"]
 Status = Literal["running", "done", "failed"]
+THEME_LENGTH = 120
 
 
 class Show(BaseModel):
@@ -31,6 +32,16 @@ class Filters(BaseModel):
     age: AgeBucket | None = None
     country: str | None = Field(default=None, min_length=2, max_length=60)
     episode_about: EpisodeAbout | None = None
+    # Free text for the LLM only (ideas, the episode, drafts, the briefing). Qloo never sees it.
+    theme: str | None = Field(default=None, max_length=THEME_LENGTH)
+
+    @field_validator("theme", mode="before")
+    @classmethod
+    def blank_theme_is_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = " ".join(value.split())
+            return value or None
+        return value
 
 
 class Step(BaseModel):

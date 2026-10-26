@@ -14,7 +14,7 @@ export type AnalysisState = {
   watched: boolean;
   error: EchoError | null;
   retry: () => void;
-  // Changes the loaded analysis in place, for a rewritten idea; the engine has saved the same change.
+  // Changes the loaded analysis in place, for a rewritten idea. The engine never saves those (lib/rewrites.ts).
   update: (change: (analysis: Analysis) => Analysis) => void;
 };
 

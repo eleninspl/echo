@@ -417,6 +417,7 @@ export function TasteMap({ analysis }: { analysis: Analysis }) {
                       fame,
                       age,
                       country,
+                      theme: analysis.filters.theme,
                       episode_about: { query: picked.item.name, type: anchor },
                     })
                   }

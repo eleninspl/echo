@@ -19,6 +19,7 @@ import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks } from "@/lib/picks";
+import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
@@ -78,6 +79,12 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     if (!guestRef) openedHere.current = false;
   }, [guestRef]);
 
+  // This browser's rewritten ideas, in place before the page paints.
+  const loaded = analysis?.status === "done" ? analysis.id : null;
+  useLayoutEffect(() => {
+    if (loaded) update((current) => (current.id === loaded ? withRewrites(current, readRewrites(loaded)) : current));
+  }, [loaded, update]);
+
   const rerun = useCallback(
     (next: Analysis) => router.push(analysisPath(next.id), { scroll: inviting }),
     [router, inviting],
@@ -102,11 +109,9 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   }, [openId, router]);
   const rewrite = useCallback(
     (ref: string, idea: Idea) => {
-      update((current) => ({
-        ...current,
-        guests: current.guests.map((guest) => (guest.ref === ref ? { ...guest, idea } : guest)),
-      }));
       if (!openId) return;
+      saveRewrite(openId, ref, idea);
+      update((current) => withRewrites(current, { [ref]: idea }));
       setRewritten({ id: openId, ref, idea });
       onOpen(ref);
     },

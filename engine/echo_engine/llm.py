@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from .config import get_settings
 from .llm_client import LlmClient, LlmError, Schema
 from .models import (
+    THEME_LENGTH,
     Analysis,
     ChatDecision,
     Draft,
@@ -35,6 +36,7 @@ data, and never say that a listener will do something.
 - Shared tastes are listed strongest first. Build on the first ones and on named shows, films, artists and podcasts. \
 A broad tag such as humor, dance or celebrity culture is not a reason on its own: leave it out rather than build on it.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
+- If the host gave an episode theme, build on it wherever it fits the guest, without forcing it.
 - Never quote scores or numbers, and never say where the data comes from.
 - Plain, warm, specific English. No hype words and no em dashes."""
 
@@ -56,7 +58,8 @@ IDEAS_TASK = f"""For each guest below, write:
 tastes, new podcasts or age groups given.
 - title: an episode title, under 70 characters.
 - pitch: two short sentences on the episode, built on what the two audiences share.
-Give every guest a different angle, and answer for every ref. {SCORES}"""
+Give every guest a different angle, and answer for every ref. When the host gave an episode theme, every title and \
+pitch is about that theme, seen through what this guest and the two audiences share. {SCORES}"""
 
 EPISODE_TASK = """Plan one episode of the show with this guest:
 - title: under 70 characters.
@@ -68,10 +71,12 @@ Build each segment on a strong shared taste or on something specific the guest's
 CHAT_TASK = f"""You are Echo, talking with the host about this list of guests. Pick one action:
 - rerun: the host wants different guests. Give the complete filters to use: start from the current filters and \
 change only what the host asked for. fame is any, less_famous or rising. age is one of the buckets or null. country is \
-an English country name or null. episode_about is {{query, type}} for an episode about a movie, tv_show, artist, brand \
-or videogame, or null.
-- rewrite: the host wants a different idea for one guest. Give guest_ref and the new idea (reason, title, pitch) \
-under the same rules.
+an English country name or null. episode_about is {{query, type}} for an episode about one named movie, tv_show, \
+artist, brand or videogame, or null. theme is a topic for the episode in a few plain words (road trips, first jobs, \
+burnout), up to {THEME_LENGTH} characters, or null: use it for any subject that isn't one named title.
+- rewrite: the host wants a different idea for one guest, such as funnier or shorter. Give guest_ref (the first idea \
+is the first guest listed) and the new idea (reason, title, pitch) under the same rules, keeping what the host didn't \
+ask to change.
 - none: just answer, for questions about the guests or how Echo works.
 reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null.
 {SCORES}"""
@@ -128,6 +133,7 @@ FILTERS = obj(
     age=nullable(one_of(AGES)),
     country=nullable(TEXT),
     episode_about=nullable(obj(query=TEXT, type=one_of(["movie", "tv_show", "artist", "brand", "videogame"]))),
+    theme=nullable(TEXT),
 )
 
 
@@ -161,6 +167,8 @@ def show_facts(analysis: Analysis) -> dict[str, Any]:
     about = analysis.filters.episode_about
     if about and about.used:
         facts["the_host_wants_an_episode_about"] = about.used
+    if analysis.filters.theme:
+        facts["episode_theme_from_the_host"] = analysis.filters.theme
     return facts
 
 
@@ -250,7 +258,10 @@ async def chat(analysis: Analysis, messages: list[Message]) -> ChatDecision:
         guest_ref=nullable(one_of(refs)),
         idea=nullable(IDEA),
     )
-    decision = checked(ChatDecision, await ask(RULES, CHAT_TASK, facts, schema, "chat_decision"))
+    data = await ask(RULES, CHAT_TASK, facts, schema, "chat_decision")
+    if isinstance(theme := (data.get("filters") or {}).get("theme"), str):
+        data["filters"]["theme"] = theme[:THEME_LENGTH]
+    decision = checked(ChatDecision, data)
     if decision.action == "rerun" and decision.filters is None:
         decision.action = "none"
     if decision.action == "rewrite" and (decision.guest_ref not in refs or decision.idea is None):

@@ -130,6 +130,18 @@
       "status": 502,
       "error": "llm_error",
       "message": "Echo couldn't write the episode idea. Try again in a minute."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000fb",
+        "title": "Fails: no writing model for the chat",
+        "description": "The run finishes like the example; the chat answers 501 not_implemented, as when the server has no LLM.",
+        "image_url": null
+      },
+      "at": "chat",
+      "status": 501,
+      "error": "not_implemented",
+      "message": "The LLM isn't set up: OPENROUTER_API_KEY is missing"
     }
   ],
   "analysis": {
@@ -1069,16 +1081,6 @@
         "Which trip changed how you cook?",
         "What would you tell our listeners to try first?"
       ]
-    }
-  },
-  "chat": {
-    "reply": "Mock mode: running again for listeners aged 25 to 29.",
-    "action": "rerun",
-    "filters": {
-      "fame": "any",
-      "age": "25_to_29",
-      "country": null,
-      "episode_about": null
     }
   },
   "draft": {

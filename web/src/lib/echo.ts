@@ -13,14 +13,20 @@ export type Filters = {
   age: AgeBucket | null;
   country: string | null;
   episode_about: EpisodeAbout | null;
+  // A topic for the episode in the host's words, for the writing only: the guests don't change for it.
+  theme?: string | null;
 };
+
+// The engine's limit on a theme's length.
+export const THEME_LENGTH = 120;
 
 export type Step = { key: string; label: string; done: boolean };
 export type MapItem = { name: string; image_url: string | null; affinity: number };
 export type MapRow = { category: string; items: MapItem[] };
 export type Scores = { fit: number; love_back: number; reach: number | null; echo: number };
 export type Evidence = { shared_tastes: string[]; new_podcasts: string[]; ages: AgeBucket[] };
-export type Idea = { reason: string; title: string; pitch: string };
+// `rewritten` is the web app's own mark on an idea Echo rewrote for this browser (lib/rewrites.ts), never the engine's.
+export type Idea = { reason: string; title: string; pitch: string; rewritten?: boolean };
 
 export type Guest = {
   ref: string;
