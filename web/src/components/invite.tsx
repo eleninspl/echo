@@ -13,7 +13,7 @@ import { Picture } from "./guest-list";
 import { LABEL_HUE, SectionHead } from "./hud";
 import { Problem } from "./problem";
 
-export const MAX_PICKS = 5;
+const BATCH = 5;
 
 const input = "field w-full px-3 py-2";
 
@@ -49,17 +49,23 @@ export function Invite({
     setProblem(null);
     if (hostName.trim()) saveHostName(hostName.trim());
     setRenaming(false);
-    try {
-      const response = await echo.drafts({
-        analysis_id: analysis.id,
-        guest_refs: picked,
-        host_name: hostName.trim() || undefined,
-        note: note.trim() || undefined,
-      });
-      setDrafts(response.drafts);
-    } catch (error) {
-      setProblem(describe(error));
-    }
+    const batches = Array.from({ length: Math.ceil(picked.length / BATCH) }, (_, index) =>
+      picked.slice(index * BATCH, (index + 1) * BATCH),
+    );
+    const results = await Promise.allSettled(
+      batches.map((guest_refs) =>
+        echo.drafts({
+          analysis_id: analysis.id,
+          guest_refs,
+          host_name: hostName.trim() || undefined,
+          note: note.trim() || undefined,
+        }),
+      ),
+    );
+    const written = results.flatMap((result) => (result.status === "fulfilled" ? result.value.drafts : []));
+    const failed = results.find((result) => result.status === "rejected");
+    if (written.length) setDrafts(written);
+    if (failed) setProblem(describe(failed.reason));
     setPending(false);
   }
 
@@ -73,9 +79,7 @@ export function Invite({
         <h1 id="invite-title" className={TITLE}>
           No guests picked yet
         </h1>
-        <p className="text-ink-soft">
-          Pick up to {MAX_PICKS} guests with + on the guests page, and Echo drafts an invitation to each.
-        </p>
+        <p className="text-ink-soft">Pick guests with + on the guests page, and Echo drafts an invitation to each.</p>
         <Link href={analysisPath(analysis.id)} className="btn btn-brand mt-2 min-h-12 px-6 text-base">
           Choose guests
         </Link>
@@ -125,7 +129,7 @@ export function Invite({
               <span className="line-clamp-2 font-display text-sm leading-tight font-semibold">{guest.name}</span>
             </li>
           ))}
-          {guests.length < MAX_PICKS && (
+          {guests.length < analysis.guests.length && (
             <li className="flex w-24 flex-col items-center gap-2.5 text-center">
               <Link
                 href={analysisPath(analysis.id)}

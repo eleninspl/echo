@@ -7,7 +7,6 @@ import { AGES, SHORT_AGE } from "@/lib/format";
 import { AGE_ORDER } from "@/lib/stats";
 
 import { Chip, hue, out100, SCORE_HUE } from "./hud";
-import { MAX_PICKS } from "./invite";
 import { Voiceprint } from "./voiceprint";
 
 const SITES: Record<string, string> = { imdb: "IMDb", spotify: "Spotify", musicbrainz: "MusicBrainz" };
@@ -91,22 +90,11 @@ function Level({
   );
 }
 
-export function PickButton({
-  guestName,
-  picked,
-  full,
-  onPick,
-}: {
-  guestName: string;
-  picked: boolean;
-  full: boolean;
-  onPick: () => void;
-}) {
+export function PickButton({ guestName, picked, onPick }: { guestName: string; picked: boolean; onPick: () => void }) {
   return (
     <button
       type="button"
       onClick={onPick}
-      disabled={full && !picked}
       aria-pressed={picked}
       className={`btn ${picked ? "btn-solid" : ""}`}
       style={hue("var(--ink)")}
@@ -118,7 +106,7 @@ export function PickButton({
           <path d="M6 2v8M2 6h8" fill="none" stroke="currentColor" strokeWidth="1.6" />
         )}
       </svg>
-      {picked ? "Picked" : full ? `${MAX_PICKS} picked already` : "Pick to invite"}
+      {picked ? "Picked" : "Pick to invite"}
       <span className="sr-only"> {guestName}</span>
     </button>
   );

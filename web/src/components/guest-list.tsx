@@ -15,7 +15,6 @@ type Props = {
   open: string | null;
   highlighted: string | null;
   picked: string[];
-  full: boolean;
   onOpen: (guestRef: string) => void;
   onPick: (guestRef: string) => void;
   onHighlight: (guestRef: string | null) => void;
@@ -23,7 +22,7 @@ type Props = {
 
 // Every guest, best Echo score first: rank, portrait, name, label, the three scores as a voiceprint and the
 // Echo score. A row opens its guest beside the list and lights its dot on the chart; the button at the end picks it.
-export function GuestList({ analysisId, guests, open, highlighted, picked, full, onOpen, onPick, onHighlight }: Props) {
+export function GuestList({ analysisId, guests, open, highlighted, picked, onOpen, onPick, onHighlight }: Props) {
   return (
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
       <SectionHead id="guests" title={`All ${guests.length} guests, ranked`}>
@@ -58,7 +57,6 @@ export function GuestList({ analysisId, guests, open, highlighted, picked, full,
             selected={guest.ref === open}
             lit={guest.ref === highlighted}
             picked={picked.includes(guest.ref)}
-            full={full}
             onOpen={() => onOpen(guest.ref)}
             onPick={() => onPick(guest.ref)}
             onHighlight={onHighlight}
@@ -76,7 +74,6 @@ function Row({
   selected,
   lit,
   picked,
-  full,
   onOpen,
   onPick,
   onHighlight,
@@ -87,7 +84,6 @@ function Row({
   selected: boolean;
   lit: boolean;
   picked: boolean;
-  full: boolean;
   onOpen: () => void;
   onPick: () => void;
   onHighlight: (guestRef: string | null) => void;
@@ -174,10 +170,9 @@ function Row({
       <button
         type="button"
         onClick={onPick}
-        disabled={full && !picked}
         aria-pressed={picked}
-        title={picked ? "Picked to invite" : full ? "Up to 5 invites" : "Pick to invite"}
-        className={`relative z-10 col-start-5 row-start-1 flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-30 @2xl:col-start-auto @2xl:row-start-auto ${
+        title={picked ? "Picked to invite" : "Pick to invite"}
+        className={`relative z-10 col-start-5 row-start-1 flex size-9 items-center justify-center rounded-full transition-colors @2xl:col-start-auto @2xl:row-start-auto ${
           picked
             ? "bg-ink text-on-hue"
             : "text-ink-soft shadow-[inset_0_0_0_1px_var(--steel-hi)] hover:bg-deck-hi hover:text-ink"
