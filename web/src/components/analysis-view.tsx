@@ -12,6 +12,8 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type KeyboardEvent,
+  type PointerEvent,
   type ReactNode,
   type SetStateAction,
 } from "react";
@@ -32,6 +34,7 @@ import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
 import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM, shownSteps } from "./hud";
 import { LabelSpectrum, LockHeader, requestFilters, ShowLock } from "./lock-header";
+import { PageNav } from "./page-nav";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
@@ -86,6 +89,11 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!guestRef) openedHere.current = false;
   }, [guestRef]);
+
+  // Arriving from the landing, Next keeps its scroll, which would open the analysis part way down.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // This browser's rewritten ideas, in place before the page paints.
   const loaded = analysis?.status === "done" ? analysis.id : null;
@@ -230,6 +238,7 @@ export function Console() {
   const figures = computeStats(analysis);
   const open = guests.find((guest) => guest.ref === openGuest);
   const beside = openGuest !== null;
+  const place = useKeptPlace(beside);
 
   useLayoutEffect(() => () => setHighlighted(null), []);
 
@@ -252,11 +261,23 @@ export function Console() {
 
   return (
     <div
+      {...place}
       className={`flex flex-1 flex-col transition-[padding] duration-500 ease-(--ease-out) motion-reduce:transition-none ${beside ? SHEET_ROOM : ""}`}
     >
       <title>{open ? `${open.name} · ${analysis.show.title} · Echo` : `${analysis.show.title} · Echo`}</title>
+      <PageNav
+        show={analysis.show}
+        lock="show-head"
+        stops={[
+          { id: "top-picks", label: guests.some(({ label }) => label === "sweet_spot") ? "Start with these" : "Closest" },
+          { id: "scope", label: "Compare" },
+          { id: "guests", label: "Ranked" },
+          { id: "tastes", label: "Listeners" },
+          { id: "ask-echo", label: "Ask Echo" },
+        ]}
+      />
       <Backdrop>
-        <div className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
+        <div id="show-head" className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
           <LockHeader
             key={`lock-${analysis.id}`}
             analysis={analysis}
@@ -333,6 +354,62 @@ export function Console() {
       <PickBar analysis={analysis} picked={picked} beside={beside} />
     </div>
   );
+}
+
+// The guest panel takes room from the page on a wide screen, so everything reflows under the pointer. This keeps
+// what was pressed to open it (a card, a row, a dot) where it was while the page settles, and again when it
+// closes, when focus goes back to it. Spread the handlers on the page, outside the panel.
+function useKeptPlace(beside: boolean) {
+  const pressed = useRef<Element | null>(null);
+  const opener = useRef<Element | null>(null);
+  const was = useRef(beside);
+
+  useLayoutEffect(() => {
+    if (was.current === beside) return;
+    was.current = beside;
+    if (beside) {
+      const on = pressed.current;
+      opener.current = on?.isConnected && !on.closest("aside") ? on : null;
+      return opener.current ? pin(opener.current) : undefined;
+    }
+    const back = opener.current;
+    opener.current = null;
+    if (!back?.isConnected) return;
+    back.closest<HTMLElement>("a, button, [tabindex]")?.focus({ preventScroll: true });
+    return pin(back);
+  }, [beside]);
+
+  return {
+    onPointerDownCapture: (event: PointerEvent<HTMLElement>) => {
+      pressed.current = event.target as Element;
+    },
+    onKeyDownCapture: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key === "Enter" || event.key === " ") pressed.current = event.target as Element;
+    },
+  };
+}
+
+// Holds an element at its place in the viewport for as long as the panel's slide takes, unless you scroll first.
+function pin(anchor: Element): (() => void) | undefined {
+  const top = anchor.getBoundingClientRect().top;
+  if (top < 0 || top > window.innerHeight) return undefined;
+  const until = performance.now() + 700;
+  let frame = 0;
+  const stop = () => {
+    cancelAnimationFrame(frame);
+    window.removeEventListener("wheel", stop);
+    window.removeEventListener("touchmove", stop);
+  };
+  const step = () => {
+    const drift = anchor.getBoundingClientRect().top - top;
+    if (Math.abs(drift) >= 1) window.scrollBy(0, drift);
+    if (performance.now() < until) frame = requestAnimationFrame(step);
+    else stop();
+  };
+  frame = requestAnimationFrame(step);
+  window.addEventListener("wheel", stop, { passive: true });
+  window.addEventListener("touchmove", stop, { passive: true });
+  return stop;
 }
 
 function LeftOut({ analysis }: { analysis: Analysis }) {

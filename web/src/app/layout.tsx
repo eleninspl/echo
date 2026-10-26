@@ -47,14 +47,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <header className="sticky top-0 z-40 bg-void/85 backdrop-blur-md">
+        {/* An analysis puts where you are on its page into #bar-context once its header scrolls away; while it's
+            there (data-on), the wordmark and the engine note make room on a phone. */}
+        <header className="group/bar sticky top-0 z-40 bg-void/85 backdrop-blur-md">
           <div className={`${FRAME} flex h-14 items-center justify-between gap-4`}>
-            <Link href="/" className="group flex items-center gap-3 rounded-full">
+            <Link href="/" className="group flex shrink-0 items-center gap-3 rounded-full">
               <Logo className="size-7 text-brand" />
-              <span className="font-display text-lg font-semibold tracking-[0.2em] text-ink">ECHO</span>
-              <span className="tag hidden border-l border-steel-hi pl-3 text-ink-dim sm:inline">Guest finder</span>
+              <span className="font-display text-lg font-semibold tracking-[0.2em] text-ink group-has-[[data-on]]/bar:max-sm:hidden">
+                ECHO
+              </span>
+              <span className="tag hidden border-l border-steel-hi pl-3 text-ink-dim sm:inline group-has-[[data-on]]/bar:hidden">
+                Guest finder
+              </span>
             </Link>
-            <div className="flex items-center gap-3">
+            <div id="bar-context" className="flex min-w-0 flex-1" />
+            <div className="flex items-center gap-3 group-has-[[data-on]]/bar:max-sm:[&>:first-child]:hidden">
               <EngineNote />
               <ThemeToggle />
             </div>
