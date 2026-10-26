@@ -87,11 +87,14 @@ DRAFTS_TASK = """Write an invitation email from the host to each guest below, on
 the two audiences share, in plain words; the episode idea; a clear ask; a sign-off with the host's name, or \
 "[Your name]" if it isn't given. Use the host's note if there is one, in every email. A guest may also \
 have their own note from the host (note_for_this_guest): use it in that guest's email only, as the host's own angle.
+- practical_details, when a guest has them: state each one plainly in that guest's email, in a sentence or two near \
+the ask, with dates, fees and lengths exactly as given (the rule on numbers doesn't apply to them). Never invent a \
+date, fee, format, place, length, release or deadline that isn't given: leave out what's missing.
 Write as the host, to the guest. Mention one or two shared tastes the way a person would ("our listeners are big \
 Kids in the Hall fans too"), with no talk of audiences, data, scores or tools, and don't flatter beyond the facts."""
 
 REVISE_TASK = """Rewrite this invitation email as the host asks. Keep everything the instruction doesn't touch, \
-including what the host's notes asked for, and keep the same rules."""
+including what the host's notes asked for and the practical details, and keep the same rules."""
 
 BRIEFING_TASK = """Write a one-page briefing in Markdown for the host to read before recording with this guest, \
 with these sections:
@@ -276,7 +279,11 @@ async def write_drafts(analysis: Analysis, guests: list[Guest], request: DraftRe
         facts = {
             **show_facts(analysis),
             **host,
-            "guest": {**guest_facts(guest), "note_for_this_guest": request.notes.get(guest.ref)},
+            "guest": {
+                **guest_facts(guest),
+                "note_for_this_guest": request.notes.get(guest.ref),
+                "practical_details": request.details_for(guest.ref).plainly() or None,
+            },
             "draft": request.previous.model_dump(),
             "instruction": request.instruction,
         }
@@ -291,6 +298,7 @@ async def write_drafts(analysis: Analysis, guests: list[Guest], request: DraftRe
                 **guest_facts(guest),
                 "idea": guest.idea.model_dump() if guest.idea else None,
                 "note_for_this_guest": request.notes.get(guest.ref),
+                "practical_details": request.details_for(guest.ref).plainly() or None,
             }
             for guest in guests
         ],

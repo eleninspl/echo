@@ -38,6 +38,7 @@ from .models import (
     GuestDetails,
     GuestMaps,
     Health,
+    InviteDetails,
     QlooCall,
     Show,
     ShowList,
@@ -245,9 +246,17 @@ def fill(template: str, analysis: Analysis, guest: Guest, **more: str) -> str:
 
 def mock_draft(template: dict[str, str], analysis: Analysis, guest: Guest, body: DraftRequest) -> Draft:
     """The example's draft with the request's details in it, so the invite flow can be checked without the LLM."""
+    details = mock_details(body.details_for(guest.ref))
     if body.previous is not None and body.instruction is not None:
-        return Draft(guest_ref=guest.ref, **mock_revise(body.previous, body.instruction).model_dump())
+        revised = mock_revise(body.previous, body.instruction)
+        paragraphs = revised.body.split("\n\n")
+        if details and details not in paragraphs:
+            # Like the model, a rewrite keeps the practical details: above the sign-off.
+            revised.body = "\n\n".join([*paragraphs[:-1], details, paragraphs[-1]])
+        return Draft(guest_ref=guest.ref, **revised.model_dump())
     notes = [note for note in (body.notes.get(guest.ref), body.note and body.note.strip()) if note]
+    if details:
+        notes.append(details)
     return Draft(
         guest_ref=guest.ref,
         subject=fill(template["subject"], analysis, guest),
@@ -260,6 +269,21 @@ def mock_draft(template: dict[str, str], analysis: Analysis, guest: Guest, body:
             host=body.host_name or "[Your name]",
         ),
     )
+
+
+MOCK_DETAIL_LABELS = {
+    "recording_dates": "Recording",
+    "fee": "Fee",
+    "format": "Format",
+    "episode_length": "Length",
+    "release": "Out",
+    "reply_by": "Reply by",
+}
+
+
+def mock_details(details: InviteDetails) -> str:
+    """The practical details as one short plain paragraph: "Recording: this month. Fee: unpaid. Format: remote."."""
+    return " ".join(f"{MOCK_DETAIL_LABELS[key]}: {value}." for key, value in details.plainly().items())
 
 
 def mock_revise(previous: DraftText, instruction: str) -> DraftText:

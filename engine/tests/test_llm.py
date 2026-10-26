@@ -15,6 +15,7 @@ from echo_engine.models import (
     Episode,
     EpisodeAbout,
     GuestMaps,
+    InviteDetails,
     MapItem,
     MapRow,
     Message,
@@ -262,6 +263,78 @@ def test_a_revise_keeps_the_guests_own_note(fake, analysis):
     )
     asyncio.run(llm.write_drafts(analysis, [analysis.guests[0]], request))
     assert facts_of(llm_fake.calls[0])["guest"]["note_for_this_guest"] == "We met at the festival"
+
+
+def test_each_guest_gets_the_shared_details_with_their_own_on_top(fake, analysis):
+    llm_fake = fake(
+        drafts=lambda schema: {
+            "drafts": [
+                {"ref": ref, "subject": "Hi", "body": "Hi"}
+                for ref in schema["properties"]["drafts"]["items"]["properties"]["ref"]["enum"]
+            ]
+        }
+    )
+    request = DraftRequest(
+        analysis_id=analysis.id,
+        guest_refs=["g1", "g3"],
+        details=InviteDetails(dates="Flexible", fee="$500", format="in_person", place="Our studio", length="45 min"),
+        details_by_ref={"g3": InviteDetails(dates="Next month", unpaid=True)},
+    )
+    asyncio.run(llm.write_drafts(analysis, [analysis.guests[0], analysis.guests[2]], request))
+    first, third = (guest["practical_details"] for guest in facts_of(llm_fake.calls[0])["guests"])
+    assert first == {
+        "recording_dates": "Flexible",
+        "fee": "$500",
+        "format": "in person, at Our studio",
+        "episode_length": "45 min",
+    }
+    assert third == {**first, "recording_dates": "Next month", "fee": "unpaid"}
+    assert "Never invent" in llm_fake.calls[0]["prompt"]
+
+
+def test_no_details_is_none_in_the_prompt(fake, analysis):
+    llm_fake = fake(
+        drafts=lambda schema: {
+            "drafts": [
+                {"ref": ref, "subject": "Hi", "body": "Hi"}
+                for ref in schema["properties"]["drafts"]["items"]["properties"]["ref"]["enum"]
+            ]
+        }
+    )
+    asyncio.run(llm.write_drafts(analysis, [analysis.guests[0]], DraftRequest(analysis_id="a", guest_refs=["g1"])))
+    assert facts_of(llm_fake.calls[0])["guests"][0]["practical_details"] is None
+
+
+def test_a_revise_keeps_the_details(fake, analysis):
+    llm_fake = fake(draft={"subject": "Short", "body": "Shorter"})
+    request = DraftRequest(
+        analysis_id=analysis.id,
+        guest_refs=["g1"],
+        details=InviteDetails(format="remote", release="March"),
+        details_by_ref={"g1": InviteDetails(fee="$200")},
+        previous=DraftText(subject="Long", body="Very long"),
+        instruction="shorter",
+    )
+    asyncio.run(llm.write_drafts(analysis, [analysis.guests[0]], request))
+    details = facts_of(llm_fake.calls[0])["guest"]["practical_details"]
+    assert details == {"fee": "$200", "format": "remote", "release": "March"}
+
+
+def test_details_are_checked_and_tidied():
+    with pytest.raises(ValueError, match="details"):
+        DraftRequest(analysis_id="a", guest_refs=["g1"], details_by_ref={"g2": InviteDetails(fee="$1")})
+    with pytest.raises(ValueError):
+        InviteDetails(fee="x" * 41)
+    with pytest.raises(ValueError):
+        InviteDetails(format="hybrid")
+    tidy = InviteDetails(dates="  next   week ", fee="$9", unpaid=True, format="remote", place="Studio", length=" ")
+    assert (tidy.dates, tidy.fee, tidy.place, tidy.length) == ("next week", None, None, None)
+    blank = DraftRequest(analysis_id="a", guest_refs=["g1"], details_by_ref={"g1": InviteDetails(dates=" ")})
+    assert blank.details_by_ref == {} and blank.details_for("g1").plainly() == {}
+    # A guest's own place replaces the shared format; their own fee replaces "unpaid".
+    shared = InviteDetails(format="remote", unpaid=True)
+    own = shared.with_own(InviteDetails(place="The pub", fee="$50"))
+    assert own.plainly() == {"fee": "$50", "format": "in person, at The pub"}
 
 
 def test_notes_are_only_for_guests_in_the_request():

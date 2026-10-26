@@ -86,6 +86,18 @@ export type ChatReply = {
 export type DraftText = { subject: string; body: string };
 export type Draft = DraftText & { guest_ref: string };
 
+// The practical side of an invitation, all optional. A fee is an amount in words ("$300"), or `unpaid`.
+export type InviteDetails = {
+  dates?: string;
+  fee?: string;
+  unpaid?: boolean;
+  format?: "in_person" | "remote";
+  place?: string;
+  length?: string;
+  release?: string;
+  reply_by?: string;
+};
+
 export type DraftRequest = {
   analysis_id: string;
   guest_refs: string[];
@@ -93,6 +105,9 @@ export type DraftRequest = {
   // `note` goes to every guest in the request; `notes` to one guest each, by ref, up to 300 characters.
   note?: string;
   notes?: Record<string, string>;
+  // `details` go to every guest; `details_by_ref` to one guest each, on top of the shared ones.
+  details?: InviteDetails;
+  details_by_ref?: Record<string, InviteDetails>;
   previous?: DraftText;
   instruction?: string;
 };

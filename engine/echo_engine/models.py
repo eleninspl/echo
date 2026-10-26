@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -203,13 +203,85 @@ class DraftText(BaseModel):
     body: str
 
 
+class InviteDetails(BaseModel):
+    """The practical side of an invitation, every field optional. Kept in the host's browser, sent with each draft."""
+
+    dates: str | None = Field(default=None, max_length=80)
+    fee: str | None = Field(default=None, max_length=40)
+    unpaid: bool = False
+    format: Literal["in_person", "remote"] | None = None
+    place: str | None = Field(default=None, max_length=80)
+    length: str | None = Field(default=None, max_length=30)
+    release: str | None = Field(default=None, max_length=40)
+    reply_by: str | None = Field(default=None, max_length=40)
+
+    # A guest's own details replace the shared ones a group at a time: a fee replaces "unpaid", a place the format.
+    GROUPS: ClassVar[tuple[tuple[str, ...], ...]] = (
+        ("dates",),
+        ("fee", "unpaid"),
+        ("format", "place"),
+        ("length",),
+        ("release",),
+        ("reply_by",),
+    )
+
+    @field_validator("dates", "fee", "place", "length", "release", "reply_by", mode="before")
+    @classmethod
+    def blank_is_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            return " ".join(value.split()) or None
+        return value
+
+    @model_validator(mode="after")
+    def consistent(self) -> "InviteDetails":
+        if self.unpaid:
+            self.fee = None
+        if self.format == "remote":
+            self.place = None
+        return self
+
+    def given(self, fields: tuple[str, ...]) -> bool:
+        return any(getattr(self, field) not in (None, False) for field in fields)
+
+    @property
+    def empty(self) -> bool:
+        return not any(self.given(group) for group in self.GROUPS)
+
+    def with_own(self, own: "InviteDetails | None") -> "InviteDetails":
+        if own is None:
+            return self
+        values = self.model_dump()
+        for group in self.GROUPS:
+            if own.given(group):
+                values.update({field: getattr(own, field) for field in group})
+        return InviteDetails.model_validate(values)
+
+    def plainly(self) -> dict[str, str]:
+        """The details given, in words, for the prompt and the mock."""
+        where = {"remote": "remote", "in_person": "in person"}.get(self.format or "", "")
+        if self.place:
+            where = f"in person, at {self.place}"
+        words = {
+            "recording_dates": self.dates,
+            "fee": "unpaid" if self.unpaid else self.fee,
+            "format": where,
+            "episode_length": self.length,
+            "release": self.release,
+            "reply_by": self.reply_by,
+        }
+        return {key: value for key, value in words.items() if value}
+
+
 class DraftRequest(BaseModel):
     analysis_id: str
     guest_refs: list[str] = Field(min_length=1, max_length=5)
     host_name: str | None = Field(default=None, max_length=80)
-    # `note` goes to every guest in the request, `notes` to one guest each, by ref.
+    # `note` and `details` go to every guest in the request; `notes` and `details_by_ref` to one guest each, by ref.
+    # A guest's own details override the shared ones.
     note: str | None = Field(default=None, max_length=500)
     notes: dict[str, Annotated[str, Field(max_length=300)]] = {}
+    details: InviteDetails = InviteDetails()
+    details_by_ref: dict[str, InviteDetails] = {}
     previous: DraftText | None = None
     instruction: str | None = Field(default=None, max_length=300)
 
@@ -221,8 +293,14 @@ class DraftRequest(BaseModel):
             raise ValueError("revise one draft at a time")
         if set(self.notes) - set(self.guest_refs):
             raise ValueError("a note is for a guest who isn't in guest_refs")
+        if set(self.details_by_ref) - set(self.guest_refs):
+            raise ValueError("details are for a guest who isn't in guest_refs")
         self.notes = {ref: note.strip() for ref, note in self.notes.items() if note.strip()}
+        self.details_by_ref = {ref: own for ref, own in self.details_by_ref.items() if not own.empty}
         return self
+
+    def details_for(self, ref: str) -> InviteDetails:
+        return self.details.with_own(self.details_by_ref.get(ref))
 
 
 class Draft(DraftText):
