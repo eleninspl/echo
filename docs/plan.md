@@ -168,7 +168,7 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
 6. **A 3D chart** (25 Oct call). Fit, love back and reach are three axes, so a 2D/3D toggle on the chart, if the 3D view isn't harder to read. After the UX pass; the tool is open.
 7. **The Audience tab as a picture** (25 Oct call). Done 26 Oct (W20): a taste map around the show, a slice per category, closer and bigger for a stronger pull; picking a film, show, artist or brand runs Echo again with it as the episode's subject. Leonidas.
-8. **The look** (25 Oct call). Done in W17: neutral, light and dark, blue for actions, orange for the sweet spot. The landing follows `/designs/09` (25 Oct review); the `/designs` routes (218 files) should go before the repo is public.
+8. **The look** (25 Oct call). Done in W17: neutral, light and dark, blue for actions, orange for the sweet spot. The landing follows design 09 (25 Oct review); the `/designs` routes were removed on 27 Oct, before the repo goes public.
 9. **The daily cap for judging.** 3,000 Qloo calls a day; a run is 29 to 66 calls, a guest panel about 6. #39 proposes 4,000 from 31 Oct to 5 Nov, then 3,000 again, which keeps the month's quota.
 
 ## The LLM
