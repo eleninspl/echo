@@ -14,10 +14,14 @@ import httpx
 from .config import LLM_BACKENDS, get_settings
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
+GROQ_URL = "https://api.groq.com/openai/v1"
 WRAPPER_URL = "http://127.0.0.1:4301"
 WRAPPER_START = "cd ~/Projects/claude-api && pnpm dev"
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 MAX_TOKENS = 8000
+# Groq doesn't send the cost: dollars per million tokens in and out, from its price list (24 Oct).
+GROQ_PRICES = {"openai/gpt-oss-120b": (0.15, 0.60), "openai/gpt-oss-20b": (0.075, 0.30)}
+KEYS = {"openrouter": "OPENROUTER_API_KEY", "groq": "GROQ_API_KEY"}
 Schema = dict[str, Any]
 
 
@@ -76,12 +80,26 @@ def openrouter_body(model: str, system: str, prompt: str, schema: Schema, name: 
     return body
 
 
-def openrouter_answer(data: dict[str, Any]) -> Answer:
+def groq_body(model: str, system: str, prompt: str, schema: Schema, name: str, effort: str | None) -> dict:
+    body: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}},
+        "max_completion_tokens": MAX_TOKENS,
+        "include_reasoning": False,
+    }
+    if effort:
+        body["reasoning_effort"] = effort
+    return body
+
+
+def chat_answer(data: dict[str, Any], who: str) -> Answer:
+    """An OpenAI-style chat completion, from OpenRouter or Groq."""
     if error := data.get("error"):
-        raise LlmError(f"OpenRouter error: {error}")
+        raise LlmError(f"{who} error: {error}")
     choices = data.get("choices") or []
     if not choices:
-        raise LlmError("OpenRouter returned no choices")
+        raise LlmError(f"{who} returned no choices")
     usage = data.get("usage") or {}
     return Answer(
         text=choices[0].get("message", {}).get("content") or "",
@@ -90,6 +108,17 @@ def openrouter_answer(data: dict[str, Any]) -> Answer:
         output_tokens=usage.get("completion_tokens", 0),
         cost_usd=usage.get("cost"),
     )
+
+
+def openrouter_answer(data: dict[str, Any]) -> Answer:
+    return chat_answer(data, "OpenRouter")
+
+
+def groq_answer(data: dict[str, Any]) -> Answer:
+    answer = chat_answer(data, "Groq")
+    if prices := GROQ_PRICES.get(answer.model):
+        answer.cost_usd = (answer.input_tokens * prices[0] + answer.output_tokens * prices[1]) / 1_000_000
+    return answer
 
 
 def wrapper_body(
@@ -142,17 +171,20 @@ class LlmClient:
         if not model:
             raise RuntimeError("ECHO_LLM_MODEL is not set")
         headers = {"Accept": "application/json"}
-        if backend == "openrouter":
+        if backend in KEYS:
             if not api_key:
-                raise RuntimeError("OPENROUTER_API_KEY is not set (put it in the repo-root .env)")
-            headers |= {"Authorization": f"Bearer {api_key}", "X-Title": "Echo"}
+                # Not set up, which the routes and the pipeline treat as not built.
+                raise NotImplementedError(f"{KEYS[backend]} is not set (put it in the repo-root .env)")
+            headers["Authorization"] = f"Bearer {api_key}"
+        if backend == "openrouter":
+            headers["X-Title"] = "Echo"
         self.backend = backend
         self.model = model
         self.workdir = workdir or (outside_repo_workdir() if backend == "claude-cli" else None)
         self.max_retries = max_retries
         self._sleep = sleep
         self._http = httpx.AsyncClient(
-            base_url=base_url or (OPENROUTER_URL if backend == "openrouter" else WRAPPER_URL),
+            base_url=base_url or {"openrouter": OPENROUTER_URL, "groq": GROQ_URL}.get(backend, WRAPPER_URL),
             headers=headers,
             timeout=timeout,
             transport=transport,
@@ -163,9 +195,8 @@ class LlmClient:
         settings = get_settings()
         if settings.on_vercel and settings.llm_backend == "claude-cli":
             raise RuntimeError("ECHO_LLM=claude-cli runs a Claude subscription locally and never in production")
-        return cls(
-            settings.llm_backend, settings.llm_model, settings.openrouter_api_key, settings.llm_url or None, **kwargs
-        )
+        backend = settings.llm_backend
+        return cls(backend, settings.llm_model, settings.api_key(backend), settings.llm_url or None, **kwargs)
 
     async def __aenter__(self) -> LlmClient:
         return self
@@ -190,6 +221,9 @@ class LlmClient:
         if self.backend == "openrouter":
             path, body = "/chat/completions", openrouter_body(model, system, prompt, schema, name, effort)
             read = openrouter_answer
+        elif self.backend == "groq":
+            path, body = "/chat/completions", groq_body(model, system, prompt, schema, name, effort)
+            read = groq_answer
         else:
             path, body = "/v1/messages", wrapper_body(model, system, prompt, schema, effort, self.workdir)
             read = wrapper_answer
@@ -228,10 +262,9 @@ class LlmClient:
         except httpx.TransportError as error:
             raise LlmError(f"{self.backend} didn't answer: {error!r}") from error
         if response.status_code != 200:
-            raise LlmError(
-                f"{self.backend} returned {response.status_code}: {response.text[:300]}",
-                retry=response.status_code in RETRY_STATUSES,
-            )
+            # Groq answers 400 json_validate_failed when the model's output doesn't fit the schema: ask again.
+            retry = response.status_code in RETRY_STATUSES or "json_validate_failed" in response.text
+            raise LlmError(f"{self.backend} returned {response.status_code}: {response.text[:300]}", retry=retry)
         try:
             data = response.json()
         except ValueError as error:

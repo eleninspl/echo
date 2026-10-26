@@ -12,6 +12,7 @@ from echo_engine.models import (
     Analysis,
     DraftRequest,
     DraftText,
+    Episode,
     EpisodeAbout,
     GuestMaps,
     MapItem,
@@ -172,7 +173,31 @@ def test_chat_can_ask_for_a_rerun_with_new_filters(fake, analysis):
     assert (result.filters.fame, result.filters.age) == ("less_famous", "25_to_29")
     facts = facts_of(llm_fake.calls[0])
     assert facts["conversation"] == [{"role": "user", "content": "Younger and less famous, please"}]
-    assert facts["current_filters"] == {"fame": "any", "age": None, "country": None, "episode_about": None}
+    assert facts["current_filters"] == {
+        "fame": "any",
+        "age": None,
+        "country": None,
+        "episode_about": None,
+        "theme": None,
+    }
+
+
+def test_the_theme_reaches_every_prompt_through_the_show_facts(fake, analysis):
+    analysis.filters.theme = "road trips"
+    llm_fake = fake(ideas={"ideas": []})
+    asyncio.run(llm.write_ideas(analysis))
+    assert facts_of(llm_fake.calls[0])["episode_theme_from_the_host"] == "road trips"
+    analysis.filters.theme = None
+    assert "episode_theme_from_the_host" not in llm.show_facts(analysis)
+
+
+def test_chat_can_set_a_theme_and_a_long_one_is_cut(fake, analysis):
+    filters = {"fame": "any", "age": None, "country": None, "episode_about": None, "theme": "burnout " * 30}
+    llm_fake = fake(chat_decision=decision(action="rerun", filters=filters))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="An episode about burnout")]))
+    assert result.action == "rerun"
+    assert result.filters.theme.startswith("burnout") and len(result.filters.theme) <= 120
+    assert "theme" in llm_fake.calls[0]["schema"]["properties"]["filters"]["anyOf"][0]["properties"]
 
 
 def test_chat_rewrites_one_idea(fake, analysis):
@@ -211,6 +236,42 @@ def test_drafts_are_one_per_guest_with_the_host_details(fake, analysis):
     assert (facts["host_name"], facts["host_note"]) == ("Sam", "We record Fridays")
 
 
+def test_each_guest_gets_only_their_own_note(fake, analysis):
+    llm_fake = fake(
+        drafts=lambda schema: {
+            "drafts": [
+                {"ref": ref, "subject": "Hi", "body": "Hi"}
+                for ref in schema["properties"]["drafts"]["items"]["properties"]["ref"]["enum"]
+            ]
+        }
+    )
+    request = DraftRequest(analysis_id=analysis.id, guest_refs=["g1", "g3"], notes={"g3": "Ask about the tour"})
+    asyncio.run(llm.write_drafts(analysis, [analysis.guests[0], analysis.guests[2]], request))
+    guests = facts_of(llm_fake.calls[0])["guests"]
+    assert [(g["ref"], g["note_for_this_guest"]) for g in guests] == [("g1", None), ("g3", "Ask about the tour")]
+
+
+def test_a_revise_keeps_the_guests_own_note(fake, analysis):
+    llm_fake = fake(draft={"subject": "Short", "body": "Shorter"})
+    request = DraftRequest(
+        analysis_id=analysis.id,
+        guest_refs=["g1"],
+        notes={"g1": "We met at the festival"},
+        previous=DraftText(subject="Long", body="Very long"),
+        instruction="shorter",
+    )
+    asyncio.run(llm.write_drafts(analysis, [analysis.guests[0]], request))
+    assert facts_of(llm_fake.calls[0])["guest"]["note_for_this_guest"] == "We met at the festival"
+
+
+def test_notes_are_only_for_guests_in_the_request():
+    with pytest.raises(ValueError, match="note"):
+        DraftRequest(analysis_id="a", guest_refs=["g1"], notes={"g2": "Hi"})
+    with pytest.raises(ValueError):
+        DraftRequest(analysis_id="a", guest_refs=["g1"], notes={"g1": "x" * 301})
+    assert DraftRequest(analysis_id="a", guest_refs=["g1"], notes={"g1": "  "}).notes == {}
+
+
 def test_a_missing_draft_is_an_llm_error(fake, analysis):
     fake(drafts={"drafts": [{"ref": "g1", "subject": "Hi", "body": "Hi"}]})
     request = DraftRequest(analysis_id=analysis.id, guest_refs=["g1", "g2"])
@@ -235,6 +296,13 @@ def test_a_draft_is_revised_as_the_host_asks(fake, analysis):
 def test_the_briefing_is_markdown(fake, analysis):
     fake(briefing={"markdown": "# Guest A\n\n## Who they are"})
     assert asyncio.run(llm.write_briefing(analysis, analysis.guests[0], maps())).startswith("# Guest A")
+
+
+def test_the_briefing_follows_the_episode_already_planned(fake, analysis):
+    llm_fake = fake(briefing={"markdown": "# Guest A"})
+    episode = Episode(title="On the road", summary="Two.", segments=[], questions=["Why?"])
+    asyncio.run(llm.write_briefing(analysis, analysis.guests[0], maps(), episode))
+    assert facts_of(llm_fake.calls[0])["the_episode"]["title"] == "On the road"
 
 
 def test_every_schema_is_strict(fake, analysis):

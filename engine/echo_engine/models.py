@@ -1,12 +1,13 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Fame = Literal["any", "less_famous", "rising"]
 AgeBucket = Literal["24_and_younger", "25_to_29", "30_to_34", "35_to_44", "45_to_54", "55_and_older"]
 AnchorType = Literal["movie", "tv_show", "artist", "brand", "videogame"]
 Label = Literal["sweet_spot", "safe", "far", "long_shot", "balanced"]
 Status = Literal["running", "done", "failed"]
+THEME_LENGTH = 120
 
 
 class Show(BaseModel):
@@ -31,6 +32,16 @@ class Filters(BaseModel):
     age: AgeBucket | None = None
     country: str | None = Field(default=None, min_length=2, max_length=60)
     episode_about: EpisodeAbout | None = None
+    # Free text for the LLM only (ideas, the episode, drafts, the briefing). Qloo never sees it.
+    theme: str | None = Field(default=None, max_length=THEME_LENGTH)
+
+    @field_validator("theme", mode="before")
+    @classmethod
+    def blank_theme_is_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = " ".join(value.split())
+            return value or None
+        return value
 
 
 class Step(BaseModel):
@@ -196,7 +207,9 @@ class DraftRequest(BaseModel):
     analysis_id: str
     guest_refs: list[str] = Field(min_length=1, max_length=5)
     host_name: str | None = Field(default=None, max_length=80)
+    # `note` goes to every guest in the request, `notes` to one guest each, by ref.
     note: str | None = Field(default=None, max_length=500)
+    notes: dict[str, Annotated[str, Field(max_length=300)]] = {}
     previous: DraftText | None = None
     instruction: str | None = Field(default=None, max_length=300)
 
@@ -206,6 +219,9 @@ class DraftRequest(BaseModel):
             raise ValueError("previous and instruction go together")
         if self.previous is not None and len(self.guest_refs) != 1:
             raise ValueError("revise one draft at a time")
+        if set(self.notes) - set(self.guest_refs):
+            raise ValueError("a note is for a guest who isn't in guest_refs")
+        self.notes = {ref: note.strip() for ref, note in self.notes.items() if note.strip()}
         return self
 
 

@@ -90,7 +90,10 @@ export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
               )}
               {guest.idea && (
                 <div className="flex flex-col gap-1">
-                  <p className="tag text-ink-dim">Episode idea</p>
+                  <p className="tag text-ink-dim">
+                    Episode idea
+                    {guest.idea.rewritten && <span className="text-accent"> · Rewritten by Echo</span>}
+                  </p>
                   <p className="font-display text-lg leading-snug font-semibold text-balance">{guest.idea.title}</p>
                 </div>
               )}

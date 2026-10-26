@@ -3,6 +3,7 @@ database, which they empty. Redis tests run on a fake Upstash, and on a real one
 TEST_UPSTASH_REDIS_REST_TOKEN are set: they use their own keys, which expire, so the production database will do."""
 
 import asyncio
+import json
 import os
 import time
 from uuid import uuid4
@@ -353,3 +354,12 @@ def test_two_engines_on_one_redis_share_the_daily_cap_and_the_quota(monkeypatch,
     response = two.get("/shows", params={"q": "something new"})
     assert response.status_code == 429
     assert response.json()["error"] == "daily_cap"
+
+
+def test_a_theme_is_part_of_the_request_key_and_no_theme_keeps_the_old_key():
+    old = json.dumps(
+        [SHOW_ID.upper(), {"fame": "any", "age": None, "country": None, "episode_about": None}], sort_keys=True
+    )
+    assert request_key(SHOW_ID, Filters()) == old
+    assert request_key(SHOW_ID, Filters(theme="road trips")) != old
+    assert request_key(SHOW_ID, Filters(theme="road trips")) != request_key(SHOW_ID, Filters(theme="first jobs"))

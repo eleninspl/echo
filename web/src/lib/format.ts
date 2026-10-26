@@ -51,6 +51,7 @@ export function filterPhrases(filters: Filters): string[] {
   if (filters.country) phrases.push(`In ${filters.country}`);
   if (filters.episode_about)
     phrases.push(`An episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
+  if (filters.theme) phrases.push(`An episode on ${filters.theme}`);
   return phrases;
 }
 

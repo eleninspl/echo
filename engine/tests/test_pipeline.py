@@ -304,3 +304,36 @@ def test_a_failed_llm_call_on_a_route_is_a_502_llm_error(engine, monkeypatch):
     response = engine.post("/chat", json={"analysis_id": analysis["id"], "messages": messages})
     assert response.status_code == 502
     assert response.json() == {"error": "llm_error", "message": "Echo couldn't write that. Try again in a minute."}
+
+
+def test_the_episode_and_briefing_are_written_once_per_guest(engine, monkeypatch):
+    written: list[str] = []
+
+    class Writer:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def json(self, system, prompt, schema, name, **kwargs):
+            written.append(name)
+            data = {
+                "hosts": {"host_ids": []},
+                "ideas": {"ideas": []},
+                "episode": {"title": "On the road", "summary": "Two.", "segments": [], "questions": ["Why?"]},
+                "briefing": {"markdown": "# Guest"},
+            }[name]
+            return Reply(data=data, model="fake", input_tokens=0, output_tokens=0, cost_usd=None, duration_ms=0)
+
+    monkeypatch.setattr(llm, "client", Writer)
+    analysis = run(engine)
+    written.clear()
+    for _ in range(2):
+        details = engine.get(f"/analyses/{analysis['id']}/guests/g1").json()
+        assert details["episode"]["title"] == "On the road"
+        briefing = engine.post("/briefings", json={"analysis_id": analysis["id"], "guest_ref": "g1"})
+        assert briefing.json() == {"markdown": "# Guest"}
+    assert written == ["episode", "briefing"]
+    engine.get(f"/analyses/{analysis['id']}/guests/g2")
+    assert written == ["episode", "briefing", "episode"]

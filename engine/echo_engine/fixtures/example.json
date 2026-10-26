@@ -130,6 +130,18 @@
       "status": 502,
       "error": "llm_error",
       "message": "Echo couldn't write the episode idea. Try again in a minute."
+    },
+    {
+      "show": {
+        "id": "00000000-0000-0000-0000-0000000000fb",
+        "title": "Fails: no writing model for the chat",
+        "description": "The run finishes like the example; the chat answers 501 not_implemented, as when the server has no LLM.",
+        "image_url": null
+      },
+      "at": "chat",
+      "status": 501,
+      "error": "not_implemented",
+      "message": "The LLM isn't set up: OPENROUTER_API_KEY is missing"
     }
   ],
   "analysis": {
@@ -1071,19 +1083,10 @@
       ]
     }
   },
-  "chat": {
-    "reply": "Mock mode: running again for listeners aged 25 to 29.",
-    "action": "rerun",
-    "filters": {
-      "fame": "any",
-      "age": "25_to_29",
-      "country": null,
-      "episode_about": null
-    }
-  },
   "draft": {
     "subject": "An invitation to {show}",
-    "body": "Hi {name},\n\nI host {show}. Our listeners and your fans have a lot in common, and I'd love to have you on.\n\nInvented for the mock.\n\n{host}"
+    "idea": " for an episode we'd call \"{title}\"",
+    "body": "Hi {name},\n\nI host {show}. Our listeners and your fans have a lot in common, and I'd love to have you on{idea}. Invented for the mock.\n\n{notes}All the best,\n{host}"
   },
   "briefing": "# {name}\n\n## Who they are\n\nInvented for the mock.\n\n## What their audience loves\n\n- Example Band\n- Example Western\n\n## Where your audiences meet\n\n- Road trips\n\n## Questions to ask\n\n1. What surprised you most this year?\n"
 }

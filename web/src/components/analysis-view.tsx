@@ -20,6 +20,7 @@ import type { Analysis, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
+import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats, noteIdeas } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
@@ -29,8 +30,21 @@ import { AskSection, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
-import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM, shownSteps } from "./hud";
-import { LabelSpectrum, LockHeader, requestFilters, ShowLock } from "./lock-header";
+import {
+  Chip,
+  FRAME,
+  hue,
+  Lamp,
+  SectionHead,
+  SHEET_ROOM,
+  shownSteps,
+} from "./hud";
+import {
+  LabelSpectrum,
+  LockHeader,
+  requestFilters,
+  ShowLock,
+} from "./lock-header";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
@@ -61,7 +75,10 @@ const OpenAnalysisContext = createContext<OpenAnalysis | null>(null);
 
 export function useOpenAnalysis(): OpenAnalysis {
   const open = useContext(OpenAnalysisContext);
-  if (!open) throw new Error("useOpenAnalysis is only available under the analyses layout.");
+  if (!open)
+    throw new Error(
+      "useOpenAnalysis is only available under the analyses layout.",
+    );
   return open;
 }
 
@@ -72,11 +89,19 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
   const openId = analysis?.id ?? null;
   const showId = analysis?.show.id ?? null;
-  const saved = useMemo(() => (picks.id === showId ? picks.value : showId ? readPicks(showId) : []), [picks, showId]);
+  const saved = useMemo(
+    () => (picks.id === showId ? picks.value : showId ? readPicks(showId) : []),
+    [picks, showId],
+  );
   const guests = useMemo(() => analysis?.guests ?? [], [analysis]);
   // Picks are saved by entity ID and shown by this run's refs, in the order they were picked.
-  const picked = saved.flatMap(({ id }) => guests.find((guest) => guest.id === id)?.ref ?? []);
-  const missing = analysis?.status === "done" ? saved.filter(({ id }) => !guests.some((guest) => guest.id === id)) : [];
+  const picked = saved.flatMap(
+    ({ id }) => guests.find((guest) => guest.id === id)?.ref ?? [],
+  );
+  const missing =
+    analysis?.status === "done"
+      ? saved.filter(({ id }) => !guests.some((guest) => guest.id === id))
+      : [];
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
   const [askSlot, setAskSlot] = useState<HTMLElement | null>(null);
   const openedHere = useRef(false);
@@ -86,8 +111,20 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     if (!guestRef) openedHere.current = false;
   }, [guestRef]);
 
+  // This browser's rewritten ideas, in place before the page paints.
+  const loaded = analysis?.status === "done" ? analysis.id : null;
+  useLayoutEffect(() => {
+    if (loaded)
+      update((current) =>
+        current.id === loaded
+          ? withRewrites(current, readRewrites(loaded))
+          : current,
+      );
+  }, [loaded, update]);
+
   const showRun = useCallback(
-    (next: Analysis) => router.push(analysisPath(next.id), { scroll: inviting }),
+    (next: Analysis) =>
+      router.push(analysisPath(next.id), { scroll: inviting }),
     [router, inviting],
   );
   // A filter or taste rerun lands at the top, where the new guests and their filters are. Next keeps the scroll
@@ -105,7 +142,12 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!toTop.current || !openId) return;
     toTop.current = false;
-    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
   }, [openId]);
   const onOpen = useCallback(
     (ref: string) => {
@@ -127,11 +169,9 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   }, [openId, router]);
   const rewrite = useCallback(
     (ref: string, idea: Idea) => {
-      update((current) => ({
-        ...current,
-        guests: current.guests.map((guest) => (guest.ref === ref ? { ...guest, idea } : guest)),
-      }));
       if (!openId) return;
+      saveRewrite(openId, ref, idea);
+      update((current) => withRewrites(current, { [ref]: idea }));
       setRewritten({ id: openId, ref, idea });
       onOpen(ref);
     },
@@ -158,7 +198,8 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     [guests, saved, keep],
   );
   const onForget = useCallback(
-    () => keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
+    () =>
+      keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
     [guests, saved, keep],
   );
 
@@ -212,14 +253,31 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      <Chat analysis={analysis} onRerun={showRun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
+      <Chat
+        analysis={analysis}
+        onRerun={showRun}
+        onRewrite={rewrite}
+        beside={openGuest !== null}
+        slot={askSlot}
+      />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, openGuest, onOpen, onClose, picked, onPick, missing, onForget, rerun, rewritten, onAskSlot } =
-    useOpenAnalysis();
+  const {
+    analysis,
+    openGuest,
+    onOpen,
+    onClose,
+    picked,
+    onPick,
+    missing,
+    onForget,
+    rerun,
+    rewritten,
+    onAskSlot,
+  } = useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
@@ -236,7 +294,9 @@ export function Console() {
           <ShowLock analysis={analysis} />
         </section>
         <div>
-          <p className="font-display text-2xl font-semibold">No guests came back for this show.</p>
+          <p className="font-display text-2xl font-semibold">
+            No guests came back for this show.
+          </p>
           <Link href="/" className="btn mt-4">
             Find another show
           </Link>
@@ -249,7 +309,11 @@ export function Console() {
     <div
       className={`flex flex-1 flex-col transition-[padding] duration-500 ease-(--ease-out) motion-reduce:transition-none ${beside ? SHEET_ROOM : ""}`}
     >
-      <title>{open ? `${open.name} · ${analysis.show.title} · Echo` : `${analysis.show.title} · Echo`}</title>
+      <title>
+        {open
+          ? `${open.name} · ${analysis.show.title} · Echo`
+          : `${analysis.show.title} · Echo`}
+      </title>
       <Backdrop>
         <div className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
           <LockHeader
@@ -283,11 +347,16 @@ export function Console() {
         >
           <div className="flex flex-col gap-5 @4xl:flex-row @4xl:items-end @4xl:justify-between @4xl:gap-12">
             <p className="max-w-[62ch] text-ink-soft">
-              Each dot is a guest. Higher up, your listeners like them more. Further right, more of their fans are new
-              to you. A bigger dot means their fans are likelier to enjoy your show. The box at the top right holds high
-              fit and high reach; the ringed dots in it are the sweet spots, whose fans also love your show back.
+              Each dot is a guest. Higher up, your listeners like them more.
+              Further right, more of their fans are new to you. A bigger dot
+              means their fans are likelier to enjoy your show. The box at the
+              top right holds high fit and high reach; the ringed dots in it are
+              the sweet spots, whose fans also love your show back.
             </p>
-            <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
+            <LabelSpectrum
+              stats={figures}
+              className="@4xl:w-[30rem] @4xl:shrink-0"
+            />
           </div>
         </Scope>
         <GuestList
@@ -307,7 +376,11 @@ export function Console() {
           className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
         >
           <div className="@3xl:col-span-3">
-            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} rerun={rerun} />
+            <TasteMap
+              key={`tastes-${analysis.id}`}
+              analysis={analysis}
+              rerun={rerun}
+            />
           </div>
           <FanAges stats={figures} />
           <CommonGround guests={guests} />
@@ -345,17 +418,24 @@ function LeftOut({ analysis }: { analysis: Analysis }) {
                 className="flex items-center justify-between gap-3 border-b border-steel pb-1.5 text-sm"
               >
                 {name}
-                <Chip color={why === "host" ? "var(--long-shot)" : "var(--balanced)"}>
+                <Chip
+                  color={
+                    why === "host" ? "var(--long-shot)" : "var(--balanced)"
+                  }
+                >
                   {why === "host" ? "Host" : "Past guest"}
                 </Chip>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-ink-dim">Nobody: no hosts or past guests came back.</p>
+          <p className="text-sm text-ink-dim">
+            Nobody: no hosts or past guests came back.
+          </p>
         )}
         <p className="text-xs text-ink-dim">
-          Echo leaves out the show&apos;s hosts and people already in its episode titles.
+          Echo leaves out the show&apos;s hosts and people already in its
+          episode titles.
         </p>
       </div>
     </section>
@@ -408,35 +488,56 @@ function Rundown({ steps: all }: { steps: Step[] }) {
                 aria-current={on ? "step" : undefined}
                 className={`flex h-12 items-center gap-4 border-b border-steel last:border-b-0 ${step.done || on ? "text-ink" : "text-ink-dim"}`}
               >
-                <span className="readout w-6 text-sm text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
+                <span className="readout w-6 text-sm text-ink-dim">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <Lamp
                   color={step.done ? "var(--ink-soft)" : "var(--accent)"}
                   on={step.done || on}
                   className={`size-2.5 ${on ? "pulse" : ""}`}
                 />
                 <span className={on ? "font-semibold" : ""}>{step.label}</span>
-                <span className="sr-only">{step.done ? "(done)" : on ? "(running)" : "(waiting)"}</span>
+                <span className="sr-only">
+                  {step.done ? "(done)" : on ? "(running)" : "(waiting)"}
+                </span>
               </li>
             );
           })}
         </ol>
-        <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
+        <Radar
+          label={current >= 0 ? steps[current].label : "Finishing"}
+          done={done}
+          total={steps.length}
+        />
       </div>
       <p className="text-sm text-ink-soft">It usually takes under a minute.</p>
       <p aria-live="polite" className="sr-only">
-        {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
+        {current >= 0
+          ? `${steps[current].label}, step ${current + 1} of ${steps.length}.`
+          : "Finishing."}
       </p>
     </section>
   );
 }
 
 // Echo rings sounding from the show while it works, and the steps done as an arc around them.
-function Radar({ label, done, total }: { label: string; done: number; total: number }) {
+function Radar({
+  label,
+  done,
+  total,
+}: {
+  label: string;
+  done: number;
+  total: number;
+}) {
   const r = 120;
   const arc = 2 * Math.PI * (r + 14);
   return (
     <div aria-hidden className="relative mx-auto size-72 shrink-0">
-      <svg viewBox="-150 -150 300 300" className="absolute inset-0 size-full overflow-visible">
+      <svg
+        viewBox="-150 -150 300 300"
+        className="absolute inset-0 size-full overflow-visible"
+      >
         {[0.33, 0.66, 1].map((t) => (
           <circle key={t} r={r * t} fill="none" stroke="var(--steel)" />
         ))}
@@ -453,7 +554,13 @@ function Radar({ label, done, total }: { label: string; done: number; total: num
           />
         ))}
         <circle r="7" fill="var(--accent)" />
-        <circle r={r + 14} fill="none" stroke="var(--sweet)" strokeOpacity="0.16" strokeWidth="5" />
+        <circle
+          r={r + 14}
+          fill="none"
+          stroke="var(--sweet)"
+          strokeOpacity="0.16"
+          strokeWidth="5"
+        />
         <circle
           r={r + 14}
           fill="none"
@@ -480,7 +587,9 @@ function Failed({ analysis }: { analysis: Analysis }) {
     <Problem problem={problem}>
       <NextStep
         problem={problem}
-        onRetry={() => start(analysis.show.id, requestFilters(analysis.filters))}
+        onRetry={() =>
+          start(analysis.show.id, requestFilters(analysis.filters))
+        }
         onBroaden={() => start(analysis.show.id)}
         retrying={pending !== null}
       />

@@ -1,7 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import type { AgeBucket, Analysis, Fame, Filters } from "@/lib/echo";
 import { AGES, filterPhrases, LABELS } from "@/lib/format";
@@ -25,14 +33,27 @@ export function ShowLock({
 }) {
   const { show, filters } = analysis;
   const phrases = filterPhrases(filters);
-  const unused = filters.episode_about && filters.episode_about.used === null && analysis.status === "done";
+  const unused =
+    filters.episode_about &&
+    filters.episode_about.used === null &&
+    analysis.status === "done";
   return (
     <div className="flex min-w-0 items-start gap-5 sm:items-center sm:gap-6">
       <Cover>
         {show.image_url ? (
-          <Image src={show.image_url} alt="" fill unoptimized sizes="128px" className="object-cover" />
+          <Image
+            src={show.image_url}
+            alt=""
+            fill
+            unoptimized
+            sizes="128px"
+            className="object-cover"
+          />
         ) : (
-          <span aria-hidden className="font-display text-5xl font-semibold text-ink-dim">
+          <span
+            aria-hidden
+            className="font-display text-5xl font-semibold text-ink-dim"
+          >
             {show.title.trim().charAt(0)}
           </span>
         )}
@@ -41,7 +62,11 @@ export function ShowLock({
         <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] leading-[0.95] font-semibold tracking-[-0.01em] text-balance">
           {show.title}
         </h1>
-        {show.description && <p className="line-clamp-2 max-w-[60ch] text-ink-soft">{show.description}</p>}
+        {show.description && (
+          <p className="line-clamp-2 max-w-[60ch] text-ink-soft">
+            {show.description}
+          </p>
+        )}
         {controls ??
           (phrases.length > 0 && (
             <ul aria-label="Filters" className="flex flex-wrap gap-1.5">
@@ -54,8 +79,8 @@ export function ShowLock({
           ))}
         {unused && (
           <p className="text-sm text-ink-soft">
-            Echo couldn&apos;t use &ldquo;{filters.episode_about?.query}&rdquo;, so these guests don&apos;t account for
-            it.
+            Echo couldn&apos;t use &ldquo;{filters.episode_about?.query}&rdquo;,
+            so these guests don&apos;t account for it.
           </p>
         )}
         {children}
@@ -95,7 +120,14 @@ export function LockHeader({
     >
       <ShowLock
         analysis={analysis}
-        filters={<FilterControls filters={analysis.filters} rerun={rerun} missing={missing} onForget={onForget} />}
+        filters={
+          <FilterControls
+            filters={analysis.filters}
+            rerun={rerun}
+            missing={missing}
+            onForget={onForget}
+          />
+        }
       />
       <div className="flex flex-col gap-3">
         <p className="flex items-end gap-3">
@@ -107,12 +139,14 @@ export function LockHeader({
           </span>
           <span className="font-display text-lg leading-tight font-semibold">
             sweet {stats.sweet === 1 ? "spot" : "spots"}
-            <span className="block font-normal text-ink-dim">among {stats.guests} guests</span>
+            <span className="block font-normal text-ink-dim">
+              among {stats.guests} guests
+            </span>
           </span>
         </p>
         <p className="text-sm text-ink-soft">
-          A sweet spot is a guest your listeners already love, whose fans are new to you and likely to love your show
-          back.
+          A sweet spot is a guest your listeners already love, whose fans are
+          new to you and likely to love your show back.
         </p>
       </div>
     </section>
@@ -120,9 +154,17 @@ export function LockHeader({
 }
 
 // How the guests split across the five labels: a block per guest in one row, and the legend.
-export function LabelSpectrum({ stats, className = "" }: { stats: Stats; className?: string }) {
+export function LabelSpectrum({
+  stats,
+  className = "",
+}: {
+  stats: Stats;
+  className?: string;
+}) {
   const present = LABEL_ORDER.filter((label) => stats.labels[label] > 0);
-  const blocks = LABEL_ORDER.flatMap((label) => Array.from({ length: stats.labels[label] }, () => label));
+  const blocks = LABEL_ORDER.flatMap((label) =>
+    Array.from({ length: stats.labels[label] }, () => label),
+  );
   return (
     <div className={`flex flex-col gap-2.5 ${className}`}>
       <div aria-hidden className="flex h-2 gap-1">
@@ -131,15 +173,26 @@ export function LabelSpectrum({ stats, className = "" }: { stats: Stats; classNa
             key={i}
             className="fade flex-1 rounded-full"
             style={
-              { background: LABEL_HUE[label], opacity: label === "sweet_spot" ? 1 : 0.7, "--order": i } as CSSProperties
+              {
+                background: LABEL_HUE[label],
+                opacity: label === "sweet_spot" ? 1 : 0.7,
+                "--order": i,
+              } as CSSProperties
             }
           />
         ))}
       </div>
-      <ul aria-label="Guests by label" className="flex flex-wrap gap-x-4 gap-y-1">
+      <ul
+        aria-label="Guests by label"
+        className="flex flex-wrap gap-x-4 gap-y-1"
+      >
         {present.map((label) => (
           <li key={label} className="flex items-center gap-1.5 text-sm">
-            <span aria-hidden className="size-2 rounded-full" style={{ background: LABEL_HUE[label] }} />
+            <span
+              aria-hidden
+              className="size-2 rounded-full"
+              style={{ background: LABEL_HUE[label] }}
+            />
             <span className="text-ink-soft">{LABELS[label].name}</span>
             <span className="readout text-ink">{stats.labels[label]}</span>
           </li>
@@ -152,7 +205,10 @@ export function LabelSpectrum({ stats, className = "" }: { stats: Stats; classNa
 // The filters as a request, without what the engine filled in.
 export function requestFilters(filters: Filters): Filters {
   const about = filters.episode_about;
-  return { ...filters, episode_about: about && { query: about.query, type: about.type } };
+  return {
+    ...filters,
+    episode_about: about && { query: about.query, type: about.type },
+  };
 }
 
 const FAME_CHOICES: { value: Fame; name: string }[] = [
@@ -186,23 +242,49 @@ type Active = { key: string; phrase: string; without: Filters };
 // Each filter that differs from the defaults, with the request that clears it.
 function activeFilters(filters: Filters): Active[] {
   const base = requestFilters(filters);
-  const phrase = (part: Partial<Filters>) => filterPhrases({ ...EMPTY, ...part })[0];
+  const phrase = (part: Partial<Filters>) =>
+    filterPhrases({ ...EMPTY, ...part })[0];
   const active: Active[] = [];
   if (base.fame !== "any")
-    active.push({ key: "fame", phrase: phrase({ fame: base.fame }), without: { ...base, fame: "any" } });
-  if (base.age) active.push({ key: "age", phrase: phrase({ age: base.age }), without: { ...base, age: null } });
+    active.push({
+      key: "fame",
+      phrase: phrase({ fame: base.fame }),
+      without: { ...base, fame: "any" },
+    });
+  if (base.age)
+    active.push({
+      key: "age",
+      phrase: phrase({ age: base.age }),
+      without: { ...base, age: null },
+    });
   if (base.country)
-    active.push({ key: "country", phrase: phrase({ country: base.country }), without: { ...base, country: null } });
+    active.push({
+      key: "country",
+      phrase: phrase({ country: base.country }),
+      without: { ...base, country: null },
+    });
   if (filters.episode_about)
     active.push({
       key: "about",
       phrase: phrase({ episode_about: filters.episode_about }),
       without: { ...base, episode_about: null },
     });
+  if (base.theme)
+    active.push({
+      key: "theme",
+      phrase: phrase({ theme: base.theme }),
+      without: { ...base, theme: null },
+    });
   return active;
 }
 
-const EMPTY: Filters = { fame: "any", age: null, country: null, episode_about: null };
+const EMPTY: Filters = {
+  fame: "any",
+  age: null,
+  country: null,
+  episode_about: null,
+  theme: null,
+};
 
 const FROM = "filters";
 
@@ -237,7 +319,10 @@ function FilterControls({
   return (
     <div className="flex flex-col gap-3">
       <div ref={box} className="relative">
-        <ul aria-label="Filters" className="flex flex-wrap items-center gap-1.5">
+        <ul
+          aria-label="Filters"
+          className="flex flex-wrap items-center gap-1.5"
+        >
           {active.map(({ key, phrase, without }) => (
             <li key={key}>
               <span className="inline-flex min-h-8 items-center gap-1 rounded-full bg-deck py-0.5 pr-0.5 pl-3 text-xs font-medium text-ink ring-1 ring-steel">
@@ -251,7 +336,12 @@ function FilterControls({
                   className="flex size-7 items-center justify-center rounded-full text-ink-dim transition-colors hover:bg-deck-hi hover:text-ink disabled:pointer-events-none disabled:opacity-40"
                 >
                   <svg aria-hidden viewBox="0 0 12 12" className="size-2.5">
-                    <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path
+                      d="M2.5 2.5l7 7M9.5 2.5l-7 7"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </button>
               </span>
@@ -272,8 +362,22 @@ function FilterControls({
                   strokeWidth="1.5"
                   strokeLinecap="round"
                 />
-                <circle cx="11" cy="4.5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                <circle cx="5" cy="11.5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <circle
+                  cx="11"
+                  cy="4.5"
+                  r="2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <circle
+                  cx="5"
+                  cy="11.5"
+                  r="2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
               </svg>
               {active.length ? "Change" : "Narrow the guests"}
             </button>
@@ -294,10 +398,15 @@ function FilterControls({
       {missing.length > 0 && (
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
           <span>
-            {missing.length === 1 ? "Your pick" : "Your picks"} {listNames(missing.map(({ name }) => name))}{" "}
+            {missing.length === 1 ? "Your pick" : "Your picks"}{" "}
+            {listNames(missing.map(({ name }) => name))}{" "}
             {missing.length === 1 ? "isn't" : "aren't"} in this run.
           </span>
-          <button type="button" onClick={onForget} className="text-ink underline underline-offset-4 hover:text-brand">
+          <button
+            type="button"
+            onClick={onForget}
+            className="text-ink underline underline-offset-4 hover:text-brand"
+          >
             Unpick
           </button>
         </p>
@@ -320,7 +429,10 @@ function FilterForm({
   const [age, setAge] = useState<AgeBucket | null>(filters.age);
   const [country, setCountry] = useState(filters.country ?? "");
   const place = country.trim();
-  const changed = fame !== filters.fame || age !== filters.age || (place || null) !== filters.country;
+  const changed =
+    fame !== filters.fame ||
+    age !== filters.age ||
+    (place || null) !== filters.country;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -360,7 +472,9 @@ function FilterForm({
           <span className="tag text-ink-dim">Listeners&apos; age</span>
           <select
             value={age ?? ""}
-            onChange={(event) => setAge((event.target.value || null) as AgeBucket | null)}
+            onChange={(event) =>
+              setAge((event.target.value || null) as AgeBucket | null)
+            }
             className="field h-10 px-3 text-sm"
           >
             <option value="">Any age</option>
@@ -402,5 +516,7 @@ function FilterForm({
 
 // Names as a sentence: "A", "A and B", "A, B and C".
 function listNames(names: string[]): string {
-  return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return names.length < 2
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
