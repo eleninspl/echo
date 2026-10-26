@@ -463,9 +463,16 @@ def score(scored: list[Scored]) -> list[Scored]:
     )
 
 
-def guest_of(item: Scored, ref: str) -> Guest:
-    props = properties(item.person)
+def guest_description(person: dict) -> str | None:
+    """Qloo's one-line description, screened like the bio's facts: one that names who the person is (their
+    identity, beliefs or health) is left out rather than shown."""
+    props = properties(person)
     description = english(props.get("short_descriptions")) or props.get("short_description")
+    return description if description and clean_fact(description) else None
+
+
+def guest_of(item: Scored, ref: str) -> Guest:
+    description = guest_description(item.person)
     return Guest(
         ref=ref,
         id=item.person["entity_id"],
