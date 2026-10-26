@@ -8,13 +8,15 @@ import { invitePath } from "@/lib/paths";
 
 import { Picture } from "./guest-list";
 import { LABEL_HUE, SHEET_ROOM } from "./hud";
-import { MAX_PICKS } from "./invite";
+
+const FACES = 5;
 
 export function PickBar({ analysis, picked, beside }: { analysis: Analysis; picked: string[]; beside: boolean }) {
   const guests = picked
     .map((ref) => analysis.guests.find((guest) => guest.ref === ref))
     .filter((guest): guest is Guest => guest !== undefined);
   const shown = guests.length > 0;
+  const faces = guests.slice(0, FACES);
   return (
     <div
       className={`pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center pr-[4.75rem] pl-3 transition-[padding] duration-500 ease-(--ease-out) sm:bottom-5 sm:px-4 ${beside ? SHEET_ROOM : ""}`}
@@ -26,7 +28,7 @@ export function PickBar({ analysis, picked, beside }: { analysis: Analysis; pick
         }`}
       >
         <ol aria-label="Picked to invite" className="flex shrink-0 -space-x-3">
-          {guests.map((guest, index) => (
+          {faces.map((guest, index) => (
             <li
               key={guest.ref}
               title={guest.name}
@@ -34,7 +36,7 @@ export function PickBar({ analysis, picked, beside }: { analysis: Analysis; pick
               style={
                 {
                   boxShadow: `0 0 0 2px var(--deck), 0 0 0 3.5px ${LABEL_HUE[guest.label]}`,
-                  zIndex: guests.length - index,
+                  zIndex: faces.length - index,
                 } as CSSProperties
               }
             >
@@ -42,13 +44,21 @@ export function PickBar({ analysis, picked, beside }: { analysis: Analysis; pick
               <span className="sr-only">{guest.name}</span>
             </li>
           ))}
+          {guests.length > faces.length && (
+            <li
+              className="relative flex size-10 items-center justify-center rounded-full bg-deck-hi font-display text-sm font-semibold text-ink sm:size-11"
+              style={{ boxShadow: "0 0 0 2px var(--deck)" }}
+            >
+              +{guests.length - faces.length}
+              <span className="sr-only"> more</span>
+            </li>
+          )}
         </ol>
         <p aria-live="polite" className="hidden shrink-0 text-sm leading-tight text-ink-soft min-[420px]:block">
           <span key={guests.length} className="rise readout inline-block text-base text-ink">
             {guests.length}
           </span>{" "}
           picked
-          <span className="block text-xs text-ink-dim">up to {MAX_PICKS}</span>
         </p>
         <Link href={invitePath(analysis.id)} className="btn btn-brand min-h-12 shrink-0 px-5 text-base sm:px-6">
           Write invitations

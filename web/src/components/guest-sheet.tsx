@@ -11,7 +11,6 @@ import { AgeLamps, GuestLinks, PickButton, Scores, TasteChips } from "./dossier"
 import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
-import { MAX_PICKS } from "./invite";
 
 type Props = {
   analysis: Analysis;
@@ -92,12 +91,7 @@ export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOp
           </Round>
         </div>
         {guest && (
-          <PickButton
-            guestName={guest.name}
-            picked={picked.includes(guest.ref)}
-            full={picked.length >= MAX_PICKS}
-            onPick={() => onPick(guest.ref)}
-          />
+          <PickButton guestName={guest.name} picked={picked.includes(guest.ref)} onPick={() => onPick(guest.ref)} />
         )}
       </div>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">

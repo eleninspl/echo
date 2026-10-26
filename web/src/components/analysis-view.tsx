@@ -29,7 +29,6 @@ import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
 import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM } from "./hud";
-import { MAX_PICKS } from "./invite";
 import { LabelSpectrum, LockHeader, ShowLock } from "./lock-header";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
@@ -205,14 +204,7 @@ export function Console() {
       </Backdrop>
 
       <div className={`${FRAME} @container flex flex-1 flex-col gap-20 pb-36`}>
-        <TopPicks
-          key={`picks-${analysis.id}`}
-          guests={guests}
-          picked={picked}
-          full={picked.length >= MAX_PICKS}
-          onPick={onPick}
-          onOpen={onOpen}
-        />
+        <TopPicks key={`picks-${analysis.id}`} guests={guests} picked={picked} onPick={onPick} onOpen={onOpen} />
         <Scope
           key={`scope-${analysis.id}`}
           title={`How all ${guests.length} compare`}
@@ -238,7 +230,6 @@ export function Console() {
           open={openGuest}
           highlighted={highlighted}
           picked={picked}
-          full={picked.length >= MAX_PICKS}
           onOpen={onOpen}
           onPick={onPick}
           onHighlight={setHighlighted}

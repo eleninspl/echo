@@ -12,12 +12,11 @@ import { Chip, LABEL_HUE, rank, SectionHead } from "./hud";
 type Props = {
   guests: Guest[];
   picked: string[];
-  full: boolean;
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
 };
 
-export function TopPicks({ guests, picked, full, onPick, onOpen }: Props) {
+export function TopPicks({ guests, picked, onPick, onOpen }: Props) {
   const sweet = guests.filter((guest) => guest.label === "sweet_spot");
   const others = guests.filter((guest) => guest.label !== "sweet_spot");
   const top = [...sweet, ...others].slice(0, sweet.length >= 4 ? 4 : 3);
@@ -83,7 +82,6 @@ export function TopPicks({ guests, picked, full, onPick, onOpen }: Props) {
                 <PickButton
                   guestName={guest.name}
                   picked={picked.includes(guest.ref)}
-                  full={full}
                   onPick={() => onPick(guest.ref)}
                 />
                 <button type="button" onClick={() => onOpen(guest.ref)} className="btn">
