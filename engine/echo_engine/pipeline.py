@@ -57,6 +57,15 @@ FAME_CAP = {"any": None, "less_famous": 0.7, "rising": 0.4}
 SECOND_LIST_CAP = 0.7
 AGE_DELTA = 0.2
 SHARED_SHOWN = 5
+SHARED_PODCASTS = 2
+# Shared tastes leave out the tags more than half the top guests have, and the podcasts more than a third of them
+# have: they say nothing about one guest.
+COMMON_TAGS = 1 / 2
+COMMON_PODCASTS = 1 / 3
+COMMON_FALLBACK = 2
+# A podcast both audiences love: the show's affinity for it is in the top half of its affinities for every
+# guest's podcasts.
+LOVED_QUANTILE = 0.5
 NEW_PODCASTS_SHOWN = 3
 EPISODE_TITLES = 200
 # Trailers and cross-promotions name people who weren't guests ("INTRODUCING: Another Show with Ann Example").
@@ -430,15 +439,56 @@ async def show_tag_ranks(client: QlooClient, show_id: str) -> dict[str, int]:
     return ranks
 
 
-def shared_tastes(show_ranks: dict[str, int], guest_tags: list[dict], common: set[str]) -> list[str]:
-    """Tags in both lists, by the sum of their ranks. `common` tags, which most of the top guests share, go last."""
-    both = sorted(
-        (tag["tag_id"] in common, show_ranks[tag["tag_id"]] + rank, tag["name"].strip())
+def tag_key(tag: dict) -> str:
+    """Tags are counted by name: a keyword and a theme can have the same one (humor and Humor)."""
+    return normalize(tag["name"])
+
+
+def shared_tags(
+    show_ranks: dict[str, int], guest_tags: list[dict], tag_guests: Counter[str], compared: int
+) -> list[str]:
+    """Tags in both lists, without those most of the `compared` guests have. Stronger and rarer first: the sum of
+    the two ranks times the number of guests with the tag, so a tag only this guest has beats a broad one. A guest
+    with only common tags keeps the strongest two, rather than none."""
+    both = [
+        (show_ranks[tag["tag_id"]] + rank + 1, tag)
         for rank, tag in enumerate(guest_tags)
         if tag["tag_id"] in show_ranks
+    ]
+    specific = sorted(
+        (ranks * max(tag_guests[tag_key(tag)], 1), ranks, tag["name"].strip())
+        for ranks, tag in both
+        if tag_guests[tag_key(tag)] <= compared * COMMON_TAGS
     )
+    if specific:
+        return [name for _, _, name in specific]
+    return [tag["name"].strip() for _, tag in sorted(both, key=lambda pair: pair[0])][:COMMON_FALLBACK]
+
+
+def loved_threshold(reach_scores: dict[str, float]) -> float:
+    values = sorted(reach_scores.values())
+    return values[int(len(values) * LOVED_QUANTILE)] if values else math.inf
+
+
+def shared_podcasts(
+    love: LoveBack, width: int, reach_scores: dict[str, float], shared_by: Counter[str], compared: int
+) -> list[str]:
+    """IDs of the guest's podcasts that the show's listeners love too, the ones fewest other guests have first,
+    then the show's strongest. Those most guests have are left out."""
+    threshold = loved_threshold(reach_scores)
+    scored = sorted(
+        (shared_by[p], -reach_scores[p], p)
+        for p in love.podcasts[:width]
+        if reach_scores.get(p, -math.inf) >= threshold and shared_by[p] <= compared * COMMON_PODCASTS
+    )
+    ids = [p for _, _, p in scored if clean_name(love.names.get(p, ""))]
+    return ids[:SHARED_PODCASTS]
+
+
+def shared_tastes(podcasts: list[str], tags: list[str]) -> list[str]:
+    """Named podcasts both audiences love, then shared tags, without repeats."""
     names: list[str] = []
-    for _, _, name in both:
+    for name in [*podcasts, *tags]:
         if name.lower() not in {n.lower() for n in names}:
             names.append(name)
     return names[:SHARED_SHOWN]
@@ -472,9 +522,14 @@ def reach_width(lists: Sequence[Sequence[str]]) -> int:
     return width
 
 
-def new_podcasts(love: LoveBack, width: int, reach_scores: dict[str, float], shared_by: Counter[str]) -> list[str]:
-    """The guest's podcasts that fewest other guests have, then the ones the show's audience over-indexes on least."""
-    scored = sorted((shared_by[p], reach_scores[p], p) for p in love.podcasts[:width] if p in reach_scores)
+def new_podcasts(
+    love: LoveBack, width: int, reach_scores: dict[str, float], shared_by: Counter[str], shown: Sequence[str] = ()
+) -> list[str]:
+    """The guest's podcasts that fewest other guests have, then the ones the show's audience over-indexes on least.
+    Those `shown` as shared tastes are left out."""
+    scored = sorted(
+        (shared_by[p], reach_scores[p], p) for p in love.podcasts[:width] if p in reach_scores and p not in shown
+    )
     names = [love.names.get(p, "") for _, _, p in scored]
     return [name for name in names if clean_name(name)][:NEW_PODCASTS_SHOWN]
 
@@ -606,13 +661,16 @@ async def fill_guests(
         age_profiles(client, [show.id] + [item.person["entity_id"] for item in top]),
     )
     show_age = ages.get(show.id, {})
-    tag_guests = Counter(tag_id for tags in guest_tags for tag_id in {tag["tag_id"] for tag in tags})
-    common = {tag_id for tag_id, n in tag_guests.items() if n > len(top) / 2}
+    tag_guests = Counter(key for tags in guest_tags for key in {tag_key(tag) for tag in tags})
     shared_by = Counter(p for s in scored for p in set(s.love.podcasts[:width]))
+    top_podcasts = Counter(p for s in top for p in set(s.love.podcasts[:width]))
     for guest, item, tags in zip(analysis.guests, top, guest_tags, strict=False):
+        podcasts = shared_podcasts(item.love, width, reach_scores, top_podcasts, len(top))
         guest.evidence = Evidence(
-            shared_tastes=shared_tastes(show_ranks, tags, common),
-            new_podcasts=new_podcasts(item.love, width, reach_scores, shared_by),
+            shared_tastes=shared_tastes(
+                [item.love.names[p] for p in podcasts], shared_tags(show_ranks, tags, tag_guests, len(top))
+            ),
+            new_podcasts=new_podcasts(item.love, width, reach_scores, shared_by, podcasts),
             ages=over_index(ages.get(item.person["entity_id"], {}), show_age),
         )
     await done("evidence")

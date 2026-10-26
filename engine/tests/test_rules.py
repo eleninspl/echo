@@ -3,7 +3,15 @@ from datetime import date
 
 from echo_engine import scoring
 from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure, normalize
-from echo_engine.pipeline import LoveBack, new_podcasts, past_guest_ids, reach_width, shared_tastes
+from echo_engine.pipeline import (
+    LoveBack,
+    new_podcasts,
+    past_guest_ids,
+    reach_width,
+    shared_podcasts,
+    shared_tags,
+    shared_tastes,
+)
 from echo_engine.screen import clean_entity, clean_name, clean_tag_name
 
 
@@ -115,10 +123,36 @@ def test_new_podcasts_prefer_what_few_other_guests_have():
     assert new_podcasts(love, 4, scores, shared_by) == ["D", "C", "A"]  # e is beyond the width
 
 
-def test_shared_tastes_put_tags_most_guests_share_last():
-    tags = [{"tag_id": t, "name": t.title()} for t in ("common", "rare", "elsewhere", "later")]
-    show_ranks = {"common": 0, "rare": 5, "later": 9}
-    assert shared_tastes(show_ranks, tags, {"common"}) == ["Rare", "Later", "Common"]
+def test_new_podcasts_leave_out_those_shown_as_shared():
+    love = LoveBack(0.5, None, ["a", "b", "c"], {p: p.upper() for p in "abc"})
+    scores = {"a": 0.1, "b": 0.2, "c": 0.9}
+    assert new_podcasts(love, 3, scores, Counter(), ["a"]) == ["B", "C"]
+
+
+def test_shared_tags_drop_what_most_guests_have_and_put_rare_ones_first():
+    names = ("Common", "broad", "rare", "elsewhere", "later")
+    tags = [{"tag_id": f"urn:tag:keyword:media:{n.lower()}", "name": n} for n in names]
+    show_ranks = {tag["tag_id"]: rank for rank, tag in zip((0, 1, 6, None, 2), tags, strict=True) if rank is not None}
+    # Common is on 6 of the 10 guests' lists, broad on 5 (counted by name, so "common" on another list counts).
+    guests = Counter({"common": 6, "broad": 5, "rare": 1, "later": 5})
+    # Ranks: broad 1 + 1, rare 6 + 2, later 2 + 4. Times the guests with it: broad 15, rare 9, later 35.
+    assert shared_tags(show_ranks, tags, guests, 10) == ["rare", "broad", "later"]
+    everywhere = Counter({"common": 9, "broad": 9, "rare": 9, "later": 9})
+    assert shared_tags(show_ranks, tags, everywhere, 10) == ["Common", "broad"]
+
+
+def test_shared_podcasts_are_loved_by_the_show_and_rare_among_the_top_guests():
+    love = LoveBack(0.5, None, ["a", "b", "c", "d", "e", "f"], {p: p.upper() for p in "abcdef"} | {"f": "Politics Now"})
+    # The show's affinities for every guest's podcasts: the top half starts at 0.6.
+    scores = {"a": 0.9, "b": 0.8, "c": 0.7, "d": 0.2, "e": 0.95, "f": 0.99, "x": 0.1, "y": 0.6, "z": 0.3, "w": 0.4}
+    top_guests = Counter({"a": 4, "b": 1, "c": 2, "d": 1, "e": 1, "f": 1})
+    # a is on more than a third of the 10 lists, d isn't loved by the show, e is beyond the width, f is screened.
+    assert shared_podcasts(love, 4, scores, top_guests, 10) == ["b", "c"]
+
+
+def test_shared_tastes_put_named_podcasts_first_without_repeats():
+    tastes = shared_tastes(["Ann's Podcast"], ["satire", "ann's podcast", "a", "b", "c"])
+    assert tastes == ["Ann's Podcast", "satire", "a", "b", "c"]
 
 
 def test_past_guests_skip_trailers_and_cross_promotions():

@@ -40,7 +40,7 @@ POLITICS = terms(
 MONEY_TROUBLE = terms("debt loan loans credit bankruptcy payday gambling betting")
 HARDSHIP = terms(
     "suffering struggle trauma traumatic grief grieving bereavement loss loneliness lonely alienation despair abuse "
-    "misery pain drug drugs"
+    "misery pain drug drugs violence violent"
 )
 PLACEHOLDER_TAGS = {"not applicable", "n a", "none", "unknown", "other"}
 PHRASES = (
