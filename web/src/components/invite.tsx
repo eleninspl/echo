@@ -635,9 +635,9 @@ const FORMATS = [
 ] as const;
 
 const TEXT_FIELDS = [
-  { key: "length", label: "Length", placeholder: "60 min" },
-  { key: "release", label: "Release", placeholder: "March" },
-  { key: "reply_by", label: "Reply by", placeholder: "Fri 7 Nov" },
+  { key: "length", label: "Length", placeholder: "e.g. 60 min" },
+  { key: "release", label: "Release", placeholder: "e.g. March" },
+  { key: "reply_by", label: "Reply by", placeholder: "e.g. Fri 7 Nov" },
 ] as const;
 
 // The details every invitation states: a compact grid, every field optional.
@@ -711,11 +711,12 @@ function SharedDetails({
   );
 }
 
-// Recording dates in words, with a few quick picks. `placeholder` shows what applies when it's left blank.
+// Recording dates in words, with a few quick picks. `placeholder` is an example, or for one guest what applies
+// when it's left blank.
 function DatesInput({
   value,
   onChange,
-  placeholder = "Weekdays in March",
+  placeholder = "e.g. weekdays in March",
   className = "",
 }: {
   value: string;
@@ -762,7 +763,7 @@ function FeeInput({
   fee,
   unpaid,
   onChange,
-  placeholder = "$300",
+  placeholder = "e.g. $300",
   className = "",
 }: {
   fee: string;

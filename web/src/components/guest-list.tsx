@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, type CSSProperties, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
 
 import type { Guest } from "@/lib/echo";
 import { LABELS } from "@/lib/format";
@@ -22,8 +23,25 @@ type Props = {
   onHighlight: (guestRef: string | null) => void;
 };
 
-// Every guest, best Echo score first: rank, portrait, name, label, the three scores as a voiceprint and the
-// Echo score. A row opens its guest beside the list and lights its dot on the chart; the button at the end picks it.
+type Sort = "echo" | "fit" | "love_back" | "reach";
+
+const SORTS: { key: Sort; name: string; color: string }[] = [
+  { key: "echo", name: "Echo score", color: "var(--ink)" },
+  { key: "fit", name: "Fit", color: SCORE_HUE.fit },
+  { key: "love_back", name: "Love back", color: SCORE_HUE.love_back },
+  { key: "reach", name: "Reach", color: SCORE_HUE.reach },
+];
+
+// The guests by one score, highest first; ties and missing scores keep their Echo order.
+function sorted(guests: Guest[], sort: Sort): Guest[] {
+  if (sort === "echo") return guests;
+  const score = (guest: Guest) => guest.scores[sort] ?? -1;
+  return [...guests].sort((a, b) => score(b) - score(a) || guests.indexOf(a) - guests.indexOf(b));
+}
+
+// Every guest, best Echo score first or by one score: rank, portrait, name, label, the three scores as a voiceprint
+// and the Echo score. A row opens its guest beside the list and lights its dot on the chart; the button at the end
+// picks it. The rank stays the Echo rank whatever the order, as everywhere else.
 export function GuestList({
   analysisId,
   guests,
@@ -35,14 +53,39 @@ export function GuestList({
   onPick,
   onHighlight,
 }: Props) {
+  const [sort, setSort] = useState<Sort>("echo");
+  const shown = sorted(guests, sort);
+  const by = SORTS.find(({ key }) => key === sort) ?? SORTS[0];
+  const order = sort === "echo" ? "ranked" : `by ${by.name.toLowerCase()}`;
+  // The rows glide to their new places where the browser can, and simply jump where it can't or motion is off.
+  const choose = (next: Sort) => {
+    const apply = () => flushSync(() => setSort(next));
+    if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) apply();
+    else document.startViewTransition(apply);
+  };
   return (
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
-      <SectionHead id="guests" title={`All ${guests.length} guests, ranked`}>
-        <span className="flex items-center gap-3 @2xl:hidden">
-          <span className="text-fit">Fit</span>
-          <span className="text-love">Love back</span>
-          <span className="text-reach">Reach</span>
-        </span>
+      <SectionHead id="guests" title={`All ${guests.length} guests, ${order}`}>
+        <div role="group" aria-label="Sort the guests" className="flex flex-wrap items-center gap-1">
+          <span className="mr-1">Sort</span>
+          {SORTS.map(({ key, name, color }) => {
+            const on = key === sort;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => choose(key)}
+                className={`flex min-h-8 items-center gap-1.5 rounded-full px-2.5 transition-colors ${
+                  on ? "bg-deck-hi text-ink ring-1 ring-steel-hi" : "text-ink-dim hover:bg-deck hover:text-ink"
+                }`}
+              >
+                <span aria-hidden className="size-1.5 rounded-full" style={{ background: color }} />
+                {name}
+              </button>
+            );
+          })}
+        </div>
         <Info>
           Ranked by the Echo score, which weighs fit, love back and reach together. Each score is out of 100, ranked
           within these guests. The top 10 come with {ideas ? "an episode idea and evidence" : "evidence"}.
@@ -60,12 +103,12 @@ export function GuestList({
         <span className="text-right">Echo score</span>
       </div>
       <ol className="flex flex-col border-t border-steel">
-        {guests.map((guest, index) => (
+        {shown.map((guest) => (
           <Row
             key={guest.ref}
             href={guestPath(analysisId, guest.ref)}
             guest={guest}
-            index={index}
+            index={guests.indexOf(guest)}
             selected={guest.ref === open}
             lit={guest.ref === highlighted}
             picked={picked.includes(guest.ref)}
@@ -110,7 +153,14 @@ function Row({
       className={`rise group relative grid scroll-mt-32 grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_auto_2.25rem] items-center gap-x-3.5 gap-y-2 border-b border-steel px-2 py-3 transition-colors @2xl:grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] @2xl:gap-x-5 ${
         lit || selected ? "bg-deck/70" : "hover:bg-deck/70"
       }`}
-      style={{ "--order": index, ...hue(color) } as CSSProperties}
+      style={
+        {
+          "--order": index,
+          // Each row its own name, so a change of sort can move it.
+          viewTransitionName: `guest-${guest.ref.replace(/[^\w-]/g, "-")}`,
+          ...hue(color),
+        } as CSSProperties
+      }
       onPointerEnter={() => onHighlight(guest.ref)}
       onPointerLeave={() => onHighlight(null)}
     >
