@@ -1,5 +1,7 @@
-import { FRAME, LABEL_HUE, Voiceprint } from "./hud";
+import { FRAME, LABEL_HUE } from "./hud";
+import { Reveal } from "./reveal";
 import { ScoreTerms } from "./score-terms";
+import { Voiceprint } from "./voiceprint";
 
 // What each label's voiceprint looks like: illustrative shapes for the key, not any guest's scores.
 const SHAPES = [
@@ -23,6 +25,9 @@ const SHAPES = [
   },
 ] as const;
 
+const REVEAL =
+  "translate-y-4 opacity-0 transition duration-700 ease-(--ease-out) group-data-shown:translate-y-0 group-data-shown:opacity-100 motion-reduce:transition-none";
+
 // How Echo scores a guest, a score at a time, then what each label's shape looks like: the key to the whole app.
 export function ScoreKey() {
   return (
@@ -31,13 +36,17 @@ export function ScoreKey() {
         How Echo scores a guest
       </h2>
       <ScoreTerms />
-      <div className={FRAME}>
+      <Reveal className={FRAME}>
         <ul
           aria-label="What each label looks like"
-          className="mt-10 grid grid-cols-1 gap-x-8 gap-y-4 rounded-2xl bg-deck p-5 sm:grid-cols-2 xl:grid-cols-4"
+          className={`mt-10 grid grid-cols-1 gap-x-8 gap-y-4 rounded-2xl bg-deck p-5 sm:grid-cols-2 xl:grid-cols-4 ${REVEAL}`}
         >
-          {SHAPES.map(({ label, name, means, fit, love, reach }) => (
-            <li key={label} className="flex items-center gap-3">
+          {SHAPES.map(({ label, name, means, fit, love, reach }, index) => (
+            <li
+              key={label}
+              className={`flex items-center gap-3 ${REVEAL}`}
+              style={{ transitionDelay: `${250 + index * 90}ms` }}
+            >
               <Voiceprint fit={fit} love={love} reach={reach} bars={22} height={26} className="w-20 shrink-0" />
               <p className="text-sm leading-snug text-ink-soft">
                 <span className="font-display font-semibold" style={{ color: LABEL_HUE[label] }}>
@@ -48,7 +57,7 @@ export function ScoreKey() {
             </li>
           ))}
         </ul>
-      </div>
+      </Reveal>
     </section>
   );
 }

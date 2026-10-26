@@ -5,7 +5,8 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type CSSPrope
 import type { Guest } from "@/lib/echo";
 import { LABELS } from "@/lib/format";
 
-import { Info, LABEL_HUE, out100, rank, SCORE_HUE, Voiceprint, ZoneHead } from "./hud";
+import { Info, LABEL_HUE, out100, rank, SCORE_HUE, SectionHead } from "./hud";
+import { Voiceprint } from "./voiceprint";
 
 // The scope from docs/qloo.md, Scoring: reach across, fit up, love back as dot size, label as colour,
 // and the sweet-spot zone at reach ≥ 0.33 and fit ≥ 0.5. Dot size steps on a fixed five-step ramp so
@@ -56,6 +57,8 @@ export const loveRadius = (love: number, scale = 1) =>
 const sizing = (width: number) => ({ scale: Math.min(Math.max(width / 720, 0.62), 1), roomy: width >= 560 });
 
 type Props = {
+  title: string;
+  children?: ReactNode;
   guests: Guest[];
   selected: string | null;
   highlighted: string | null;
@@ -63,7 +66,7 @@ type Props = {
   onHighlight: (guestRef: string | null) => void;
 };
 
-export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: Props) {
+export function Scope({ title, children, guests, selected, highlighted, onSelect, onHighlight }: Props) {
   const frame = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const motion = usePlaysMotion();
@@ -78,7 +81,7 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
 
   const unscored = guests.filter((guest) => guest.scores.reach === null);
   const lane = unscored.length ? LANE : 0;
-  const height = Math.round(Math.min(Math.max(width * 0.68, 340), 600));
+  const height = Math.round(Math.min(Math.max(width * 0.62, 340), 560));
   const axis = PAD.left;
   const plot = {
     left: PAD.left + lane,
@@ -115,8 +118,8 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
   const names = width > 0 ? placeNames(guests, focus, position, radius, plot, captions) : [];
 
   return (
-    <section aria-labelledby="scope" className="zone flex flex-col">
-      <ZoneHead id="scope" title="Fit by reach">
+    <section aria-labelledby="scope" className="flex flex-col gap-4">
+      <SectionHead id="scope" title={title}>
         <Hint name="Love back" color="var(--love)" place={{ top: "100%", right: 0, marginTop: 8 }}>
           {MEANS.love}
         </Hint>
@@ -125,8 +128,9 @@ export function Scope({ guests, selected, highlighted, onSelect, onHighlight }: 
           Bigger dots: their fans like your show more. The teal corner is the sweet spot, high on all three; the shaded
           regions are the labels fit and reach decide on their own.
         </Info>
-      </ZoneHead>
-      <div ref={frame} className="screen relative mx-4 mt-2 mb-4 shrink-0" style={{ height }}>
+      </SectionHead>
+      {children}
+      <div ref={frame} className="relative shrink-0" style={{ height }}>
         {width > 0 && (
           <svg
             width={width}

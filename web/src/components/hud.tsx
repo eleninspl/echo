@@ -34,6 +34,10 @@ export const rank = (index: number) => String(index + 1).padStart(2, "0");
 // The page's frame width and gutters.
 export const FRAME = "mx-auto w-full max-w-[96rem] px-4 sm:px-6";
 
+export const SHEET_WIDTH = "lg:w-[min(40rem,45vw)]";
+export const SHEET_ROOM = "lg:pr-[min(40rem,45vw)]";
+export const SHEET_CLEAR = "lg:right-[calc(min(40rem,45vw)+1rem)]";
+
 // A score out of 100 for a readout, or a dash when there's none.
 export const out100 = (value: number | null | undefined) =>
   value === null || value === undefined ? "–" : String(Math.round(value * 100));
@@ -90,6 +94,56 @@ export function ZoneHead({
       </Heading>
       {children && <div className="tag flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-dim">{children}</div>}
     </div>
+  );
+}
+
+// An open section's head, on the page itself rather than in a panel: the name, and optional readouts at the right.
+export function SectionHead({
+  id,
+  title,
+  children,
+  as: Heading = "h2",
+  small = false,
+}: {
+  id?: string;
+  title: string;
+  children?: ReactNode;
+  as?: "h2" | "h3";
+  small?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <Heading
+        id={id}
+        className={`font-display leading-tight font-semibold text-ink ${small ? "text-lg" : "text-xl sm:text-2xl"}`}
+      >
+        {title}
+      </Heading>
+      {children && <div className="tag flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-dim">{children}</div>}
+    </div>
+  );
+}
+
+export function Part({
+  id,
+  title,
+  aside,
+  children,
+  className = "",
+}: {
+  id: string;
+  title: string;
+  aside?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section aria-labelledby={id} className={`flex flex-col gap-4 border-t border-steel pt-6 ${className}`}>
+      <SectionHead id={id} title={title} as="h3" small>
+        {aside}
+      </SectionHead>
+      {children}
+    </section>
   );
 }
 
@@ -196,35 +250,4 @@ export function voiceBars(fit: number, love: number, reach: number | null, bars:
       silent: reach === null && position > 2 / 3,
     };
   });
-}
-
-// A guest's three scores as one voiceprint: a lobe each for fit, love back and reach, as tall as the score.
-// With no reach score the last third is a dotted line, never a made-up lobe.
-export function Voiceprint({
-  fit,
-  love,
-  reach,
-  bars = 36,
-  height = 32,
-  className = "",
-}: {
-  fit: number;
-  love: number;
-  reach: number | null;
-  bars?: number;
-  height?: number;
-  className?: string;
-}) {
-  const middle = height / 2;
-  return (
-    <svg aria-hidden viewBox={`0 0 ${bars * VOICE_STEP} ${height}`} className={`block h-auto ${className}`}>
-      {voiceBars(fit, love, reach, bars, height).map(({ x, height: h, color, silent }, index) =>
-        silent ? (
-          <circle key={index} cx={x + VOICE_THICK / 2} cy={middle} r={VOICE_THICK / 2.4} fill={color} opacity="0.55" />
-        ) : (
-          <rect key={index} x={x} y={middle - h / 2} width={VOICE_THICK} height={h} rx={VOICE_THICK / 2} fill={color} />
-        ),
-      )}
-    </svg>
-  );
 }

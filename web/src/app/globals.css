@@ -72,9 +72,9 @@
   --brand: #3d8fd6;
   --sweet: #0f7f70;
 
-  --fit: #1673cc;
-  --love: #e0502b;
-  --reach: #d42e6e;
+  --fit: #0a8cff;
+  --love: #ff4a1a;
+  --reach: #ff0a7e;
 
   --safe: #7787ab;
   --far: #9b86b5;
@@ -502,6 +502,66 @@ a {
       opacity 260ms ease-out 140ms,
       visibility 0s;
   }
+
+  @keyframes surface {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+      filter: blur(6px);
+    }
+  }
+
+  .surface {
+    animation: surface 620ms var(--ease-out) both;
+    animation-delay: calc(var(--order, 0) * 70ms);
+  }
+
+  @keyframes rail {
+    from {
+      transform: scaleY(0);
+    }
+  }
+
+  .rail {
+    transform-origin: top;
+    animation: rail 900ms var(--ease-out) both;
+  }
+
+  @keyframes eq {
+    0%,
+    100% {
+      transform: scaleY(0.25);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  .eq > span {
+    transform-origin: bottom;
+    animation: eq 900ms ease-in-out infinite;
+    animation-delay: calc(var(--order, 0) * -180ms);
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 25%,
+      color-mix(in srgb, var(--ink) 11%, transparent) 50%,
+      color-mix(in srgb, var(--ink) 5%, transparent) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
 }
 
 /* Printing a briefing prints only that briefing, copied to the end of body (components/briefing.tsx). */
@@ -536,6 +596,13 @@ a {
 
   .ring {
     display: none;
+  }
+
+  .surface,
+  .rail,
+  .eq > span,
+  .shimmer {
+    animation: none;
   }
 
   .ask-dock,
