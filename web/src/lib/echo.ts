@@ -84,7 +84,9 @@ export type DraftRequest = {
   analysis_id: string;
   guest_refs: string[];
   host_name?: string;
+  // `note` goes to every guest in the request; `notes` to one guest each, by ref, up to 300 characters.
   note?: string;
+  notes?: Record<string, string>;
   previous?: DraftText;
   instruction?: string;
 };
