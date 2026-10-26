@@ -15,7 +15,8 @@ import { Voiceprint } from "./voiceprint";
 // the dossier say it in words.
 const ZONE = { reach: 0.33, fit: 0.5 };
 // The label regions that fit and reach alone decide (docs/qloo.md, Scoring): safe under 33 reach, long shot
-// under 33 fit. Far also needs a low love back, so it has no region; its dots gather at the right.
+// under 33 fit, balanced in between below the sweet spot. Far also needs a low love back, so it has no region;
+// its dots gather at the right.
 const LOW = 0.33;
 const RAMP = [4.5, 6.5, 8.5, 11, 13.5];
 const PAD = { top: 30, right: 24, bottom: 50, left: 58 };
@@ -114,6 +115,7 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
     roomy
       ? { left: plot.right - 220, top: plot.top + 6, right: plot.right - 8, bottom: plot.top + 26 }
       : { left: plot.right - 110, top: y(ZONE.fit) - 24, right: plot.right - 8, bottom: y(ZONE.fit) - 4 },
+    { left: plot.right - (roomy ? 190 : 80), top: y(LOW) - 24, right: plot.right - 8, bottom: y(LOW) - 4 },
   ];
   const names = width > 0 ? placeNames(guests, focus, position, radius, plot, captions) : [];
 
@@ -189,6 +191,23 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
               rx="12"
               fill="var(--long-shot)"
               fillOpacity="0.08"
+            />
+            <rect
+              x={x(ZONE.reach)}
+              y={y(ZONE.fit)}
+              width={plot.right - x(ZONE.reach)}
+              height={y(LOW) - y(ZONE.fit)}
+              rx="12"
+              fill="var(--balanced)"
+              fillOpacity="0.07"
+            />
+            <Region
+              x={plot.right - 12}
+              y={y(LOW) - 10}
+              anchor="end"
+              color="var(--balanced)"
+              name="Balanced"
+              means={roomy ? "decent on each" : undefined}
             />
             <Region
               x={plot.left + 12}

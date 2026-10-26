@@ -10,7 +10,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 
 import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
@@ -22,7 +24,7 @@ import { useAnalysis } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
 import { Backdrop } from "./backdrop";
-import { Chat } from "./chat";
+import { AskSection, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
@@ -32,7 +34,8 @@ import { LabelSpectrum, LockHeader, ShowLock } from "./lock-header";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
-import { CommonGround, FanAges, Spectrum } from "./spectrum";
+import { CommonGround, FanAges } from "./spectrum";
+import { TasteMap } from "./taste-map";
 import { TopPicks } from "./top-picks";
 
 type OpenAnalysis = {
@@ -43,6 +46,7 @@ type OpenAnalysis = {
   picked: string[];
   onPick: (guestRef: string) => void;
   rewritten: Rewrite | null;
+  onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
 };
 
 export type Rewrite = { id: string; ref: string; idea: Idea };
@@ -67,6 +71,7 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     analysis?.guests.some((guest) => guest.ref === ref),
   );
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
+  const [askSlot, setAskSlot] = useState<HTMLElement | null>(null);
   const openedHere = useRef(false);
   const openGuest = openId === id ? guestRef : null;
 
@@ -152,15 +157,17 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <OpenAnalysisContext value={{ analysis, openGuest, onOpen, onClose, picked, onPick, rewritten }}>
+    <OpenAnalysisContext
+      value={{ analysis, openGuest, onOpen, onClose, picked, onPick, rewritten, onAskSlot: setAskSlot }}
+    >
       {children}
-      <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} beside={openGuest !== null} />
+      <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, openGuest, onOpen, onClose, picked, onPick, rewritten } = useOpenAnalysis();
+  const { analysis, openGuest, onOpen, onClose, picked, onPick, rewritten, onAskSlot } = useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
@@ -241,12 +248,13 @@ export function Console() {
           className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
         >
           <div className="@3xl:col-span-3">
-            <Spectrum rows={analysis.audience_map} />
+            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} />
           </div>
           <FanAges stats={figures} />
           <CommonGround guests={guests} />
           <LeftOut analysis={analysis} />
         </section>
+        <AskSection onSlot={onAskSlot} />
       </div>
 
       <GuestSheet
