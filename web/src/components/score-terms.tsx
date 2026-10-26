@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 
+import { ECHO_EVENT, ECHO_LIFE, type EchoDetail } from "./echo-field";
 import { SCORE_HUE, VOICE_STEP, VOICE_THICK, voiceBars } from "./hud";
+import { useReveal } from "./reveal";
 
 type Part = "fit" | "love" | "reach";
 
@@ -22,6 +24,7 @@ const RIPPLE_PERIOD = 1.2;
 const RIPPLE_LENGTH = 50;
 const LENS_WIDTH = 11;
 const SETTLE = 0.12;
+const KICK = 0.14;
 
 export function ScoreTerms() {
   const svg = useRef<SVGSVGElement>(null);
@@ -29,12 +32,20 @@ export function ScoreTerms() {
   const [active, setActive] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!svg.current || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const rects = Array.from(svg.current.querySelectorAll("rect"));
+    const voice = svg.current;
+    if (!voice || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rects = Array.from(voice.querySelectorAll("rect"));
     let frame = 0;
     let last = performance.now();
     let lens = 0;
     let centre = 0;
+    let echoes: (EchoDetail & { at: number })[] = [];
+
+    const hear = (event: Event) => {
+      const { detail } = event as CustomEvent<EchoDetail>;
+      echoes = [...echoes, { ...detail, at: performance.now() / 1000 }];
+    };
+    window.addEventListener(ECHO_EVENT, hear);
 
     const tick = (now: number) => {
       const time = now / 1000;
@@ -43,6 +54,8 @@ export function ScoreTerms() {
       const target = pointer.current;
       lens += ((target === null ? 0 : 1) - lens) * ease;
       if (target !== null) centre = lens < 0.02 ? target : centre + (target - centre) * ease;
+      if (echoes.length && time - echoes[0].at > 2 * ECHO_LIFE) echoes = echoes.slice(1);
+      const box = echoes.length ? voice.getBoundingClientRect() : null;
 
       rects.forEach((rect, index) => {
         const distance = Math.abs(index - centre);
@@ -51,7 +64,19 @@ export function ScoreTerms() {
         const swing = 0.775 + 0.225 * (wave + (ripple - wave) * lens);
         const base = SHAPE[index].height * swing;
         const pull = lens * Math.exp(-((distance / LENS_WIDTH) ** 2));
-        const height = base + (Math.max(SHAPE[index].height, RAISED) - base) * pull;
+        const kick = box
+          ? echoes.reduce((sum, { x, y, speed, at }) => {
+              const arrival =
+                Math.hypot(
+                  box.left + scrollX + ((index + 0.5) / BARS) * box.width - x,
+                  box.top + scrollY + box.height / 2 - y,
+                ) / speed;
+              const late = (time - at - arrival) / KICK;
+              return sum + 0.5 * Math.exp(-late * late - arrival / ECHO_LIFE);
+            }, 0)
+          : 0;
+        const lensed = base + (Math.max(SHAPE[index].height, RAISED) - base) * pull;
+        const height = Math.min(lensed + (Math.min(SHAPE[index].height * 1.5 + 3, HEIGHT) - base) * kick, HEIGHT);
         rect.setAttribute("y", String((HEIGHT - height) / 2));
         rect.setAttribute("height", String(height));
       });
@@ -59,7 +84,10 @@ export function ScoreTerms() {
     };
 
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener(ECHO_EVENT, hear);
+    };
   }, []);
 
   function follow(event: PointerEvent<SVGSVGElement>) {
@@ -99,27 +127,55 @@ export function ScoreTerms() {
         ))}
       </svg>
       <ol className="mt-6 grid grid-cols-1 gap-x-8 gap-y-8 px-4 sm:px-6 md:mt-0 md:grid-cols-3">
-        {TERMS.map(({ part, term, color, means }, index) => (
-          <li
-            key={part}
-            className="flex flex-col transition-opacity duration-300 md:items-center"
-            style={{ opacity: active === null || active === index ? 1 : 0.35 }}
-          >
-            <span aria-hidden className="hidden h-5 w-px md:block" style={{ background: color }} />
-            <span aria-hidden className="hidden size-1.5 rounded-full md:block" style={{ background: color }} />
-            <div className="flex items-center gap-4 md:mt-4 md:flex-col md:gap-3 md:text-center">
-              <Overlap part={part} className="h-24 w-auto shrink-0 md:h-32 xl:h-36" />
-              <div className="flex max-w-[40ch] flex-col md:items-center">
-                <h3 className="font-display text-xl leading-none font-semibold md:text-2xl" style={{ color }}>
-                  {term}
-                </h3>
-                <p className="mt-2 leading-snug text-ink-soft">{means}</p>
-              </div>
-            </div>
-          </li>
+        {TERMS.map((entry, index) => (
+          <Term key={entry.part} {...entry} order={index} dimmed={active !== null && active !== index} />
         ))}
       </ol>
     </div>
+  );
+}
+
+const MOVE = "transition duration-700 ease-(--ease-out) motion-reduce:transition-none";
+
+function Term({
+  part,
+  term,
+  color,
+  means,
+  order,
+  dimmed,
+}: (typeof TERMS)[number] & { order: number; dimmed: boolean }) {
+  const [ref, shown] = useReveal<HTMLLIElement>();
+  const delay = order * 180;
+  return (
+    <li
+      ref={ref}
+      className="flex flex-col transition-opacity duration-300 md:items-center"
+      style={{ opacity: dimmed ? 0.35 : 1 }}
+    >
+      <span
+        aria-hidden
+        className={`hidden h-5 w-px origin-top md:block ${MOVE} ${shown ? "scale-y-100" : "scale-y-0"}`}
+        style={{ background: color, transitionDelay: `${delay}ms` }}
+      />
+      <span
+        aria-hidden
+        className={`hidden size-1.5 rounded-full md:block ${MOVE} ${shown ? "scale-100" : "scale-0"}`}
+        style={{ background: color, transitionDelay: `${delay + 300}ms` }}
+      />
+      <div className="flex items-center gap-4 md:mt-4 md:flex-col md:gap-3 md:text-center">
+        <Overlap part={part} shown={shown} delay={delay} className="h-24 w-auto shrink-0 md:h-32 xl:h-36" />
+        <div
+          className={`flex max-w-[40ch] flex-col md:items-center ${MOVE} ${shown ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"}`}
+          style={{ transitionDelay: `${delay + 500}ms` }}
+        >
+          <h3 className="font-display text-xl leading-none font-semibold md:text-2xl" style={{ color }}>
+            {term}
+          </h3>
+          <p className="mt-2 leading-snug text-ink-soft">{means}</p>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -133,12 +189,29 @@ const ARROW: Record<Part, string | null> = {
   reach: null,
 };
 
-function Overlap({ part, className = "" }: { part: Part; className?: string }) {
+function Overlap({
+  part,
+  shown,
+  delay,
+  className = "",
+}: {
+  part: Part;
+  shown: boolean;
+  delay: number;
+  className?: string;
+}) {
   const color = SCORE_HUE[part === "love" ? "love_back" : part];
   const id = `overlap-${part}`;
   const arrow = ARROW[part];
+  const after = (wait: number) => ({ transitionDelay: `${delay + wait}ms` });
+  const side = (shift: number) => ({
+    ...after(150),
+    transform: shown ? "none" : `translateX(${shift}px)`,
+    opacity: shown ? 1 : 0,
+    transitionDuration: "900ms",
+  });
   return (
-    <svg aria-hidden viewBox="36 6 168 148" className={`block ${className}`}>
+    <svg aria-hidden viewBox="36 6 168 148" className={`block overflow-visible ${className}`}>
       <defs>
         <clipPath id={`${id}-show`}>
           <circle cx={SHOW.x} cy={SHOW.y} r={RADIUS} />
@@ -155,51 +228,68 @@ function Overlap({ part, className = "" }: { part: Part; className?: string }) {
         </marker>
       </defs>
 
-      {part === "reach" ? (
-        <g mask={`url(#${id}-outside)`}>
-          <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={color} fillOpacity="0.12" />
-          <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={`url(#${id}-hatch)`} fillOpacity="0.7" />
-        </g>
-      ) : (
-        <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={color} fillOpacity="0.2" clipPath={`url(#${id}-show)`} />
-      )}
+      <g className={MOVE} style={{ ...after(800), opacity: shown ? 1 : 0 }}>
+        {part === "reach" ? (
+          <g mask={`url(#${id}-outside)`}>
+            <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={color} fillOpacity="0.12" />
+            <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={`url(#${id}-hatch)`} fillOpacity="0.7" />
+          </g>
+        ) : (
+          <circle cx={GUEST.x} cy={GUEST.y} r={RADIUS} fill={color} fillOpacity="0.2" clipPath={`url(#${id}-show)`} />
+        )}
+      </g>
 
-      {[SHOW, GUEST].map(({ x, y }) => (
-        <circle
-          key={x}
-          cx={x}
-          cy={y}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--ink-dim)"
-          strokeOpacity="0.7"
-          vectorEffect="non-scaling-stroke"
-        />
+      {[
+        { at: SHOW, label: "You", labelX: SHOW.x - 36, shift: -24 },
+        { at: GUEST, label: "Guest", labelX: GUEST.x + 36, shift: 24 },
+      ].map(({ at, label, labelX, shift }) => (
+        <g key={label} className={MOVE} style={side(shift)}>
+          <circle
+            cx={at.x}
+            cy={at.y}
+            r={RADIUS}
+            fill="none"
+            stroke="var(--ink-dim)"
+            strokeOpacity="0.7"
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle cx={at.x} cy={at.y} r="5" fill="var(--ink)" />
+          <text x={labelX} y="150" className="tag" fill="var(--ink-dim)" textAnchor="middle" style={{ fontSize: 18 }}>
+            {label}
+          </text>
+        </g>
       ))}
 
       {arrow && (
-        <path
-          d={arrow}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-          markerEnd={`url(#${id}-tip)`}
-        />
+        <>
+          <path
+            d={arrow}
+            pathLength={1}
+            fill="none"
+            stroke={color}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeDasharray="1 1"
+            className={MOVE}
+            style={{
+              ...after(1000),
+              strokeDashoffset: shown ? 0 : 1,
+              opacity: shown ? 1 : 0,
+              transitionProperty: "stroke-dashoffset, opacity",
+              transitionDuration: "600ms",
+            }}
+          />
+          <path
+            d={arrow}
+            fill="none"
+            stroke="none"
+            strokeWidth="2"
+            markerEnd={`url(#${id}-tip)`}
+            className={MOVE}
+            style={{ ...after(1450), opacity: shown ? 1 : 0, transitionDuration: "250ms" }}
+          />
+        </>
       )}
-
-      <circle cx={SHOW.x} cy={SHOW.y} r="5" fill="var(--ink)" />
-      <circle cx={GUEST.x} cy={GUEST.y} r="5" fill="var(--ink)" />
-
-      <g className="tag" fill="var(--ink-dim)" textAnchor="middle" style={{ fontSize: 18 }}>
-        <text x={SHOW.x - 36} y="150">
-          You
-        </text>
-        <text x={GUEST.x + 36} y="150">
-          Guest
-        </text>
-      </g>
     </svg>
   );
 }

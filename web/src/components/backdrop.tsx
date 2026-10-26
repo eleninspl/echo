@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { EchoField } from "./echo-field";
 import { SCORE_HUE } from "./hud";
 
 const GLOWS = [
@@ -19,7 +20,7 @@ export function Backdrop({ className = "", children }: { className?: string; chi
     <section className={`relative isolate ${className}`}>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_55%,transparent)]"
+        className="pointer-events-none absolute inset-x-0 top-0 -bottom-14 -z-10 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_50%,transparent)]"
       >
         {GLOWS.map(({ color, place, time, radius, opacity }, index) => (
           <div
@@ -37,6 +38,7 @@ export function Backdrop({ className = "", children }: { className?: string; chi
           />
         ))}
       </div>
+      <EchoField />
       {children}
     </section>
   );
