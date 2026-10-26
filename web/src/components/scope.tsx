@@ -9,8 +9,9 @@ import { Info, LABEL_HUE, out100, rank, SCORE_HUE, SectionHead } from "./hud";
 import { Voiceprint } from "./voiceprint";
 
 // The scope from docs/qloo.md, Scoring: reach across, fit up, love back as dot size, label as colour,
-// and the sweet-spot zone at reach ≥ 0.33 and fit ≥ 0.5. Dot size steps on a fixed five-step ramp so
-// the same size means the same love back everywhere. Colour is never the only cue: sweet spots carry a
+// and the box of high fit and reach at reach ≥ 0.33 and fit ≥ 0.5. Only its ringed dots are sweet spots: a
+// sweet spot also needs love back, so a far or balanced guest can sit in the box too. Dot size steps on a
+// fixed five-step ramp so the same size means the same love back everywhere. Colour is never the only cue: sweet spots carry a
 // ring, the regions and the top guests are named on the chart, the tooltip names the label, and the list and
 // the dossier say it in words.
 const ZONE = { reach: 0.33, fit: 0.5 };
@@ -20,8 +21,10 @@ const ZONE = { reach: 0.33, fit: 0.5 };
 const LOW = 0.33;
 const RAMP = [4.5, 6.5, 8.5, 11, 13.5];
 const PAD = { top: 30, right: 24, bottom: 50, left: 58 };
-// How many of the best guests are named beside their dots; the rest are named on hover or focus.
+// How many of the best guests are named beside their dots, fewer on a narrow chart so names don't crowd; the
+// rest are named on hover or focus.
 const NAMED = 10;
+const NAMED_NARROW = 6;
 // Guests without a reach score sit in a lane of their own inside the plot, between the fit axis and reach's zero.
 const LANE = 64;
 
@@ -55,7 +58,11 @@ export const loveRadius = (love: number, scale = 1) =>
   RAMP[Math.min(Math.floor(love * RAMP.length), RAMP.length - 1)] * scale;
 
 // How much to shrink the dots and whether there's room for each region's meaning beside its name.
-const sizing = (width: number) => ({ scale: Math.min(Math.max(width / 720, 0.62), 1), roomy: width >= 560 });
+const sizing = (width: number) => ({
+  scale: Math.min(Math.max(width / 720, 0.62), 1),
+  roomy: width >= 560,
+  named: width >= 480 ? NAMED : NAMED_NARROW,
+});
 
 type Props = {
   title: string;
@@ -105,19 +112,45 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
   const markedAt = marked ? position(marked) : null;
   const activeAt = active ? position(active) : null;
   const sweet = guests.filter((guest) => guest.label === "sweet_spot");
+  // Sweet spots without a reach score sit in the lane, outside the box, and are counted apart.
+  const boxed = sweet.filter((guest) => guest.scores.reach !== null).length;
+  const laned = sweet.length - boxed;
   const index = new Map(guests.map((guest, i) => [guest.ref, i]));
-  const { scale, roomy } = sizing(width);
+  const { scale, roomy, named } = sizing(width);
   const radius = (guest: Guest) => loveRadius(guest.scores.love_back, scale);
-  // The region captions, kept clear of the guests' names.
+  const dots: Box[] = guests.map((guest) => {
+    const { cx, cy } = position(guest);
+    const r = radius(guest);
+    return { left: cx - r, top: cy - r, right: cx + r, bottom: cy + r };
+  });
+  // A region's name goes at the first of its places that no dot sits under: Safe at the top of its region or the
+  // bottom, Balanced at the right end of its strip or the left.
+  const caption = (x: number, at: number, width: number, anchor: "start" | "end") => {
+    const box = {
+      left: anchor === "end" ? x - width : x,
+      top: at - 14,
+      right: anchor === "end" ? x : x + width,
+      bottom: at + 6,
+    };
+    return { x, y: at, anchor, box };
+  };
+  const clearest = (places: ReturnType<typeof caption>[]) =>
+    places.find(({ box }) => !dots.some((dot) => overlaps(dot, box))) ?? places[0];
+  const safe = clearest([
+    caption(plot.left + 12, plot.top + 20, roomy ? 140 : 40, "start"),
+    caption(plot.left + 12, y(LOW) - 10, roomy ? 140 : 40, "start"),
+  ]);
+  const balanced = clearest([
+    caption(plot.right - 12, y(LOW) - 10, roomy ? 180 : 70, "end"),
+    caption(x(ZONE.reach) + 12, y(LOW) - 10, roomy ? 180 : 70, "start"),
+  ]);
+  // The region captions inside the plot, kept clear of the guests' names. The sweet spots' box is named above it.
   const captions: Box[] = [
-    { left: plot.left + 8, top: plot.top + 6, right: plot.left + (roomy ? 150 : 50), bottom: plot.top + 26 },
+    safe.box,
+    balanced.box,
     { left: plot.right - (roomy ? 240 : 110), top: plot.bottom - 26, right: plot.right - 8, bottom: plot.bottom - 6 },
-    roomy
-      ? { left: plot.right - 220, top: plot.top + 6, right: plot.right - 8, bottom: plot.top + 26 }
-      : { left: plot.right - 110, top: y(ZONE.fit) - 24, right: plot.right - 8, bottom: y(ZONE.fit) - 4 },
-    { left: plot.right - (roomy ? 190 : 80), top: y(LOW) - 24, right: plot.right - 8, bottom: y(LOW) - 4 },
   ];
-  const names = width > 0 ? placeNames(guests, focus, position, radius, plot, captions) : [];
+  const names = width > 0 ? placeNames(guests, focus, position, dots, { ...plot, lane: axis }, captions, named) : [];
 
   return (
     <section aria-labelledby="scope" className="flex flex-col gap-4">
@@ -127,8 +160,9 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
         </Hint>
         <Info>
           Up is how much your listeners like a guest beyond their fame; right, how new the guest&apos;s fans are to you.
-          Bigger dots: their fans like your show more. The teal corner is the sweet spot, high on all three; the shaded
-          regions are the labels fit and reach decide on their own.
+          Bigger dots: their fans like your show more. The teal box holds high fit and high reach; its ringed dots are
+          the sweet spots, whose fans also love your show back. The shaded regions are the labels fit and reach decide
+          on their own.
         </Info>
       </SectionHead>
       {children}
@@ -202,20 +236,14 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
               fillOpacity="0.07"
             />
             <Region
-              x={plot.right - 12}
-              y={y(LOW) - 10}
-              anchor="end"
+              x={balanced.x}
+              y={balanced.y}
+              anchor={balanced.anchor}
               color="var(--balanced)"
               name="Balanced"
               means={roomy ? "decent on each" : undefined}
             />
-            <Region
-              x={plot.left + 12}
-              y={plot.top + 20}
-              color="var(--safe)"
-              name="Safe"
-              means={roomy ? "few new ears" : undefined}
-            />
+            <Region x={safe.x} y={safe.y} color="var(--safe)" name="Safe" means={roomy ? "few new ears" : undefined} />
             <Region
               x={plot.right - 12}
               y={plot.bottom - 12}
@@ -225,7 +253,7 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
               means={roomy ? "your listeners aren't into them" : undefined}
             />
 
-            {/* The sweet-spot zone. */}
+            {/* High fit and reach: the sweet spots' box. */}
             <rect
               x={x(ZONE.reach)}
               y={plot.top}
@@ -238,12 +266,12 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
               strokeOpacity="0.45"
             />
             <Region
-              x={plot.right - 12}
-              y={roomy ? plot.top + 20 : y(ZONE.fit) - 10}
+              x={plot.right - 4}
+              y={plot.top - 9}
               anchor="end"
               color="var(--sweet)"
-              name={`Sweet spot · ${sweet.length}`}
-              means={roomy ? "high on all three" : undefined}
+              name={roomy ? "High fit and reach" : `Sweet ${boxed === 1 ? "spot" : "spots"} · ${boxed}`}
+              means={roomy ? `${boxed} sweet ${boxed === 1 ? "spot" : "spots"}, ringed` : undefined}
             />
 
             {[0, 0.5, 1].map((tick) => (
@@ -456,7 +484,10 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
           </div>
         )}
       </div>
-      <p className="sr-only">{sweet.length} guests sit in the sweet-spot zone.</p>
+      <p className="sr-only">
+        {boxed} sweet {boxed === 1 ? "spot sits" : "spots sit"} in the box of high fit and reach
+        {laned > 0 && `, and ${laned} without a reach score in the lane on the left`}.
+      </p>
     </section>
   );
 }
@@ -558,29 +589,27 @@ type Box = { left: number; top: number; right: number; bottom: number };
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
 // Where to name the best guests and the one in focus: beside each dot on the first side that clears the
-// other names and dots and stays inside the plot. A name with no clear side is left to the hover.
+// other names and dots and stays inside the plot, or for a guest without reach inside the plot and its lane. A
+// name with no clear side is left to the hover.
 function placeNames(
   guests: Guest[],
   focus: string | null,
   position: (guest: Guest) => { cx: number; cy: number },
-  radius: (guest: Guest) => number,
-  plot: { left: number; right: number; top: number; bottom: number },
+  dots: Box[],
+  plot: { left: number; right: number; top: number; bottom: number; lane: number },
   reserved: Box[],
+  named: number,
 ) {
-  const dots: Box[] = guests.map((guest) => {
-    const { cx, cy } = position(guest);
-    const r = radius(guest);
-    return { left: cx - r, top: cy - r, right: cx + r, bottom: cy + r };
-  });
   const placed: Box[] = [...reserved];
   const out: { guest: Guest; x: number; y: number; anchor: "start" | "end" }[] = [];
   const order = guests
     .map((guest, i) => ({ guest, i }))
-    .filter(({ guest, i }) => (i < NAMED || guest.ref === focus) && guest.scores.reach !== null)
+    .filter(({ guest, i }) => i < named || guest.ref === focus)
     .sort((a, b) => Number(b.guest.ref === focus) - Number(a.guest.ref === focus) || a.i - b.i);
   for (const { guest, i } of order) {
     const { cx, cy } = position(guest);
-    const r = radius(guest);
+    const r = (dots[i].right - dots[i].left) / 2;
+    const left = guest.scores.reach === null ? plot.lane : plot.left;
     const w = 22 + guest.name.length * 6.6;
     const h = 15;
     const sides = [
@@ -592,7 +621,7 @@ function placeNames(
     for (const side of sides) {
       const box = { ...side.box, top: side.y - h + 3, bottom: side.y + 3 };
       const inside =
-        box.left >= plot.left + 2 && box.right <= plot.right - 2 && box.top >= plot.top && box.bottom <= plot.bottom;
+        box.left >= left + 2 && box.right <= plot.right - 2 && box.top >= plot.top && box.bottom <= plot.bottom;
       const clear =
         !placed.some((other) => overlaps(box, other)) && !dots.some((dot, d) => d !== i && overlaps(box, dot));
       if (inside && clear) {

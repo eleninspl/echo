@@ -4,11 +4,11 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import type { Analysis, AnchorType, MapItem, MapRow } from "@/lib/echo";
-import { describe } from "@/lib/errors";
 import { category as categoryName } from "@/lib/format";
-import { useStart } from "@/lib/use-start";
+import type { Rerun } from "@/lib/use-analysis";
 
-import { categoryHue, Chip, hue, Info, SectionHead } from "./hud";
+import { requestFilters } from "./lock-header";
+import { categoryHue, Chip, hue, Info, RerunStatus, SectionHead } from "./hud";
 import { useReveal } from "./reveal";
 import { Track } from "./spectrum";
 
@@ -123,7 +123,9 @@ function sector(centre: number, inner: number, outer: number, from: number, to: 
   return `M ${point(inner, from)} L ${point(outer, from)} A ${outer} ${outer} 0 ${large} 1 ${point(outer, to)} L ${point(inner, to)} A ${inner} ${inner} 0 ${large} 0 ${point(inner, from)} Z`;
 }
 
-export function TasteMap({ analysis }: { analysis: Analysis }) {
+const FROM = "tastes";
+
+export function TasteMap({ analysis, rerun }: { analysis: Analysis; rerun: Rerun }) {
   const rows = useMemo(() => analysis.audience_map.filter((row) => row.items.length > 0), [analysis.audience_map]);
   const frame = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -132,7 +134,6 @@ export function TasteMap({ analysis }: { analysis: Analysis }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
-  const { start, pending, error } = useStart();
 
   useEffect(() => {
     const element = frame.current;
@@ -157,7 +158,7 @@ export function TasteMap({ analysis }: { analysis: Analysis }) {
   const lit = spots.find((spot) => spot.key === (hovered ?? chosen));
   const total = rows.reduce((sum, row) => sum + row.items.length, 0);
   const anchor = picked ? ANCHOR[picked.category] : undefined;
-  const { fame, age, country } = analysis.filters;
+  const busy = rerun.busy && rerun.from === FROM;
 
   return (
     <section aria-labelledby="tastes" className="flex flex-col gap-6">
@@ -166,8 +167,8 @@ export function TasteMap({ analysis }: { analysis: Analysis }) {
           {total} tastes · {rows.length} categories
         </span>
         <Info>
-          What your listeners like more than most people do, as a group, from Qloo. The closer to your show and the
-          bigger the circle, the stronger the pull, out of 100.
+          What your listeners like more than most people do, as a group. The closer to your show and the bigger the
+          circle, the stronger the pull, out of 100.
         </Info>
       </SectionHead>
       <div className="grid grid-cols-1 gap-x-12 gap-y-8 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:items-center">
@@ -411,26 +412,22 @@ export function TasteMap({ analysis }: { analysis: Analysis }) {
               <div className="flex flex-col gap-2.5 border-t border-steel pt-5">
                 <button
                   type="button"
-                  disabled={pending !== null}
+                  disabled={rerun.busy}
                   onClick={() =>
-                    start(analysis.show.id, {
-                      fame,
-                      age,
-                      country,
-                      episode_about: { query: picked.item.name, type: anchor },
-                    })
+                    rerun.start(
+                      { ...requestFilters(analysis.filters), episode_about: { query: picked.item.name, type: anchor } },
+                      FROM,
+                    )
                   }
                   className="btn btn-brand min-h-12 px-5 text-base text-balance"
                 >
-                  {pending ? "Starting…" : `Find guests for an episode about ${picked.item.name}`}
+                  {busy ? "Finding guests…" : `Find guests for an episode about ${picked.item.name}`}
                 </button>
-                <p className="text-sm text-ink-dim">
-                  Echo runs again with {picked.item.name} as the episode&apos;s subject. It takes a few seconds.
-                </p>
-                {error && (
-                  <p role="alert" className="text-sm">
-                    <span className="font-semibold text-alert">{describe(error).title}.</span>{" "}
-                    <span className="text-ink-soft">{describe(error).message}</span>
+                {busy || (rerun.from === FROM && rerun.error) ? (
+                  <RerunStatus rerun={rerun} from={FROM} />
+                ) : (
+                  <p className="text-sm text-ink-dim">
+                    Echo runs again with {picked.item.name} as the episode&apos;s subject.
                   </p>
                 )}
               </div>

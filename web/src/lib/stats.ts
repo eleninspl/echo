@@ -1,6 +1,6 @@
-import type { AgeBucket, Analysis, Guest, Label } from "./echo";
+import type { AgeBucket, Analysis, Label } from "./echo";
 
-// The desk's readouts, all computed from the analysis itself. Nothing here is estimated or invented.
+// The page's readouts, all computed from the analysis itself. Nothing here is estimated or invented.
 
 export const LABEL_ORDER: Label[] = ["sweet_spot", "safe", "far", "balanced", "long_shot"];
 export const AGE_ORDER: AgeBucket[] = [
@@ -12,21 +12,12 @@ export const AGE_ORDER: AgeBucket[] = [
   "55_and_older",
 ];
 
-function median(values: number[]): number | null {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
 export type Stats = ReturnType<typeof stats>;
 
 export function stats(analysis: Analysis) {
-  const { guests, left_out: leftOut, audience_map: map } = analysis;
+  const { guests } = analysis;
   const labels = Object.fromEntries(LABEL_ORDER.map((label) => [label, 0])) as Record<Label, number>;
   for (const guest of guests) labels[guest.label] += 1;
-
-  const reach = guests.map((guest) => guest.scores.reach).filter((value): value is number => value !== null);
 
   const ages = Object.fromEntries(AGE_ORDER.map((age) => [age, 0])) as Record<AgeBucket, number>;
   let withAges = 0;
@@ -36,25 +27,33 @@ export function stats(analysis: Analysis) {
     for (const age of guest.evidence.ages) ages[age] += 1;
   }
 
-  const top: Guest | undefined = [...guests].sort((a, b) => b.scores.echo - a.scores.echo)[0];
-  const items = map.flatMap((row) => row.items.map((item) => ({ ...item, category: row.category })));
-
   return {
     guests: guests.length,
     labels,
     sweet: labels.sweet_spot,
-    top,
-    medianFit: median(guests.map((guest) => guest.scores.fit)),
-    medianLove: median(guests.map((guest) => guest.scores.love_back)),
-    medianReach: median(reach),
-    unscoredReach: guests.length - reach.length,
-    hosts: leftOut.filter((entry) => entry.why === "host").length,
-    pastGuests: leftOut.filter((entry) => entry.why === "past_guest").length,
-    categories: map.filter((row) => row.items.length > 0).length,
-    bands: map.filter((row) => row.items.length > 0).map((row) => ({ category: row.category, n: row.items.length })),
-    tastes: items.length,
-    strongest: [...items].sort((a, b) => b.affinity - a.affinity)[0],
+    ideas: guests.filter((guest) => guest.idea !== null).length,
     ages,
     withAges,
   };
+}
+
+// Whether the engine writes episode ideas. Without a writing model every idea comes back null, and that
+// doesn't change between runs, so the last finished run's answer is kept for the next run's step list.
+const IDEAS = "echo.ideas";
+
+export function noteIdeas(analysis: Analysis) {
+  if (analysis.status !== "done" || !analysis.guests.length) return;
+  try {
+    window.sessionStorage.setItem(IDEAS, analysis.guests.some((guest) => guest.idea) ? "on" : "off");
+  } catch {
+    return;
+  }
+}
+
+export function ideasOff(): boolean {
+  try {
+    return window.sessionStorage.getItem(IDEAS) === "off";
+  } catch {
+    return false;
+  }
 }

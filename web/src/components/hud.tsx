@@ -1,6 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { Label } from "@/lib/echo";
+import type { Label, Step } from "@/lib/echo";
+import { describe } from "@/lib/errors";
+import { ideasOff } from "@/lib/stats";
+import type { Rerun } from "@/lib/use-analysis";
 
 // The panel parts shared by every zone: hues, lamps, level bars, gauges and zone heads.
 
@@ -250,4 +253,50 @@ export function voiceBars(fit: number, love: number, reach: number | null, bars:
       silent: reach === null && position > 2 / 3,
     };
   });
+}
+
+// A run's steps as the host sees them: without "Writing episode ideas" when the engine writes none.
+export function shownSteps(steps: Step[]): Step[] {
+  return ideasOff() ? steps.filter((step) => step.key !== "ideas") : steps;
+}
+
+// A rerun's progress, or why it failed, in place of the control that started it. The page keeps the guests
+// from before until the new run is done.
+export function RerunStatus({ rerun, from, className = "" }: { rerun: Rerun; from: string; className?: string }) {
+  if (rerun.from !== from) return null;
+  if (rerun.error) {
+    const problem = describe(rerun.error);
+    return (
+      <p role="alert" className={`text-sm ${className}`}>
+        <span className="font-semibold text-alert">{problem.title}.</span>{" "}
+        <span className="text-ink-soft">{problem.message} These guests are still the ones from before.</span>
+      </p>
+    );
+  }
+  if (!rerun.busy) return null;
+  const steps = shownSteps(rerun.running?.steps ?? []);
+  const done = steps.filter((step) => step.done).length;
+  const current = steps.find((step) => !step.done);
+  return (
+    <div role="status" className={`flex flex-col gap-2 ${className}`}>
+      <p className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="flex items-center gap-2 text-ink">
+          <Lamp color="var(--brand)" className="pulse size-2" />
+          {current ? current.label : steps.length ? "Finishing" : "Starting"}
+        </span>
+        {steps.length > 0 && (
+          <span className="readout text-xs text-ink-dim">
+            {done} / {steps.length}
+          </span>
+        )}
+      </p>
+      <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-steel">
+        <span
+          className="block h-full rounded-full bg-brand transition-[width] duration-500 ease-(--ease-out)"
+          style={{ width: `${steps.length ? Math.max((done / steps.length) * 100, 4) : 4}%` }}
+        />
+      </span>
+      <p className="text-xs text-ink-dim">These guests stay until the new ones are ready.</p>
+    </div>
+  );
 }

@@ -9,22 +9,38 @@ import { PickButton, Scores, TasteChips } from "./dossier";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, rank, SectionHead } from "./hud";
 
+// How many sweet spots to lead with; the rest are in the ranked list.
+const MOST = 4;
+// How many guests come closest when there's no sweet spot.
+const CLOSEST = 3;
+
 type Props = {
   guests: Guest[];
+  // Whether this run came with episode ideas.
+  ideas: boolean;
   picked: string[];
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
 };
 
-export function TopPicks({ guests, picked, onPick, onOpen }: Props) {
+// The sweet spots, best Echo score first; with none, the guests that come closest, so the labels on this
+// section always agree with its title.
+export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
   const sweet = guests.filter((guest) => guest.label === "sweet_spot");
-  const others = guests.filter((guest) => guest.label !== "sweet_spot");
-  const top = [...sweet, ...others].slice(0, sweet.length >= 4 ? 4 : 3);
+  const top = sweet.length ? sweet.slice(0, MOST) : guests.slice(0, CLOSEST);
+  const more = sweet.length - top.length;
   return (
     <section aria-labelledby="top-picks" className="flex flex-col gap-6">
-      <SectionHead id="top-picks" title={sweet.length ? "Start with these" : "No sweet spot yet. These come closest"} />
+      <SectionHead id="top-picks" title={sweet.length ? "Start with these" : "No sweet spot yet, these come closest"}>
+        {more > 0 && <span>{more} more in the list</span>}
+      </SectionHead>
+      {!ideas && (
+        <p className="-mt-3 text-sm text-ink-dim">
+          Episode ideas are off in this demo. The scores and evidence are all here.
+        </p>
+      )}
       <ol
-        className={`grid grid-cols-1 gap-x-10 gap-y-12 ${top.length === 4 ? "@3xl:grid-cols-2 @6xl:grid-cols-4" : "@4xl:grid-cols-3"}`}
+        className={`grid grid-cols-1 gap-x-10 gap-y-12 ${top.length === 4 ? "@3xl:grid-cols-2 @6xl:grid-cols-4" : top.length === 2 ? "@3xl:grid-cols-2" : "@4xl:grid-cols-3"}`}
       >
         {top.map((guest, order) => {
           const color = LABEL_HUE[guest.label];

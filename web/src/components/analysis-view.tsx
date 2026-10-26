@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -15,12 +16,12 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { Analysis, Filters, Idea, Step } from "@/lib/echo";
+import type { Analysis, Idea, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
-import { readPicks, savePicks } from "@/lib/picks";
-import { stats as computeStats } from "@/lib/stats";
-import { useAnalysis } from "@/lib/use-analysis";
+import { readPicks, savePicks, type Pick } from "@/lib/picks";
+import { stats as computeStats, noteIdeas } from "@/lib/stats";
+import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
 import { Backdrop } from "./backdrop";
@@ -28,8 +29,8 @@ import { AskSection, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
-import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM } from "./hud";
-import { LabelSpectrum, LockHeader, ShowLock } from "./lock-header";
+import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM, shownSteps } from "./hud";
+import { LabelSpectrum, LockHeader, requestFilters, ShowLock } from "./lock-header";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
@@ -44,6 +45,10 @@ type OpenAnalysis = {
   onClose: () => void;
   picked: string[];
   onPick: (guestRef: string) => void;
+  // Picks for this show that aren't in this run, and a way to drop them.
+  missing: Pick[];
+  onForget: () => void;
+  rerun: Rerun;
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
 };
@@ -63,12 +68,15 @@ export function useOpenAnalysis(): OpenAnalysis {
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { id, guestRef, inviting } = readPath(usePathname());
-  const { analysis, error, retry, update } = useAnalysis(id);
-  const [picks, setPicks] = useState<Choice<string[]>>({ id: null, value: [] });
+  const { analysis, error, retry, update } = useAnalysis(id, noteIdeas);
+  const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
   const openId = analysis?.id ?? null;
-  const picked = (picks.id === openId ? picks.value : openId ? readPicks(openId) : []).filter((ref) =>
-    analysis?.guests.some((guest) => guest.ref === ref),
-  );
+  const showId = analysis?.show.id ?? null;
+  const saved = useMemo(() => (picks.id === showId ? picks.value : showId ? readPicks(showId) : []), [picks, showId]);
+  const guests = useMemo(() => analysis?.guests ?? [], [analysis]);
+  // Picks are saved by entity ID and shown by this run's refs, in the order they were picked.
+  const picked = saved.flatMap(({ id }) => guests.find((guest) => guest.id === id)?.ref ?? []);
+  const missing = analysis?.status === "done" ? saved.filter(({ id }) => !guests.some((guest) => guest.id === id)) : [];
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
   const [askSlot, setAskSlot] = useState<HTMLElement | null>(null);
   const openedHere = useRef(false);
@@ -78,10 +86,27 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     if (!guestRef) openedHere.current = false;
   }, [guestRef]);
 
-  const rerun = useCallback(
+  const showRun = useCallback(
     (next: Analysis) => router.push(analysisPath(next.id), { scroll: inviting }),
     [router, inviting],
   );
+  // A filter or taste rerun lands at the top, where the new guests and their filters are. Next keeps the scroll
+  // across the shared layout, so the page scrolls itself once the new run is in.
+  const toTop = useRef(false);
+  const showRerun = useCallback(
+    (next: Analysis) => {
+      toTop.current = true;
+      router.push(analysisPath(next.id), { scroll: false });
+    },
+    [router],
+  );
+  const rerun = useRerun(showId ?? "", openId, showRerun);
+
+  useEffect(() => {
+    if (!toTop.current || !openId) return;
+    toTop.current = false;
+    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [openId]);
   const onOpen = useCallback(
     (ref: string) => {
       if (!openId || ref === guestRef) return;
@@ -112,14 +137,29 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     },
     [update, openId, onOpen],
   );
+  const keep = useCallback(
+    (value: Pick[]) => {
+      if (!showId) return;
+      setPicks({ id: showId, value });
+      savePicks(showId, value);
+    },
+    [showId],
+  );
   const onPick = useCallback(
     (ref: string) => {
-      if (!openId) return;
-      const value = picked.includes(ref) ? picked.filter((other) => other !== ref) : [...picked, ref];
-      setPicks({ id: openId, value });
-      savePicks(openId, value);
+      const guest = guests.find((other) => other.ref === ref);
+      if (!guest) return;
+      keep(
+        saved.some(({ id }) => id === guest.id)
+          ? saved.filter(({ id }) => id !== guest.id)
+          : [...saved, { id: guest.id, name: guest.name }],
+      );
     },
-    [openId, picked],
+    [guests, saved, keep],
+  );
+  const onForget = useCallback(
+    () => keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
+    [guests, saved, keep],
   );
 
   if (!analysis) {
@@ -157,16 +197,29 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
 
   return (
     <OpenAnalysisContext
-      value={{ analysis, openGuest, onOpen, onClose, picked, onPick, rewritten, onAskSlot: setAskSlot }}
+      value={{
+        analysis,
+        openGuest,
+        onOpen,
+        onClose,
+        picked,
+        onPick,
+        missing,
+        onForget,
+        rerun,
+        rewritten,
+        onAskSlot: setAskSlot,
+      }}
     >
       {children}
-      <Chat analysis={analysis} onRerun={rerun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
+      <Chat analysis={analysis} onRerun={showRun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, openGuest, onOpen, onClose, picked, onPick, rewritten, onAskSlot } = useOpenAnalysis();
+  const { analysis, openGuest, onOpen, onClose, picked, onPick, missing, onForget, rerun, rewritten, onAskSlot } =
+    useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
@@ -199,12 +252,26 @@ export function Console() {
       <title>{open ? `${open.name} · ${analysis.show.title} · Echo` : `${analysis.show.title} · Echo`}</title>
       <Backdrop>
         <div className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
-          <LockHeader key={`lock-${analysis.id}`} analysis={analysis} stats={figures} />
+          <LockHeader
+            key={`lock-${analysis.id}`}
+            analysis={analysis}
+            stats={figures}
+            rerun={rerun}
+            missing={missing}
+            onForget={onForget}
+          />
         </div>
       </Backdrop>
 
       <div className={`${FRAME} @container flex flex-1 flex-col gap-20 pb-36`}>
-        <TopPicks key={`picks-${analysis.id}`} guests={guests} picked={picked} onPick={onPick} onOpen={onOpen} />
+        <TopPicks
+          key={`picks-${analysis.id}`}
+          guests={guests}
+          ideas={figures.ideas > 0}
+          picked={picked}
+          onPick={onPick}
+          onOpen={onOpen}
+        />
         <Scope
           key={`scope-${analysis.id}`}
           title={`How all ${guests.length} compare`}
@@ -217,8 +284,8 @@ export function Console() {
           <div className="flex flex-col gap-5 @4xl:flex-row @4xl:items-end @4xl:justify-between @4xl:gap-12">
             <p className="max-w-[62ch] text-ink-soft">
               Each dot is a guest. Higher up, your listeners like them more. Further right, more of their fans are new
-              to you. A bigger dot means their fans are likelier to enjoy your show. The shaded box at the top right is
-              the sweet spot.
+              to you. A bigger dot means their fans are likelier to enjoy your show. The box at the top right holds high
+              fit and high reach; the ringed dots in it are the sweet spots, whose fans also love your show back.
             </p>
             <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
           </div>
@@ -227,6 +294,7 @@ export function Console() {
           key={`list-${analysis.id}`}
           analysisId={analysis.id}
           guests={guests}
+          ideas={figures.ideas > 0}
           open={openGuest}
           highlighted={highlighted}
           picked={picked}
@@ -239,7 +307,7 @@ export function Console() {
           className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
         >
           <div className="@3xl:col-span-3">
-            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} />
+            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} rerun={rerun} />
           </div>
           <FanAges stats={figures} />
           <CommonGround guests={guests} />
@@ -317,9 +385,10 @@ export function ConsoleSkeleton() {
   );
 }
 
-// The run's six steps beside echo rings sounding while Echo works. Fixed heights, so polling never moves
+// The run's steps beside echo rings sounding while Echo works. Fixed heights, so polling never moves
 // the page.
-function Rundown({ steps }: { steps: Step[] }) {
+function Rundown({ steps: all }: { steps: Step[] }) {
+  const steps = shownSteps(all);
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
   return (
@@ -353,7 +422,7 @@ function Rundown({ steps }: { steps: Step[] }) {
         </ol>
         <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
       </div>
-      <p className="text-sm text-ink-soft">It usually takes a few seconds.</p>
+      <p className="text-sm text-ink-soft">It usually takes under a minute.</p>
       <p aria-live="polite" className="sr-only">
         {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
       </p>
@@ -412,28 +481,25 @@ function Failed({ analysis }: { analysis: Analysis }) {
       <NextStep
         problem={problem}
         onRetry={() => start(analysis.show.id, requestFilters(analysis.filters))}
+        onBroaden={() => start(analysis.show.id)}
         retrying={pending !== null}
       />
     </Problem>
   );
 }
 
-// The filters as a request, without what the engine filled in.
-function requestFilters(filters: Filters): Filters {
-  const about = filters.episode_about;
-  return { ...filters, episode_about: about && { query: about.query, type: about.type } };
-}
-
 function NextStep({
   problem,
   onRetry,
+  onBroaden,
   retrying = false,
 }: {
   problem: HostError;
   onRetry: () => void;
+  // Runs the show again without filters, for a run they narrowed too far.
+  onBroaden?: () => void;
   retrying?: boolean;
 }) {
-  const router = useRouter();
   switch (problem.next) {
     case "featured":
       return (
@@ -456,11 +522,25 @@ function NextStep({
           {retrying ? "Starting…" : "Try again"}
         </button>
       );
+    // Never the browser's Back: from a direct link it would leave Echo.
     case "previous":
       return (
-        <button type="button" onClick={() => router.back()} className="btn self-start">
-          Go back
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {onBroaden && (
+            <button
+              type="button"
+              onClick={onBroaden}
+              disabled={retrying}
+              className="btn btn-solid"
+              style={hue("var(--ink)")}
+            >
+              {retrying ? "Starting…" : "Run without filters"}
+            </button>
+          )}
+          <Link href="/" className="btn">
+            Find another show
+          </Link>
+        </div>
       );
     case "home":
       return (
