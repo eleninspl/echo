@@ -197,15 +197,60 @@ def test_openrouter_needs_a_key():
         LlmClient("openrouter", "openai/gpt-oss-120b", "")
 
 
+def test_groq_needs_a_key_and_reads_as_not_built_without_one():
+    with pytest.raises(NotImplementedError, match="GROQ_API_KEY"):
+        LlmClient("groq", "openai/gpt-oss-120b", "")
+
+
 def test_unknown_backend_is_refused():
     with pytest.raises(RuntimeError, match="ECHO_LLM"):
-        LlmClient("groq", "openai/gpt-oss-120b", "key")
+        LlmClient("mistral", "openai/gpt-oss-120b", "key")
+
+
+def test_groq_sends_a_strict_schema_and_prices_the_tokens():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        reply = openrouter_reply('{"title": "A night of jokes"}')
+        del reply["usage"]["cost"]
+        return httpx.Response(200, json=reply)
+
+    reply = asyncio.run(ask(make_client("groq", handler), effort="low"))
+
+    request = seen[0]
+    body = json.loads(request.content)
+    assert request.url == "https://api.groq.com/openai/v1/chat/completions"
+    assert request.headers["Authorization"] == "Bearer test-key"
+    assert "X-Title" not in request.headers
+    assert body["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {"name": "title", "strict": True, "schema": SCHEMA},
+    }
+    assert body["reasoning_effort"] == "low"
+    assert body["include_reasoning"] is False
+    assert "provider" not in body and "reasoning" not in body
+    assert reply.data == {"title": "A night of jokes"}
+    assert reply.cost_usd == pytest.approx((120 * 0.15 + 30 * 0.60) / 1_000_000)
+
+
+def test_groq_asks_again_when_the_output_misses_the_schema():
+    statuses = iter([400, 200])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if next(statuses) == 400:
+            return httpx.Response(400, json={"error": {"code": "json_validate_failed", "message": "bad output"}})
+        return httpx.Response(200, json=openrouter_reply('{"title": "x"}'))
+
+    client = make_client("groq", handler)
+    assert asyncio.run(ask(client)).data == {"title": "x"}
+    assert client.sleeps == [2.0]
 
 
 @pytest.fixture
 def settings_env(monkeypatch):
     monkeypatch.setattr(llm_client, "get_settings", Settings)
-    for name in ("ECHO_LLM", "ECHO_LLM_MODEL", "ECHO_LLM_URL", "OPENROUTER_API_KEY", "VERCEL"):
+    for name in ("ECHO_LLM", "ECHO_LLM_MODEL", "ECHO_LLM_URL", "OPENROUTER_API_KEY", "GROQ_API_KEY", "VERCEL"):
         monkeypatch.setenv(name, "")
     return monkeypatch
 
@@ -218,6 +263,39 @@ def test_settings_default_to_openrouter_with_gpt_oss(settings_env):
         "openai/gpt-oss-120b",
         "https://openrouter.ai/api/v1",
     )
+    asyncio.run(client.aclose())
+
+
+def test_settings_default_to_groq_when_only_its_key_is_set(settings_env):
+    settings_env.setenv("GROQ_API_KEY", "test-key")
+    client = LlmClient.from_settings()
+    assert (client.backend, client.model, str(client._http.base_url).rstrip("/")) == (
+        "groq",
+        "openai/gpt-oss-120b",
+        "https://api.groq.com/openai/v1",
+    )
+    asyncio.run(client.aclose())
+
+
+def test_settings_prefer_openrouter_when_both_keys_are_set(settings_env):
+    settings_env.setenv("GROQ_API_KEY", "test-key")
+    settings_env.setenv("OPENROUTER_API_KEY", "other-key")
+    assert Settings().llm_backend == "openrouter"
+    settings_env.setenv("ECHO_LLM", "groq")
+    assert Settings().llm_backend == "groq"
+
+
+def test_settings_without_a_key_stay_on_openrouter_which_reads_as_not_built(settings_env):
+    assert Settings().llm_backend == "openrouter"
+    with pytest.raises(NotImplementedError, match="OPENROUTER_API_KEY"):
+        LlmClient.from_settings()
+
+
+def test_groq_may_run_on_vercel(settings_env):
+    settings_env.setenv("GROQ_API_KEY", "test-key")
+    settings_env.setenv("VERCEL", "1")
+    client = LlmClient.from_settings()
+    assert client.backend == "groq"
     asyncio.run(client.aclose())
 
 
