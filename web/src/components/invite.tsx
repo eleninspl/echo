@@ -235,7 +235,7 @@ export function Invite({
                 }))
               }
               maxLength={SHARED_NOTE_LIMIT}
-              placeholder="A recent episode, why now…"
+              placeholder="A recent episode, why now, or how to write: shorter, warmer…"
               className={input}
             />
           </label>
