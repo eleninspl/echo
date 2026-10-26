@@ -94,6 +94,40 @@ def test_drafts_and_revise_rules(mock):
     assert mock.post("/drafts", json={**revise_two, "instruction": "shorter"}).status_code == 400
 
 
+def draft(mock, **request) -> dict:
+    response = mock.post("/drafts", json={"analysis_id": "an_example", **request})
+    assert response.status_code == 200, response.text
+    return response.json()["drafts"][0]
+
+
+def test_mock_drafts_use_the_host_and_their_notes(mock):
+    request = {
+        "guest_refs": ["g1", "g3"],
+        "host_name": "Sam",
+        "note": "We record Fridays",
+        "notes": {"g3": "Loved the tour"},
+    }
+    drafts = mock.post("/drafts", json={"analysis_id": "an_example", **request}).json()["drafts"]
+    first, third = (d["body"] for d in drafts)
+    assert all(body.endswith("Sam") and "We record Fridays" in body for body in (first, third))
+    assert "Loved the tour" in third and "Loved the tour" not in first
+    assert "[Your name]" in draft(mock, guest_refs=["g1"])["body"]
+
+
+def test_mock_revise_follows_the_instruction(mock):
+    written = draft(mock, guest_refs=["g1"], host_name="Sam", note="We record Fridays")
+    revise = {"guest_refs": ["g1"], "previous": {"subject": written["subject"], "body": written["body"]}}
+    shorter = draft(mock, **revise, instruction="Shorter")
+    assert len(shorter["body"]) < len(written["body"]) and shorter["body"].endswith("Sam")
+    warmer = draft(mock, **revise, instruction="warmer")
+    assert "warmer" in warmer["body"] and warmer["subject"] == written["subject"]
+
+
+def test_a_note_for_a_guest_not_asked_for_is_a_400(mock):
+    request = {"analysis_id": "an_example", "guest_refs": ["g1"], "notes": {"g2": "Hi"}}
+    assert mock.post("/drafts", json=request).status_code == 400
+
+
 def test_briefing(mock):
     markdown = mock.post("/briefings", json={"analysis_id": "an_example", "guest_ref": "g1"}).json()["markdown"]
     assert markdown.startswith("# ")

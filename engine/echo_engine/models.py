@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -196,7 +196,9 @@ class DraftRequest(BaseModel):
     analysis_id: str
     guest_refs: list[str] = Field(min_length=1, max_length=5)
     host_name: str | None = Field(default=None, max_length=80)
+    # `note` goes to every guest in the request, `notes` to one guest each, by ref.
     note: str | None = Field(default=None, max_length=500)
+    notes: dict[str, Annotated[str, Field(max_length=300)]] = {}
     previous: DraftText | None = None
     instruction: str | None = Field(default=None, max_length=300)
 
@@ -206,6 +208,9 @@ class DraftRequest(BaseModel):
             raise ValueError("previous and instruction go together")
         if self.previous is not None and len(self.guest_refs) != 1:
             raise ValueError("revise one draft at a time")
+        if set(self.notes) - set(self.guest_refs):
+            raise ValueError("a note is for a guest who isn't in guest_refs")
+        self.notes = {ref: note.strip() for ref, note in self.notes.items() if note.strip()}
         return self
 
 
