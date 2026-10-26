@@ -6,6 +6,7 @@ from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure
 from echo_engine.pipeline import (
     LoveBack,
     bio_of,
+    guest_description,
     known_facts,
     links_of,
     new_podcasts,
@@ -252,3 +253,11 @@ def test_the_bio_screens_awards_that_say_who_someone_is():
     assert (
         bio_of(person, "Comedian", TODAY) == "Comedian. Received Example Comedy Award. Has worked for Example Studio."
     )
+
+
+def test_a_description_that_names_who_someone_is_is_left_out():
+    english = lambda text: invented_person(short_descriptions=[{"value": text, "language": "en"}])  # noqa: E731
+    assert guest_description(english("Example comedian and podcaster")) == "Example comedian and podcaster"
+    for text in ("Example transgender activist", "Example gay rights activist", "Example NAACP organizer"):
+        assert guest_description(english(text)) is None, text
+    assert guest_description(invented_person()) is None
