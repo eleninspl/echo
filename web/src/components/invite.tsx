@@ -412,6 +412,10 @@ function GuestCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="font-display text-xl leading-tight font-semibold">{guest.name}</h2>
+          {/* Who they are, to help with the note just for them. */}
+          {(guest.bio ?? guest.description) && (
+            <p className="max-w-prose text-sm text-pretty text-ink-soft">{guest.bio ?? guest.description}</p>
+          )}
           {Object.keys(guest.links).length > 0 && (
             <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-dim">
               <span>Find them on</span>
