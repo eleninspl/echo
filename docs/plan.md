@@ -4,7 +4,7 @@ What we build by the **27 Oct freeze**, from the 22 Oct call. Only what the demo
 
 ## v1
 
-Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both on Vercel ([Hosting](#hosting)). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film") and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
+Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both on Vercel ([Hosting](#hosting)). The host types their show, picks it from a short list, and sees their audience map and 10 guests the audience will like, whose fans are new to the show and would like it back. Each guest has a reason, an episode title and a two-line pitch; a click opens the full episode idea and what that guest would add to the audience map. The host can ask for changes in a chat ("younger listeners", "less famous", "an episode about a film"), or with the filter controls on the page, and Echo runs again. The host picks one or more guests and gets an invitation draft for each, plus a briefing. Echo sends nothing.
 
 1. **Find the show.** Qloo search, up to 5 podcasts with image and description; the host picks one. A show Qloo doesn't have, or one with too little data, gets "Echo can't analyse this show yet" and the featured shows.
 2. **Audience map** across music, film, TV, books, brands and podcasts.
@@ -98,11 +98,11 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 | L6 | Briefing | 0.25 | first version |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. Next: compare models on OpenRouter and tune the prompts. Without `OPENROUTER_API_KEY` the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
+Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. Next: compare models on OpenRouter and tune the prompts. Without an OpenRouter or Groq key the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
 
 ## Web app tasks
 
-**W**, in `web/`: the whole v1 flow above, built against mock mode first (`ECHO_MOCK=1`), then on the live engine. The app talks to the engine only, from the browser, through `web/src/lib/echo.ts`. Three routes: `/` (find the show, featured shows), `/analyses/[id]` (everything else, so a featured show or a rerun is just another ID) and `/analyses/[id]/guests/[ref]` (one guest's page). A layout over the last two holds the analysis, the picks, the selected guest and the chat, so they carry across.
+**W**, in `web/`: the whole v1 flow above, built against mock mode first (`ECHO_MOCK=1`), then on the live engine. The app talks to the engine only, from the browser, through `web/src/lib/echo.ts`. Four routes: `/` (find the show, featured shows), `/analyses/[id]` (everything else, so a featured show or a rerun is just another ID), `/analyses/[id]/guests/[ref]` (the page with one guest's panel open) and `/analyses/[id]/invite`. A layout over the last two holds the analysis, the picks, the selected guest and the chat, so they carry across.
 
 | # | W: web app | Days | |
 | --- | --- | --- | --- |
@@ -110,11 +110,11 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 | W2 | Data layer: the typed client, polling once a second while running, a host-facing message for every error code below | 0.25 | done |
 | W3 | Find the show: search on submit (2 to 100 characters), pick from up to 5, "Echo can't analyse this show yet" with the featured shows; featured shows open instantly | 0.5 | done |
 | W4 | Analysis page: the steps while running without layout shift, the audience map, the failed states | 0.5 | done |
-| W5 | Guests: the ranked list with label, the three scores, reason, episode title, pitch and evidence; "No guest clears all three yet" when there's no sweet spot; who was left out and why | 0.5 | done |
-| W6 | The fit, love back and reach chart (qloo.md, Scoring): reach across, fit up, love back as dot size, label as colour, the sweet-spot zone; a dot and its row select each other | 0.5 | done |
+| W5 | Guests: the ranked list with label, the three scores, reason, episode title, pitch and evidence; "No sweet spot yet, these come closest" when there's no sweet spot (26 Oct wording); who was left out and why | 0.5 | done |
+| W6 | The fit, love back and reach chart (qloo.md, Scoring): reach across, fit up, love back as dot size, label as colour, the box of high fit and reach, whose ringed dots are the sweet spots; a dot and its row select each other | 0.5 | done |
 | W7 | Guest details: the full episode idea, the guest's audience map next to the show's, and what the guest adds | 0.5 | done |
-| W8 | Chat: the last 20 messages; `rerun` polls the new analysis and keeps the old one on screen until it's done; `rewrite` swaps one idea in place; the active filters shown, and a note when `episode_about.used` is null | 0.75 | done |
-| W9 | Invite: pick 1 to 5 guests, optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | done |
+| W8 | Chat: the last 20 messages; `rerun` polls the new analysis and keeps the old one on screen until it's done (filter and taste-map reruns too, since W24); `rewrite` swaps one idea in place; the active filters shown, and a note when `episode_about.used` is null | 0.75 | done |
+| W9 | Invite: pick 1 to 5 guests (any number since W21), optional host name and note, a draft each with a copy button, revise one ("shorter") | 0.5 | done |
 | W10 | Briefing for one guest: rendered, with copy and print | 0.25 | done |
 | W11 | What Qloo saw: every Qloo call of the analysis, with path, params, status, time and whether it was cached | 0.25 | done |
 | W12 | Deploy: the Vercel project from `web/`, `NEXT_PUBLIC_ENGINE_URL`, the web origin in the engine's CORS list, the whole flow once on the live engine | 0.25 | done |
@@ -127,6 +127,9 @@ Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas
 | W19 | The analysis page in reading order, without tabs (26 Oct review): the show and its sweet-spot count, the sweet spots to start with, the chart with a plain explanation, every guest ranked, what the listeners love. A guest opens in a panel beside the chart instead of on its own page (same URL, arrows for the next guest); the episode loads once the guest has been open for a moment, so stepping through guests doesn't write one each. Picks bring up a bar that leads to a separate invite page. Replaces W15's tabs and W18's page | 0.5 | done |
 | W20 | What the listeners love as a taste map (To agree 7): the show in the middle, a slice per category, each taste a circle with its picture, closer and bigger for a stronger pull. Picking one shows it and, for a film, show, artist or brand, starts a run with it as `episode_about`. The chart's Balanced strip shaded and named. At the bottom of the page an Ask Echo section: scrolled to it, the round button flies in and the conversation opens out of it | 0.5 | done |
 | W21 | No limit on picks (26 Oct, reverses the 25 Oct call's 5, Eleni to confirm): the invite page asks `/drafts` for 5 guests at a time in parallel, so the API's limit of 5 per request stays | 0.1 | done |
+| W22 | The invite page complete (26 Oct, #40): a card per guest with their email (kept in the browser only), their own note and "Open in email"; drafts kept in the browser and editable, writing again asks before replacing a changed one; the briefing on each card. Engine: `notes` per guest on `/drafts`, the episode and briefing stored per analysis, guest and idea | 0.5 | done |
+| W23 | Ask Echo and the episode theme (26 Oct, #41): an optional theme on the landing with examples (`filters.theme`, LLM only), a keyword mock chat whose reruns change the guests, rewrites and the conversation kept in the browser, an off state without an LLM, landing start errors that clear and retry | 0.5 | done |
+| W24 | The analysis page agrees with itself (26 Oct, #42): filter controls with clearable chips, reruns in place, picks per show by entity ID, "Start with these" only sweet spots, the chart's count and labels, copy for when there are no ideas, 404 and error pages, the health badge rechecking | 0.5 | done |
 
 W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.5 more. W7 to W10 call L3 to L6 through the engine, and mock mode answers them all, so they don't wait for L.
 
@@ -150,27 +153,29 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 | Date | What |
 | --- | --- |
 | 23 Oct | Done: Q1 to Q17, the web app (W1 to W13), both deployed and checked on real shows |
-| 24 to 26 Oct | L, once someone has it; featured shows; fixes |
+| 24 to 26 Oct | L1 to L6 first version; the analysis page, invite and chat rebuilt; 35 gaps fixed (#39 to #42); featured shows warmed |
 | 27 Oct | **Freeze** |
 | 27 to 29 Oct | Together: Devpost text, README, screenshots, repo public, submit |
 
 ## To agree
 
 1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
-2. **Who builds L**, by 24 Oct. Q and the web app are done. L is about 3 days, so it has to start by 24 Oct to make the freeze. If it can't all fit, a proposed order by what the demo shows most: L2 ideas, L5 drafts, L3 the full episode, L6 briefing, L4 chat (the costliest), then L1 (Apple's author line already catches most hosts).
-3. **Featured shows** by 25 Oct: comedy, music, sports and a business or tech interview show, each with at least 3 sweet spots. Consider the investor judge's own show for the last slot. Their titles or Qloo IDs go in `ECHO_FEATURED` in `.env`, never the repo; `scripts/warm.py` prints each one's sweet spots. A shortlist of 13 checked shows is with Eleni; music is the weakest genre.
+2. **The LLM in production.** Leonidas built L1 to L6 (25 Oct), and the engine can use Groq (#39). Production still needs a key: `GROQ_API_KEY` from `engine/` with `vercel env add`, then a redeploy and `scripts/warm.py` again so the featured shows get ideas. Then compare models (The LLM, below).
+3. **Featured shows.** Done 26 Oct (#39): comedy, music, sports and a business interview show, 3 or 4 sweet spots each, warmed to production. Titles are in `ECHO_FEATURED`, never the repo. Music is the weakest: its guests are mostly radio interviewers, not musicians.
 4. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.
 5. **The web app's domain.** `echo-web.vercel.app` was taken, so Vercel named it `echo-web-mu-taupe.vercel.app`. A clearer `*.vercel.app` name or our own domain before the judges see it.
 6. **A 3D chart** (25 Oct call). Fit, love back and reach are three axes, so a 2D/3D toggle on the chart, if the 3D view isn't harder to read. After the UX pass; the tool is open.
 7. **The Audience tab as a picture** (25 Oct call). Done 26 Oct (W20): a taste map around the show, a slice per category, closer and bigger for a stronger pull; picking a film, show, artist or brand runs Echo again with it as the episode's subject. Leonidas.
-8. **The look** (25 Oct call). Done in W17: neutral, light and dark, blue for actions, orange for the sweet spot. The home page still waits for the team's pick from `/designs`.
+8. **The look** (25 Oct call). Done in W17: neutral, light and dark, blue for actions, orange for the sweet spot. The landing follows `/designs/09` (25 Oct review); the `/designs` routes (218 files) should go before the repo is public.
+9. **The daily cap for judging.** 3,000 Qloo calls a day; a run is 29 to 66 calls, a guest panel about 6. #39 proposes 4,000 from 31 Oct to 5 Nov, then 3,000 again, which keeps the month's quota.
 
 ## The LLM
 
 24 Oct (Eleni): a cheap open-weight model, **`openai/gpt-oss-120b`**, on Groq (#38). 25 Oct (Leonidas): calls go through **OpenRouter** instead, so one key can try several models and we keep the cheapest that writes well enough. gpt-oss-120b stays the default and the first candidate. Eleni to confirm.
 
 - **Client:** `engine/echo_engine/llm_client.py`. A call is a system prompt, a user prompt and a JSON schema; it returns the parsed object with the model, tokens, cost and time. It retries a 429, a 5xx or an answer that isn't JSON, twice. `ECHO_LLM` picks the backend:
-  - `openrouter`, the default and the only one in production: OpenAI-compatible API at `https://openrouter.ai/api/v1` with `OPENROUTER_API_KEY`, `response_format` with a strict JSON schema, and `provider.require_parameters`, so a request only goes to providers that support the schema. The cost comes back in every response.
+  - `openrouter`, the default when its key is set: OpenAI-compatible API at `https://openrouter.ai/api/v1` with `OPENROUTER_API_KEY`, `response_format` with a strict JSON schema, and `provider.require_parameters`, so a request only goes to providers that support the schema. The cost comes back in every response.
+  - `groq` (26 Oct, #39): Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1` with `GROQ_API_KEY`, a strict `json_schema`, `reasoning_effort`, and the cost worked out from Groq's prices. Retries a 400 `json_validate_failed`. With `ECHO_LLM` unset and only this key set, the engine uses Groq.
   - `claude-cli`, local only: Leonidas's [claude-cli-wrapper](https://github.com/anagnole/claude-cli-wrapper) runs the Claude Code CLI on a Claude subscription behind an Anthropic Messages API at `http://127.0.0.1:4301`. Start it with `cd ~/Projects/claude-api && pnpm dev`. The engine sends the schema, turns the CLI's tools and MCP servers off and runs it in an empty folder outside the repo, so no `CLAUDE.md` is read. Default model `claude-sonnet-5-5`; model names must start with `claude-`. The engine refuses it on Vercel.
 - `ECHO_LLM_MODEL` names the model on either backend and `ECHO_LLM_URL` overrides the URL. `scripts/llm_check.py` (`--backend`, `--model`, `--effort`) sends one small call and prints the time, tokens and cost. Through the wrapper, `claude-haiku-5-5` answered in 5 s on 25 Oct.
 - **Building on Claude isn't testing the model.** Claude can hide what a cheap model gets wrong (broken JSON, facts the evidence doesn't give). Use `claude-cli` for the plumbing and the web app, and judge the prompts on OpenRouter models. Next: a script that runs L2 for 3 cached shows on several models and puts the pitches, cost and time side by side; rerun it after prompt changes.
@@ -198,7 +203,7 @@ A Vercel function keeps nothing between requests and several instances can run a
 
 ### Deploying the engine
 
-Set up 23 Oct. The Vercel project is `echo-qloo` (team "eleni's projects", Pro; a $5 on-demand budget with alerts at 50, 75 and 100%, and no pause, so the demo never goes dark during judging), Root Directory `engine`, production URL `https://echo-qloo.vercel.app`. `engine/pyproject.toml` points Vercel at `echo_engine.app:app` (`[tool.vercel]`), `engine/.python-version` pins Python 3.12, and `engine/vercel.json` runs the function in `iad1` for up to 300 s, without `tests/` and `scripts/`. Dependencies install from `pyproject.toml` and `uv.lock`. Every push to `main` deploys to production.
+Set up 23 Oct. The Vercel project is `echo-qloo` (team "eleni's projects", Pro; a $5 on-demand budget with alerts at 50, 75 and 100%, and no pause, so the demo never goes dark during judging), Root Directory `engine`, production URL `https://echo-qloo.vercel.app`. `engine/pyproject.toml` points Vercel at `echo_engine.app:app` (`[tool.vercel]`), `engine/.python-version` pins Python 3.12, and `engine/vercel.json` runs the function in `iad1` for up to 300 s, without `tests/` and `scripts/`. Dependencies install from `pyproject.toml` and `uv.lock`. Every push to `main` deploys to production, except commits by an author outside the Vercel team: Vercel blocks those (Leonidas's, since 26 Oct), and they go live only with a deploy by hand (`vercel deploy --prod` from `engine/` or `web/`) or once he's on the team.
 
 Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, so Leonidas can be invited to them without a Vercel seat. Their variables are set on Vercel by hand.
 
@@ -212,8 +217,9 @@ Neon and Upstash are standalone accounts, not Vercel Marketplace integrations, s
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | The `echo` database | The same |
 | `ECHO_WEB_ORIGINS` | The web app's URL. CORS takes exact origins, comma-separated. | Not set: `http://localhost:3000` |
 | `ECHO_DAILY_QLOO_CALLS` | Not set: 3000 | |
-| `OPENROUTER_API_KEY` | When L is built | |
-| `ECHO_LLM` | Not set: `openrouter`. Never `claude-cli`. | |
+| `OPENROUTER_API_KEY` | Not set | |
+| `GROQ_API_KEY` | To set (Eleni, #39) | |
+| `ECHO_LLM` | Not set: OpenRouter if its key is set, else Groq. Never `claude-cli`. | |
 | `ECHO_LLM_MODEL` | Not set: `openai/gpt-oss-120b` | |
 
 All of them are Sensitive. Add or change one with `vercel env add NAME production` from `engine/` (linked to the project; `engine/.vercel` is git-ignored), then `vercel redeploy <url> --target production`. Sensitive values can't be pulled back: `vercel env pull` gives placeholders. `ECHO_MOCK`, `ECHO_CACHE_DIR` and `ECHO_FEATURED` aren't used on Vercel.
@@ -236,16 +242,16 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }`, empty until `scripts/warm.py` has run |
 | POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
-| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }` |
+| GET | `/analyses/{id}/guests/{ref}` | | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }`. The episode is written once per analysis, guest and idea, then stored. |
 | POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
-| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note? }`, or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
-| POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }` |
+| POST | `/drafts` | `{ analysis_id, guest_refs, host_name?, note?, notes?: { ref: text } }` (each note up to 300 characters, only for refs in `guest_refs`), or one ref with `previous: { subject, body }` and `instruction` | `{ drafts: [{ guest_ref, subject, body }] }` |
+| POST | `/briefings` | `{ analysis_id, guest_ref }` | `{ markdown }`, written once per analysis, guest and idea, from the stored episode |
 
 `Show` is `{ id, title, description, image_url }`.
 
-`filters`: `fame` is `any`, `less_famous` or `rising`; `age` is null or a Qloo age bucket (`24_and_younger` to `55_and_older`); `country` is null or an English country name; `episode_about` is null or `{ query, type }` with type `movie`, `tv_show`, `artist`, `brand` or `videogame`.
+`filters`: `fame` is `any`, `less_famous` or `rising`; `age` is null or a Qloo age bucket (`24_and_younger` to `55_and_older`); `country` is null or an English country name; `episode_about` is null or `{ query, type }` with type `movie`, `tv_show`, `artist`, `brand` or `videogame`. `theme` is null or free text up to 120 characters, for the LLM only (Qloo never sees it); it's part of the request key.
 
-Chat `action`: `rerun` (poll the new `analysis_id`), `rewrite` (`guest_ref` and the new `idea`) or `none`.
+Chat `action`: `rerun` (poll the new `analysis_id`), `rewrite` (`guest_ref` and the new `idea`, not saved in the analysis, which other visitors share: the web app keeps it in the browser) or `none`.
 
 The analysis, when done:
 
