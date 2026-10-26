@@ -28,7 +28,7 @@ from .models import (
     Show,
 )
 from .qloo_client import QlooClient, QlooError
-from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_name, clean_tag_name
+from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_fact, clean_name, clean_tag_name
 
 log = logging.getLogger("echo.pipeline")
 
@@ -390,7 +390,7 @@ def fact_names(person: dict, key: str, most: int, skip: frozenset[str] = frozens
     names: list[str] = []
     for value in values:
         name = " ".join(value.split()) if isinstance(value, str) else ""
-        if not name or len(name) > BIO_NAME_LENGTH or not clean_name(name) or normalize(name) in skip | {own}:
+        if not name or len(name) > BIO_NAME_LENGTH or not clean_fact(name) or normalize(name) in skip | {own}:
             continue
         if normalize(name) not in {normalize(n) for n in names}:
             names.append(name)

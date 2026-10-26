@@ -87,6 +87,15 @@ def clean_name(name: str) -> bool:
     return bool(name.strip()) and not has_term(name, NAME_TERMS)
 
 
+# A guest's bio states facts about one real person, so its awards, employers and works are screened like tags,
+# not like titles: an award from an advocacy group says something about who the person is.
+FACT_TERMS = NAME_TERMS | SEXUALITY | ETHNICITY | terms("glaad naacp")
+
+
+def clean_fact(name: str) -> bool:
+    return bool(name.strip()) and not has_term(name, FACT_TERMS)
+
+
 NEWS_ONLY = {"news", "podcasts", "news commentary", "daily news"}
 
 

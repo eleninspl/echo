@@ -242,3 +242,13 @@ def test_the_website_is_an_http_link_only():
     assert links_of(invented_person(official_website=["http://example.com"])) == {"website": "http://example.com"}
     for bad in (["javascript:alert(1)"], ["example.com"], ["https://"], ["https://exa mple.com"], [], None, [3]):
         assert "website" not in links_of(invented_person(official_website=bad))
+
+
+def test_the_bio_screens_awards_that_say_who_someone_is():
+    person = invented_person(
+        award_received=["GLAAD Example Award", "Example Gay Film Prize", "NAACP Example Award", "Example Comedy Award"],
+        employer=["Example Latino Network", "Example Studio"],
+    )
+    assert (
+        bio_of(person, "Comedian", TODAY) == "Comedian. Received Example Comedy Award. Has worked for Example Studio."
+    )
