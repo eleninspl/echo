@@ -166,6 +166,35 @@ def test_mock_revise_follows_the_instruction(mock):
     assert "warmer" in warmer["body"] and warmer["subject"] == written["subject"]
 
 
+def test_mock_drafts_state_the_details_with_each_guests_own_on_top(mock):
+    request = {
+        "guest_refs": ["g1", "g3"],
+        "details": {"dates": "This month", "fee": "$300", "format": "remote", "length": "60 min"},
+        "details_by_ref": {"g3": {"unpaid": True, "dates": "  "}},
+    }
+    drafts = mock.post("/drafts", json={"analysis_id": "an_example", **request}).json()["drafts"]
+    first, third = (d["body"] for d in drafts)
+    assert "Recording: This month. Fee: $300. Format: remote. Length: 60 min." in first
+    assert "Recording: This month. Fee: unpaid. Format: remote." in third and "$300" not in third
+    assert "Recording" not in draft(mock, guest_refs=["g1"])["body"]
+
+
+def test_a_mock_revise_keeps_the_details(mock):
+    details = {"details": {"format": "remote"}, "details_by_ref": {"g1": {"fee": "$50"}}}
+    written = draft(mock, guest_refs=["g1"], host_name="Sam", **details)
+    revise = {"guest_refs": ["g1"], "previous": {"subject": written["subject"], "body": written["body"]}}
+    shorter = draft(mock, **revise, **details, instruction="Shorter")
+    assert "Fee: $50. Format: remote." in shorter["body"] and shorter["body"].endswith("Sam")
+    assert shorter["body"].count("Fee:") == 1
+
+
+def test_details_for_a_guest_not_asked_for_are_a_400(mock):
+    request = {"analysis_id": "an_example", "guest_refs": ["g1"], "details_by_ref": {"g2": {"fee": "$10"}}}
+    assert mock.post("/drafts", json=request).status_code == 400
+    too_long = {"analysis_id": "an_example", "guest_refs": ["g1"], "details": {"dates": "x" * 81}}
+    assert mock.post("/drafts", json=too_long).status_code == 400
+
+
 def test_a_note_for_a_guest_not_asked_for_is_a_400(mock):
     request = {"analysis_id": "an_example", "guest_refs": ["g1"], "notes": {"g2": "Hi"}}
     assert mock.post("/drafts", json=request).status_code == 400

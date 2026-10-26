@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useId, useState, type CSSProperties, type FormEvent } from "react";
 
-import { echo, type Analysis, type Draft, type Guest } from "@/lib/echo";
+import { echo, type Analysis, type Draft, type Guest, type InviteDetails } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
 import { saveHostName, useHostName } from "@/lib/host-name";
 import {
+  DETAIL_LIMITS,
   NOTE_LIMIT,
   SHARED_NOTE_LIMIT,
+  cleanDetails,
   isEmail,
   mailto,
+  mergedDetails,
   saved,
+  useDetails,
   useDrafts,
   useEmails,
   useNotes,
@@ -63,8 +67,15 @@ export function Invite({
     .map((ref) => analysis.guests.find((guest) => guest.ref === ref))
     .filter((guest): guest is Guest => guest !== undefined);
   const missing = guests.filter((guest) => !drafts[guest.ref]).map((guest) => guest.ref);
+  const [details, setDetails] = useDetails(analysis.show.id);
   const noteFor = (ref: string) => notes.perGuest[ref]?.trim().slice(0, NOTE_LIMIT) || undefined;
   const forAll = notes.forAll.trim() || undefined;
+  const sharedDetails = cleanDetails(details.forAll);
+  // A guest's own dates and fee are kept by their entity ID, like their email.
+  const ownDetails = (ref: string) => {
+    const guest = guests.find((each) => each.ref === ref);
+    return guest ? cleanDetails(details.perGuest[guest.id]) : undefined;
+  };
 
   async function write(refs: string[]) {
     setConfirm(null);
@@ -85,6 +96,13 @@ export function Invite({
           note: forAll,
           notes: Object.fromEntries(
             guest_refs.flatMap((ref) => [[ref, noteFor(ref) ?? ""]]).filter(([, note]) => note),
+          ),
+          details: sharedDetails,
+          details_by_ref: Object.fromEntries(
+            guest_refs.flatMap((ref) => {
+              const own = ownDetails(ref);
+              return own ? [[ref, own]] : [];
+            }),
           ),
         }),
       ),
@@ -165,6 +183,16 @@ export function Invite({
           onSubmit={submit}
           className="grid gap-5 border-t border-steel pt-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_auto] md:items-end md:gap-x-6"
         >
+          <fieldset className="flex flex-col gap-4 md:col-span-3">
+            <legend className="mb-4 flex items-baseline gap-2">
+              <span className="font-display text-base font-semibold">{one ? "The details" : "For everyone"}</span>
+              <span className="text-sm text-ink-dim">all optional</span>
+            </legend>
+            <SharedDetails
+              details={details.forAll}
+              onChange={(change) => setDetails((current) => ({ ...current, forAll: { ...current.forAll, ...change } }))}
+            />
+          </fieldset>
           {savedName && !renaming ? (
             <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft md:pb-3">
               Signed as <span className="font-semibold text-ink">{savedName}</span>
@@ -190,7 +218,7 @@ export function Invite({
             </label>
           )}
           <label className="flex flex-col gap-1.5">
-            <span className="tag text-ink-dim">{one ? "Anything to mention" : "For everyone"}</span>
+            <span className="tag text-ink-dim">Anything else</span>
             <input
               value={notes.forAll}
               onChange={(event) =>
@@ -200,7 +228,7 @@ export function Invite({
                 }))
               }
               maxLength={SHARED_NOTE_LIMIT}
-              placeholder="Dates you record, the fee, a recent episode…"
+              placeholder="A recent episode, why now…"
               className={input}
             />
           </label>
@@ -244,7 +272,22 @@ export function Invite({
                   perGuest: { ...current.perGuest, [guest.ref]: note },
                 }))
               }
-              revise={{ hostName, note: forAll, guestNote: noteFor(guest.ref) }}
+              sharedDetails={details.forAll}
+              ownDetails={details.perGuest[guest.id] ?? {}}
+              onOwnDetails={(own) =>
+                setDetails((current) => {
+                  const perGuest = { ...current.perGuest, [guest.id]: own };
+                  if (!cleanDetails(own)) delete perGuest[guest.id];
+                  return { ...current, perGuest };
+                })
+              }
+              revise={{
+                hostName,
+                note: forAll,
+                guestNote: noteFor(guest.ref),
+                details: sharedDetails,
+                guestDetails: ownDetails(guest.ref),
+              }}
               notSetUp={notSetUp}
               onChange={(draft) => update(guest.ref, draft)}
               onWriteAgain={() => writeAgain([guest.ref], guest.ref)}
@@ -313,7 +356,16 @@ type CardProps = {
   onEmail: (email: string) => void;
   note: string;
   onNote: (note: string) => void;
-  revise: { hostName?: string; note?: string; guestNote?: string };
+  sharedDetails: InviteDetails;
+  ownDetails: InviteDetails;
+  onOwnDetails: (own: InviteDetails) => void;
+  revise: {
+    hostName?: string;
+    note?: string;
+    guestNote?: string;
+    details?: InviteDetails;
+    guestDetails?: InviteDetails;
+  };
   notSetUp: boolean;
   onChange: (draft: SavedDraft) => void;
   onWriteAgain: () => void;
@@ -332,6 +384,9 @@ function GuestCard({
   onEmail,
   note,
   onNote,
+  sharedDetails,
+  ownDetails,
+  onOwnDetails,
   revise,
   notSetUp,
   onChange,
@@ -404,6 +459,8 @@ function GuestCard({
         </label>
       </div>
 
+      <GuestDetailsFields name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
+
       {writing ? (
         <div aria-live="polite" className="flex flex-col gap-3 border-t border-steel pt-5">
           <span className="sr-only">Writing the invitation to {guest.name}</span>
@@ -472,6 +529,8 @@ function DraftBody({
         host_name: revise.hostName,
         note: revise.note,
         notes: revise.guestNote ? { [guest.ref]: revise.guestNote } : undefined,
+        details: revise.details,
+        details_by_ref: revise.guestDetails ? { [guest.ref]: revise.guestDetails } : undefined,
         previous: { subject: draft.subject, body: draft.body },
         instruction: instruction.trim(),
       });
@@ -557,6 +616,279 @@ function DraftBody({
           </span>{" "}
           <span className="text-ink-soft">{problem.message}</span>
         </p>
+      )}
+    </div>
+  );
+}
+
+const small = "field h-10 w-full min-w-0 px-3 text-sm";
+
+const DATE_CHIPS = ["This month", "Next month", "Flexible"];
+
+const FORMATS = [
+  { value: "in_person", name: "In person" },
+  { value: "remote", name: "Remote" },
+] as const;
+
+const TEXT_FIELDS = [
+  { key: "length", label: "Length", placeholder: "60 min" },
+  { key: "release", label: "Release", placeholder: "March" },
+  { key: "reply_by", label: "Reply by", placeholder: "Fri 7 Nov" },
+] as const;
+
+// The details every invitation states: a compact grid, every field optional.
+function SharedDetails({
+  details,
+  onChange,
+}: {
+  details: InviteDetails;
+  onChange: (change: Partial<InviteDetails>) => void;
+}) {
+  const id = useId();
+  // Six columns: dates, fee and format take a row each on a phone; length, release and reply-by are always three
+  // across.
+  return (
+    <div className="grid grid-cols-6 items-start gap-x-3 gap-y-4 sm:gap-x-5">
+      <DatesInput
+        value={details.dates ?? ""}
+        onChange={(dates) => onChange({ dates })}
+        className="col-span-6 sm:col-span-3 lg:col-span-2"
+      />
+      <FeeInput
+        fee={details.fee ?? ""}
+        unpaid={details.unpaid ?? false}
+        onChange={(fee, unpaid) => onChange({ fee, unpaid })}
+        className="col-span-6 sm:col-span-3 lg:col-span-2"
+      />
+      <div className="col-span-6 flex flex-col gap-1.5 lg:col-span-2">
+        <span id={`${id}-format`} className="tag text-ink-dim">
+          Format
+        </span>
+        <div role="group" aria-labelledby={`${id}-format`} className="flex items-center gap-1.5">
+          {FORMATS.map((format) => {
+            const on = details.format === format.value;
+            return (
+              <button
+                key={format.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onChange({ format: on ? undefined : format.value })}
+                className={`btn btn-sm min-h-10 shrink-0 ${on ? "btn-solid" : ""}`}
+              >
+                {format.name}
+              </button>
+            );
+          })}
+          {details.format === "in_person" && (
+            <input
+              aria-label="Where"
+              value={details.place ?? ""}
+              onChange={(event) => onChange({ place: event.target.value })}
+              maxLength={DETAIL_LIMITS.place}
+              placeholder="Where"
+              className={`${small} flex-1`}
+            />
+          )}
+        </div>
+      </div>
+      {TEXT_FIELDS.map((field) => (
+        <label key={field.key} className="col-span-2 flex flex-col gap-1.5">
+          <span className="tag text-ink-dim">{field.label}</span>
+          <input
+            value={details[field.key] ?? ""}
+            onChange={(event) => onChange({ [field.key]: event.target.value })}
+            maxLength={DETAIL_LIMITS[field.key]}
+            placeholder={field.placeholder}
+            className={small}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Recording dates in words, with a few quick picks. `placeholder` shows what applies when it's left blank.
+function DatesInput({
+  value,
+  onChange,
+  placeholder = "Weekdays in March",
+  className = "",
+}: {
+  value: string;
+  onChange: (dates: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label htmlFor={id} className="tag text-ink-dim">
+        Recording dates
+      </label>
+      <input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        maxLength={DETAIL_LIMITS.dates}
+        placeholder={placeholder}
+        className={small}
+      />
+      <div className="flex flex-wrap gap-1">
+        {DATE_CHIPS.map((chip) => {
+          const on = value.trim() === chip;
+          return (
+            <button
+              key={chip}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(on ? "" : chip)}
+              className={`rounded-full px-2.5 py-0.5 text-xs ring-1 transition-colors ${on ? "bg-deck-hi text-ink ring-ink/40" : "text-ink-soft ring-ink/12 hover:bg-deck-hi hover:text-ink"}`}
+            >
+              {chip}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// The fee as an amount in words, or unpaid.
+function FeeInput({
+  fee,
+  unpaid,
+  onChange,
+  placeholder = "$300",
+  className = "",
+}: {
+  fee: string;
+  unpaid: boolean;
+  onChange: (fee: string, unpaid: boolean) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label htmlFor={id} className="tag text-ink-dim">
+        Fee
+      </label>
+      <div className="flex gap-1.5">
+        <input
+          id={id}
+          value={unpaid ? "" : fee}
+          onChange={(event) => onChange(event.target.value, false)}
+          disabled={unpaid}
+          maxLength={DETAIL_LIMITS.fee}
+          placeholder={unpaid ? "No fee" : placeholder}
+          className={`${small} flex-1 disabled:opacity-60`}
+        />
+        <button
+          type="button"
+          aria-pressed={unpaid}
+          onClick={() => onChange(fee, !unpaid)}
+          className={`btn btn-sm min-h-10 shrink-0 ${unpaid ? "btn-solid" : ""}`}
+        >
+          Unpaid
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// The details as short phrases, a guest's own ones marked.
+function detailWords(details: InviteDetails, own: InviteDetails | undefined) {
+  const where =
+    details.format === "remote"
+      ? "Remote"
+      : details.place
+        ? `In person, ${details.place}`
+        : details.format === "in_person"
+          ? "In person"
+          : "";
+  const words = [
+    { key: "dates", text: details.dates, own: Boolean(own?.dates) },
+    { key: "fee", text: details.unpaid ? "Unpaid" : details.fee, own: Boolean(own?.fee || own?.unpaid) },
+    { key: "format", text: where, own: false },
+    { key: "length", text: details.length, own: false },
+    { key: "release", text: details.release && `Out ${details.release}`, own: false },
+    { key: "reply_by", text: details.reply_by && `Reply by ${details.reply_by}`, own: false },
+  ];
+  return words.filter((word): word is typeof word & { text: string } => Boolean(word.text));
+}
+
+// On a guest's card: the details their invitation states, and their own dates and fee in place of everyone's.
+function GuestDetailsFields({
+  name,
+  shared,
+  own,
+  onOwn,
+}: {
+  name: string;
+  shared: InviteDetails;
+  own: InviteDetails;
+  onOwn: (own: InviteDetails) => void;
+}) {
+  const [opened, setOpened] = useState(false);
+  const forAll = cleanDetails(shared);
+  const theirs = cleanDetails(own);
+  const open = opened || theirs !== undefined;
+  const words = detailWords(mergedDetails(forAll, theirs), theirs);
+  const change = (next: InviteDetails) => {
+    setOpened(true);
+    onOwn(next);
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      {(words.length > 0 || !open) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {words.length > 0 && (
+            <ul aria-label={`Details for ${name}`} className="flex min-w-0 flex-wrap gap-1.5">
+              {words.map((word) => (
+                <li
+                  key={word.key}
+                  className={`max-w-full truncate rounded-full px-2.5 py-0.5 text-xs ring-1 ${word.own ? "text-ink ring-brand/60" : "text-ink-soft ring-steel-hi"}`}
+                >
+                  {word.text}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!open && (
+            <button
+              type="button"
+              onClick={() => setOpened(true)}
+              className="px-1 text-xs text-ink-soft underline underline-offset-4 hover:text-ink"
+            >
+              {forAll?.dates || forAll?.fee || forAll?.unpaid ? "Change for them" : "Dates or fee for them"}
+            </button>
+          )}
+        </div>
+      )}
+      {open && (
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          <DatesInput
+            value={own.dates ?? ""}
+            onChange={(dates) => change({ ...own, dates })}
+            placeholder={forAll?.dates ?? "Same as everyone"}
+          />
+          <FeeInput
+            fee={own.fee ?? ""}
+            unpaid={own.unpaid ?? false}
+            onChange={(fee, unpaid) => change({ ...own, fee, unpaid })}
+            placeholder={forAll?.unpaid ? "Unpaid" : (forAll?.fee ?? "Same as everyone")}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              onOwn({});
+              setOpened(false);
+            }}
+            className="justify-self-start px-1 text-xs text-ink-soft underline underline-offset-4 hover:text-ink sm:col-span-2"
+          >
+            Same as everyone
+          </button>
+        </div>
       )}
     </div>
   );
