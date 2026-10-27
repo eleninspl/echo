@@ -308,3 +308,31 @@ def test_search_finds_the_failing_shows_by_title(mock):
 
 def test_httpx_does_not_log_every_request():
     assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+
+
+def test_mock_map_lens_bridge_and_taste_fans(mock):
+    analysis = mock.get("/analyses/an_example").json()
+    lens = mock.get("/analyses/an_example/map", params={"age": "24_and_younger"}).json()
+    assert lens["age"] == "24_and_younger" and lens["audience_map"] != analysis["audience_map"]
+    bridge = mock.get("/analyses/an_example/guests/g1/bridge").json()
+    assert bridge["both"] and bridge["yours"] and bridge["theirs"]
+    film = next(row for row in analysis["audience_map"] if row["category"] == "film")["items"][0]["name"]
+    fans = mock.get("/analyses/an_example/taste", params={"category": "film", "name": film}).json()
+    assert len(fans["guests"]) == len(analysis["guests"])
+    assert mock.get("/analyses/an_example/taste", params={"category": "film", "name": "Nope"}).status_code == 404
+
+
+def test_mock_chat_about_a_taste(mock):
+    analysis = mock.get("/analyses/an_example").json()
+    film = next(row for row in analysis["audience_map"] if row["category"] == "film")["items"][0]["name"]
+    reply = mock.post(
+        "/chat",
+        json={
+            "analysis_id": "an_example",
+            "messages": [{"role": "user", "content": "Who shares it?"}],
+            "taste": {"category": "film", "name": film},
+        },
+    ).json()
+    assert reply["action"] == "none"
+    assert reply["map"]["tastes"] == [film]
+    assert len(reply["guest_refs"]) == 2

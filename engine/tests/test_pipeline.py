@@ -395,7 +395,7 @@ def test_a_run_with_the_llm_puts_ideas_on_the_top_guests(engine, monkeypatch):
 
 
 def test_a_failed_llm_call_on_a_route_is_a_502_llm_error(engine, monkeypatch):
-    async def broken(analysis, messages):
+    async def broken(analysis, messages, taste=None):
         raise LlmError("the model sent nonsense")
 
     monkeypatch.setattr(llm, "chat", broken)
@@ -484,3 +484,149 @@ def test_a_rewritten_idea_comes_whole_and_for_a_guest_asked_for(engine):
     idea = {"title": "T", "pitch": "P", "reason": "R"}
     drafts = {"analysis_id": analysis["id"], "guest_refs": ["g1"], "ideas": {"g2": idea}}
     assert engine.post("/drafts", json=drafts).status_code == 400
+
+
+def test_the_map_for_one_age_group_costs_six_calls(engine):
+    analysis = run(engine)
+    before = calls_today(engine)
+    lens = engine.get(f"/analyses/{analysis['id']}/map", params={"age": "25_to_29"}).json()
+    assert calls_today(engine) - before == 6
+    assert lens["age"] == "25_to_29"
+    names = {item["name"] for row in lens["audience_map"] for item in row["items"]}
+    plain = {item["name"] for row in analysis["audience_map"] for item in row["items"]}
+    assert names and names != plain
+    assert all(item["id"] for row in lens["audience_map"] for item in row["items"])
+
+
+def test_the_map_without_a_lens_is_the_analysis_map(engine):
+    analysis = run(engine)
+    before = calls_today(engine)
+    lens = engine.get(f"/analyses/{analysis['id']}/map").json()
+    assert lens["audience_map"] == analysis["audience_map"]
+    assert calls_today(engine) == before
+
+
+def test_a_lens_with_no_data_says_so(engine):
+    analysis = run(engine)
+    response = engine.get(f"/analyses/{analysis['id']}/map", params={"country": "Nowhere"})
+    assert response.status_code == 400
+    assert response.json()["error"] == "filters_too_narrow"
+
+
+def test_the_map_for_an_unknown_country_says_so(engine):
+    analysis = run(engine)
+    response = engine.get(f"/analyses/{analysis['id']}/map", params={"country": "Atlantis"})
+    assert response.status_code == 400
+    assert response.json()["error"] == "unknown_country"
+
+
+def test_the_bridge_splits_both_maps_into_three(engine):
+    analysis = run(engine)
+    bridge = engine.get(f"/analyses/{analysis['id']}/guests/g2/bridge").json()
+    assert bridge["ref"] == "g2"
+
+    def names(key: str) -> set[tuple[str, str]]:
+        return {(row["category"], item["name"]) for row in bridge[key] for item in row["items"]}
+
+    both, yours, theirs = names("both"), names("yours"), names("theirs")
+    assert both and theirs
+    assert not both & yours and not both & theirs and not yours & theirs
+    details = engine.get(f"/analyses/{analysis['id']}/guests/g2").json()
+    adds = {(row["category"], item["name"]) for row in details["adds"] for item in row["items"]}
+    assert theirs == adds
+    totals = bridge["totals"]
+    assert sum(count["both"] for count in totals.values()) >= len(both)
+    assert all(count["theirs"] >= 0 for count in totals.values())
+    assert SHOW_TITLE not in {name for _, name in both | yours | theirs}
+
+
+def test_taste_fans_rank_the_guests_with_one_call(engine):
+    analysis = run(engine)
+    film = next(row for row in analysis["audience_map"] if row["category"] == "film")["items"][0]["name"]
+    before = calls_today(engine)
+    fans = engine.get(f"/analyses/{analysis['id']}/taste", params={"category": "film", "name": film}).json()
+    assert calls_today(engine) - before == 1
+    assert fans["name"] == film
+    refs = [guest["ref"] for guest in analysis["guests"]]
+    assert sorted(fan["ref"] for fan in fans["guests"]) == sorted(refs)
+    values = [fan["affinity"] for fan in fans["guests"]]
+    assert values == sorted(values, reverse=True)
+
+
+def test_taste_fans_find_tastes_beyond_the_top_eight_and_in_a_lens(engine):
+    analysis = run(engine)
+    lens = engine.get(f"/analyses/{analysis['id']}/map", params={"age": "24_and_younger"}).json()
+    shown = {item["name"] for row in analysis["audience_map"] for item in row["items"]}
+    only_there = next(
+        item["name"]
+        for row in lens["audience_map"]
+        if row["category"] == "film"
+        for item in row["items"]
+        if item["name"] not in shown
+    )
+    url = f"/analyses/{analysis['id']}/taste"
+    assert engine.get(url, params={"category": "film", "name": only_there}).json()["guests"]
+    fans = engine.get(url, params={"category": "film", "name": only_there, "age": "24_and_younger"})
+    assert fans.status_code == 200 and fans.json()["guests"]
+    assert engine.get(url, params={"category": "film", "name": "Not a taste"}).status_code == 404
+
+
+def test_a_book_qloo_cannot_use_has_no_fans(engine):
+    analysis = run(engine)
+    book = next(row for row in analysis["audience_map"] if row["category"] == "books")["items"][0]["name"]
+    fans = engine.get(f"/analyses/{analysis['id']}/taste", params={"category": "books", "name": book}).json()
+    assert fans["guests"] == []
+
+
+def test_the_chat_about_a_taste_gets_its_fans_and_points_at_it(engine, monkeypatch):
+    analysis = run(engine)
+    film = next(row for row in analysis["audience_map"] if row["category"] == "film")["items"][0]["name"]
+    seen = {}
+
+    async def chat(analysis, messages, taste=None):
+        seen["taste"] = taste
+        return llm.ChatDecision(reply="Fans of it like Person 10.", action="none", guest_refs=["g1"])
+
+    monkeypatch.setattr(llm, "chat", chat)
+    reply = engine.post(
+        "/chat",
+        json={
+            "analysis_id": analysis["id"],
+            "messages": [{"role": "user", "content": "Who shares this?"}],
+            "taste": {"category": "film", "name": film},
+        },
+    ).json()
+    assert seen["taste"].name == film and seen["taste"].guests
+    assert reply["action"] == "none"
+    assert reply["guest_refs"] == ["g1"]
+
+
+def test_the_chat_says_when_a_country_it_points_at_has_no_data(engine, monkeypatch):
+    analysis = run(engine)
+
+    async def chat(analysis, messages, taste=None):
+        focus = llm.MapFocus(category="film", country="Nowhere")
+        return llm.ChatDecision(reply="The map now shows them.", action="none", map=focus)
+
+    monkeypatch.setattr(llm, "chat", chat)
+    reply = engine.post(
+        "/chat",
+        json={"analysis_id": analysis["id"], "messages": [{"role": "user", "content": "What do they watch there?"}]},
+    ).json()
+    assert reply["reply"] == "The map now shows them. Echo has too little taste data on those listeners."
+    assert reply["map"] == {"category": "film", "tastes": [], "age": None, "country": None}
+
+
+def test_the_chat_names_what_a_country_leans_to(engine, monkeypatch):
+    analysis = run(engine)
+
+    async def chat(analysis, messages, taste=None):
+        return llm.ChatDecision(reply="The map now shows them.", action="none", map=llm.MapFocus(country="Canada"))
+
+    monkeypatch.setattr(llm, "chat", chat)
+    reply = engine.post(
+        "/chat",
+        json={"analysis_id": analysis["id"], "messages": [{"role": "user", "content": "And in Canada?"}]},
+    ).json()
+    assert reply["map"]["country"] == "Canada" and len(reply["map"]["tastes"]) == 3
+    assert reply["reply"].startswith("The map now shows them. Listeners in Canada lean most to ")

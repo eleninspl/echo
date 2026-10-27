@@ -18,10 +18,11 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { Analysis, Idea, Step } from "@/lib/echo";
+import type { Analysis, Idea, MapFocus, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
+import type { Ask, Pointer } from "@/lib/pointer";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
@@ -56,6 +57,11 @@ type OpenAnalysis = {
   rerun: Rerun;
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
+  pointer: Pointer | null;
+  onClearPointer: () => void;
+  bridged: string | null;
+  onBridge: (guestId: string | null) => void;
+  onAsk: (ask: Ask) => void;
 };
 
 export type Rewrite = { id: string; ref: string; idea: Idea };
@@ -84,6 +90,20 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   const missing = analysis?.status === "done" ? saved.filter(({ id }) => !guests.some((guest) => guest.id === id)) : [];
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
   const [askSlot, setAskSlot] = useState<HTMLElement | null>(null);
+  const [pointer, setPointer] = useState<Pointer | null>(null);
+  const [bridged, setBridged] = useState<string | null>(null);
+  const pointed = useRef(0);
+  const asker = useRef<((ask: Ask) => void) | null>(null);
+  const onPoint = useCallback((focus: MapFocus) => {
+    pointed.current += 1;
+    setBridged(null);
+    setPointer({ ...focus, key: pointed.current });
+  }, []);
+  const onClearPointer = useCallback(() => setPointer(null), []);
+  const onAsker = useCallback((ask: ((ask: Ask) => void) | null) => {
+    asker.current = ask;
+  }, []);
+  const onAsk = useCallback((ask: Ask) => asker.current?.(ask), []);
   const openedHere = useRef(false);
   const openGuest = openId === id ? guestRef : null;
 
@@ -235,17 +255,47 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         rerun,
         rewritten,
         onAskSlot: setAskSlot,
+        pointer,
+        onClearPointer,
+        bridged,
+        onBridge: setBridged,
+        onAsk,
       }}
     >
       {children}
-      <Chat analysis={analysis} onRerun={showRun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
+      <Chat
+        analysis={analysis}
+        onRerun={showRun}
+        onRewrite={rewrite}
+        onPoint={onPoint}
+        onOpenGuest={onOpen}
+        onAsker={onAsker}
+        beside={openGuest !== null}
+        slot={askSlot}
+      />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, openGuest, onOpen, onClose, picked, onPick, missing, onForget, rerun, rewritten, onAskSlot } =
-    useOpenAnalysis();
+  const {
+    analysis,
+    openGuest,
+    onOpen,
+    onClose,
+    picked,
+    onPick,
+    missing,
+    onForget,
+    rerun,
+    rewritten,
+    onAskSlot,
+    pointer,
+    onClearPointer,
+    bridged,
+    onBridge,
+    onAsk,
+  } = useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
@@ -282,7 +332,10 @@ export function Console() {
         show={analysis.show}
         lock="show-head"
         stops={[
-          { id: "top-picks", label: guests.some(({ label }) => label === "sweet_spot") ? "Start with these" : "Closest" },
+          {
+            id: "top-picks",
+            label: guests.some(({ label }) => label === "sweet_spot") ? "Start with these" : "Closest",
+          },
           { id: "scope", label: "Compare" },
           { id: "guests", label: "Ranked" },
           { id: "tastes", label: "Listeners" },
@@ -346,7 +399,17 @@ export function Console() {
           className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
         >
           <div className="@3xl:col-span-3">
-            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} rerun={rerun} />
+            <TasteMap
+              key={`tastes-${analysis.id}`}
+              analysis={analysis}
+              rerun={rerun}
+              pointer={pointer}
+              onClearPointer={onClearPointer}
+              bridged={bridged}
+              onBridge={onBridge}
+              onAsk={onAsk}
+              onOpen={onOpen}
+            />
           </div>
           <FanAges stats={figures} />
           <CommonGround guests={guests} />
@@ -363,6 +426,7 @@ export function Console() {
         onPick={onPick}
         onOpen={onOpen}
         onClose={onClose}
+        onBridge={onBridge}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>

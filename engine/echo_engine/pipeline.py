@@ -25,10 +25,12 @@ from .cleanup import (
 from .models import (
     AgeBucket,
     Analysis,
+    BridgeCount,
     EpisodeAbout,
     Evidence,
     Filters,
     Guest,
+    GuestBridge,
     GuestMaps,
     LeftOut,
     MapItem,
@@ -36,6 +38,9 @@ from .models import (
     Person,
     Scores,
     Show,
+    TasteAsk,
+    TasteFan,
+    TasteFans,
 )
 from .qloo_client import QlooClient, QlooError
 from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_fact, clean_name, clean_person, clean_tag_name
@@ -224,16 +229,25 @@ async def show_entity(client: QlooClient, show_id: str) -> dict:
     return podcasts[0]
 
 
-async def map_lists(client: QlooClient, entity_id: str, leave_out: str | None = None) -> dict[str, list[MapItem]]:
+async def map_lists(
+    client: QlooClient, entity_id: str, leave_out: str | None = None, signals: dict[str, str] | None = None
+) -> dict[str, list[MapItem]]:
     """The audience map of `entity_id`, without itself and without `leave_out` (the show, on a guest's map)."""
     skip = {entity_id.upper(), (leave_out or "").upper()}
 
     async def one(kind: str) -> list[MapItem]:
         try:
             data = await client.insights(
-                {"filter.type": f"urn:entity:{kind}", "signal.interests.entities": entity_id, "take": MAP_TAKE}
+                {
+                    "filter.type": f"urn:entity:{kind}",
+                    "signal.interests.entities": entity_id,
+                    "take": MAP_TAKE,
+                    **(signals or {}),
+                }
             )
         except QlooError as error:
+            if error.status == 400 and "locality" in error.body.lower():
+                raise AnalysisFailed("unknown_country", "Echo doesn't recognise that country.") from error
             if error.status == 400:
                 return []
             raise
@@ -242,7 +256,13 @@ async def map_lists(client: QlooClient, entity_id: str, leave_out: str | None = 
         if len(listed) - len(kept) > len(listed) * MAP_SCREENED:
             return []
         return [
-            MapItem(name=e["name"].strip(), image_url=image_of(e), affinity=round(affinity(e) or 0.0, 3)) for e in kept
+            MapItem(
+                name=e["name"].strip(),
+                image_url=image_of(e),
+                affinity=round(affinity(e) or 0.0, 3),
+                id=e.get("entity_id"),
+            )
+            for e in kept
         ]
 
     lists = await asyncio.gather(*(one(kind) for _, kind in MAP_TYPES))
@@ -877,3 +897,75 @@ async def guest_maps(client: QlooClient, analysis: Analysis, guest: Guest) -> Gu
         known = shared | {normalize(item.name) for item in show_lists.get(category, [])}
         adds[category] = [item for item in items if normalize(item.name) not in known]
     return GuestMaps(audience_map=rows_of(guest_lists), adds=rows_of(adds))
+
+
+def lens_signals(age: AgeBucket | None, country: str | None) -> dict[str, str]:
+    signals = {}
+    if age:
+        signals["signal.demographics.age"] = age
+    if country:
+        signals["signal.location.query"] = country
+    return signals
+
+
+async def lens_map(client: QlooClient, analysis: Analysis, age: AgeBucket | None, country: str | None) -> list[MapRow]:
+    if not age and not country:
+        return analysis.audience_map
+    return rows_of(await map_lists(client, analysis.show.id, signals=lens_signals(age, country)))
+
+
+async def guest_bridge(client: QlooClient, analysis: Analysis, guest: Guest) -> GuestBridge:
+    show_lists, guest_lists = await asyncio.gather(
+        map_lists(client, analysis.show.id), map_lists(client, guest.id, analysis.show.id)
+    )
+    loved_by_both = {normalize(name) for name in (guest.evidence.shared_tastes if guest.evidence else [])}
+    both, yours, theirs = {}, {}, {}
+    for category, _ in MAP_TYPES:
+        ours = show_lists.get(category, [])
+        their = guest_lists.get(category, [])
+        our_rank = {normalize(item.name): rank for rank, item in enumerate(ours)}
+        their_rank = {normalize(item.name): rank for rank, item in enumerate(their)}
+        shared = sorted(
+            (item for item in ours if normalize(item.name) in their_rank),
+            key=lambda item: our_rank[normalize(item.name)] + their_rank[normalize(item.name)],
+        )
+        also = [item for item in their if normalize(item.name) in loved_by_both - our_rank.keys()]
+        both[category] = shared + also
+        yours[category] = [item for item in ours if normalize(item.name) not in their_rank]
+        theirs[category] = [item for item in their if normalize(item.name) not in our_rank.keys() | loved_by_both]
+    totals = {
+        category: BridgeCount(both=len(both[category]), yours=len(yours[category]), theirs=len(theirs[category]))
+        for category, _ in MAP_TYPES
+        if both[category] or yours[category] or theirs[category]
+    }
+    return GuestBridge(ref=guest.ref, both=rows_of(both), yours=rows_of(yours), theirs=rows_of(theirs), totals=totals)
+
+
+async def taste_fans(client: QlooClient, analysis: Analysis, ask: TasteAsk) -> TasteFans | None:
+    wanted = normalize(ask.name)
+
+    def find(rows: Sequence[MapRow]) -> MapItem | None:
+        return next(
+            (i for row in rows if row.category == ask.category for i in row.items if normalize(i.name) == wanted), None
+        )
+
+    item = find(await lens_map(client, analysis, ask.age, ask.country))
+    if item is None or item.id is None:
+        lists = await map_lists(client, analysis.show.id, signals=lens_signals(ask.age, ask.country))
+        item = find([MapRow(category=category, items=items) for category, items in lists.items()]) or item
+    if item is None:
+        return None
+    taste_id = item.id
+    fans = TasteFans(category=ask.category, name=item.name, guests=[])
+    if taste_id is None or not analysis.guests:
+        return fans
+    by_id = {guest.id: guest.ref for guest in analysis.guests}
+    try:
+        scores = await lens(client, {"filter.type": PERSON, "signal.interests.entities": taste_id}, list(by_id))
+    except QlooError as error:
+        if is_rejected_input(error):
+            return fans
+        raise
+    ranked = sorted(((value, by_id[i]) for i, value in scores.items() if i in by_id), reverse=True)
+    fans.guests = [TasteFan(ref=ref, affinity=round(value, 3)) for value, ref in ranked]
+    return fans

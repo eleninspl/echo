@@ -18,11 +18,13 @@ from . import mock as mocked
 from .config import get_settings
 from .llm_client import LlmError
 from .models import (
+    AgeBucket,
     Analysis,
     AnalysisRequest,
     AnalysisStarted,
     Briefing,
     BriefingRequest,
+    ChatDecision,
     ChatReply,
     ChatRequest,
     Draft,
@@ -35,15 +37,20 @@ from .models import (
     FeaturedList,
     Filters,
     Guest,
+    GuestBridge,
     GuestDetails,
     GuestMaps,
     Health,
     InviteDetails,
+    MapLens,
+    MapRow,
     QlooCall,
     RewrittenIdea,
     Show,
     ShowList,
     Step,
+    TasteAsk,
+    TasteFans,
 )
 from .qloo_client import QlooClient, QlooError
 from .store import AnalysisStore, Counters, LocalCounters, LocalStore, analysis_store, qloo_counters, request_key
@@ -242,6 +249,56 @@ class Engine:
             return GuestMaps.model_validate(self.example["guest_details"])
         async with self.client() as client:
             return await pipeline.guest_maps(client, analysis, guest)
+
+    async def lens_map(self, analysis: Analysis, age: AgeBucket | None, country: str | None) -> list[MapRow]:
+        if self.mock:
+            return mocked.lens_map(analysis.audience_map, age, country)
+        try:
+            async with self.client() as client:
+                rows = await pipeline.lens_map(client, analysis, age, country)
+        except pipeline.AnalysisFailed as error:
+            raise EchoError(400, error.code, error.message) from None
+        if not rows:
+            raise EchoError(400, "filters_too_narrow", "Echo has too little taste data on those listeners.")
+        return rows
+
+    async def bridge(self, analysis: Analysis, guest: Guest) -> GuestBridge:
+        if self.mock:
+            maps = GuestMaps.model_validate(self.example["guest_details"])
+            return mocked.bridge(guest.ref, analysis.audience_map, maps.audience_map, maps.adds)
+        async with self.client() as client:
+            return await pipeline.guest_bridge(client, analysis, guest)
+
+    async def with_lens(self, analysis: Analysis, decision: ChatDecision) -> ChatDecision:
+        focus = decision.map
+        if focus is None or not (focus.age or focus.country):
+            return decision
+        try:
+            rows = await self.lens_map(analysis, focus.age, focus.country)
+        except EchoError as error:
+            if error.code not in ("unknown_country", "filters_too_narrow"):
+                raise
+            decision.reply = f"{decision.reply} {error.message}"
+            decision.map = focus.model_copy(update={"age": None, "country": None, "tastes": []})
+            return decision
+        names = llm.lens_leaders(rows, focus.category)
+        if names:
+            focus.tastes = names
+            decision.reply = f"{decision.reply} {llm.lens_line(focus, names)}"
+        return decision
+
+    async def taste_fans(self, analysis: Analysis, ask: TasteAsk) -> TasteFans:
+        if self.mock:
+            fans = mocked.taste_fans(analysis.guests, mocked.lens_map(analysis.audience_map, ask.age, ask.country), ask)
+        else:
+            try:
+                async with self.client() as client:
+                    fans = await pipeline.taste_fans(client, analysis, ask)
+            except pipeline.AnalysisFailed as error:
+                raise EchoError(400, error.code, error.message) from None
+        if fans is None:
+            raise EchoError(404, "not_found", "That taste isn't on this map.")
+        return fans
 
 
 def up_to_date(analysis: Analysis) -> bool:
@@ -462,14 +519,47 @@ def create_app(
                 await engine.writings.put(analysis, guest, "episode", episode)
         return GuestDetails(ref=ref, audience_map=maps.audience_map, adds=maps.adds, episode=episode)
 
+    @app.get("/analyses/{analysis_id}/map")
+    async def map_lens(
+        analysis_id: str,
+        age: AgeBucket | None = None,
+        country: str | None = Query(None, min_length=2, max_length=60),
+    ) -> MapLens:
+        analysis = await engine.done(analysis_id)
+        return MapLens(age=age, country=country, audience_map=await engine.lens_map(analysis, age, country))
+
+    @app.get("/analyses/{analysis_id}/guests/{ref}/bridge")
+    async def guest_bridge(analysis_id: str, ref: str) -> GuestBridge:
+        analysis = await engine.done(analysis_id)
+        return await engine.bridge(analysis, engine.guest(analysis, ref))
+
+    @app.get("/analyses/{analysis_id}/taste")
+    async def taste(
+        analysis_id: str,
+        category: str = Query(min_length=1, max_length=20),
+        name: str = Query(min_length=1, max_length=300),
+        age: AgeBucket | None = None,
+        country: str | None = Query(None, min_length=2, max_length=60),
+    ) -> TasteFans:
+        analysis = await engine.done(analysis_id)
+        return await engine.taste_fans(analysis, TasteAsk(category=category, name=name, age=age, country=country))
+
     @app.post("/chat")
     async def chat(body: ChatRequest, tasks: BackgroundTasks) -> ChatReply:
         analysis = await engine.done(body.analysis_id)
         engine.mock_fails(analysis.show.id, "chat")
+        taste = None
+        if body.taste is not None:
+            try:
+                taste = await engine.taste_fans(analysis, body.taste)
+            except EchoError as error:
+                if error.code != "not_found":
+                    raise
         if engine.mock:
-            decision = mocked.decide(analysis.guests, analysis.filters, body.messages)
+            decision = mocked.decide(analysis.guests, analysis.filters, body.messages, analysis.audience_map, taste)
         else:
-            decision = await llm.chat(analysis, body.messages)
+            decision = await llm.chat(analysis, body.messages, taste)
+        decision = await engine.with_lens(analysis, decision)
         if decision.action == "rerun":
             rerun = await engine.start(analysis.show.id, decision.filters or analysis.filters, tasks)
             return ChatReply(reply=decision.reply, action="rerun", analysis_id=rerun.id)
@@ -478,7 +568,7 @@ def create_app(
             # every visitor. The web app keeps the visitor's own rewrites.
             engine.guest(analysis, decision.guest_ref)
             return ChatReply(reply=decision.reply, action="rewrite", guest_ref=decision.guest_ref, idea=decision.idea)
-        return ChatReply(reply=decision.reply, action="none")
+        return ChatReply(reply=decision.reply, action="none", map=decision.map, guest_refs=decision.guest_refs)
 
     @app.post("/drafts")
     async def drafts(body: DraftRequest) -> DraftList:

@@ -21,7 +21,7 @@ export type Filters = {
 export const THEME_LENGTH = 120;
 
 export type Step = { key: string; label: string; done: boolean };
-export type MapItem = { name: string; image_url: string | null; affinity: number };
+export type MapItem = { name: string; image_url: string | null; affinity: number; id?: string | null };
 export type MapRow = { category: string; items: MapItem[] };
 export type Scores = { fit: number; love_back: number; reach: number | null; echo: number };
 export type Evidence = { shared_tastes: string[]; new_podcasts: string[]; ages: AgeBucket[] };
@@ -78,12 +78,28 @@ export type Episode = {
 export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]; episode: Episode | null };
 export type Message = { role: "user" | "assistant"; content: string };
 
+export type Lens = { age: AgeBucket | null; country: string | null };
+export type MapLens = Lens & { audience_map: MapRow[] };
+export type BridgeCount = { both: number; yours: number; theirs: number };
+export type GuestBridge = {
+  ref: string;
+  both: MapRow[];
+  yours: MapRow[];
+  theirs: MapRow[];
+  totals?: Record<string, BridgeCount>;
+};
+export type TasteFans = { category: string; name: string; guests: { ref: string; affinity: number }[] };
+export type TasteAsk = Lens & { category: string; name: string };
+export type MapFocus = Lens & { category: string | null; tastes: string[] };
+
 export type ChatReply = {
   reply: string;
   action: "rerun" | "rewrite" | "none";
   analysis_id: string | null;
   guest_ref: string | null;
   idea: Idea | null;
+  map?: MapFocus | null;
+  guest_refs?: string[];
 };
 
 export type DraftText = { subject: string; body: string };
@@ -174,11 +190,27 @@ export const echo = {
       undefined,
       signal,
     ),
-  chat: (analysis_id: string, messages: Message[]) => call<ChatReply>("/chat", { analysis_id, messages }),
+  chat: (analysis_id: string, messages: Message[], taste?: TasteAsk) =>
+    call<ChatReply>("/chat", { analysis_id, messages, taste }),
+  lens: (id: string, lens: Lens, signal?: AbortSignal) =>
+    call<MapLens>(`/analyses/${encodeURIComponent(id)}/map?${lensQuery(lens)}`, undefined, signal),
+  bridge: (id: string, ref: string, signal?: AbortSignal) =>
+    call<GuestBridge>(
+      `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}/bridge`,
+      undefined,
+      signal,
+    ),
+  tasteFans: (id: string, taste: TasteAsk, signal?: AbortSignal) =>
+    call<TasteFans>(
+      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}&${lensQuery(taste)}`,
+      undefined,
+      signal,
+    ),
   drafts: (request: DraftRequest) =>
     call<{ drafts: Draft[] }>("/drafts", {
       ...request,
-      ideas: request.ideas && Object.fromEntries(Object.entries(request.ideas).map(([ref, idea]) => [ref, plain(idea)])),
+      ideas:
+        request.ideas && Object.fromEntries(Object.entries(request.ideas).map(([ref, idea]) => [ref, plain(idea)])),
     }),
   briefing: (analysis_id: string, guest_ref: string, idea?: Idea) =>
     call<{ markdown: string }>("/briefings", { analysis_id, guest_ref, idea: idea && plain(idea) }),
@@ -187,4 +219,11 @@ export const echo = {
 // An idea as the engine takes it, without the web app's own mark.
 function plain({ reason, title, pitch }: Idea) {
   return { reason, title, pitch };
+}
+
+function lensQuery({ age, country }: Lens): string {
+  const query = new URLSearchParams();
+  if (age) query.set("age", age);
+  if (country) query.set("country", country);
+  return query.toString();
 }

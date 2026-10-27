@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 
 import type { Analysis, Guest } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
+import { showTastes } from "@/lib/pointer";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
@@ -13,6 +14,9 @@ import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
 
+const BESIDE = "(min-width: 64rem)";
+const AFTER_CLOSE = 750;
+
 type Props = {
   analysis: Analysis;
   guestRef: string | null;
@@ -21,9 +25,10 @@ type Props = {
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
   onClose: () => void;
+  onBridge: (guestId: string) => void;
 };
 
-export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOpen, onClose }: Props) {
+export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOpen, onClose, onBridge }: Props) {
   const { guests } = analysis;
   const [last, setLast] = useState(guestRef);
   if (guestRef !== null && guestRef !== last) setLast(guestRef);
@@ -103,6 +108,15 @@ export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOp
             guest={guest}
             rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
+            onShowMap={() => {
+              onBridge(guest.id);
+              if (matchMedia(BESIDE).matches) {
+                showTastes();
+                return;
+              }
+              onClose();
+              window.setTimeout(showTastes, AFTER_CLOSE);
+            }}
           />
         ) : (
           <p className="px-5 pt-8 font-display text-2xl font-semibold sm:px-8">This guest isn&apos;t in this run.</p>
@@ -117,11 +131,13 @@ function GuestBody({
   guest,
   rewritten,
   heading,
+  onShowMap,
 }: {
   analysis: Analysis;
   guest: Guest;
   rewritten: boolean;
   heading: RefObject<HTMLHeadingElement | null>;
+  onShowMap: () => void;
 }) {
   const { scores, idea, evidence } = guest;
   const color = LABEL_HUE[guest.label];
@@ -232,6 +248,7 @@ function GuestBody({
         guestRef={guest.ref}
         idea={rewrittenIdea(guest)}
         showMap={analysis.audience_map}
+        onShowMap={onShowMap}
       />
 
       <Part id="sheet-brief" title="Before you record">

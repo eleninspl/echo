@@ -9,7 +9,25 @@ from typing import get_args
 from zlib import crc32
 
 from . import scoring
-from .models import THEME_LENGTH, AgeBucket, AnchorType, ChatDecision, EpisodeAbout, Filters, Guest, Idea, Message
+from .models import (
+    THEME_LENGTH,
+    AgeBucket,
+    AnchorType,
+    BridgeCount,
+    ChatDecision,
+    EpisodeAbout,
+    Filters,
+    Guest,
+    GuestBridge,
+    Idea,
+    MapFocus,
+    MapItem,
+    MapRow,
+    Message,
+    TasteAsk,
+    TasteFan,
+    TasteFans,
+)
 
 AGES: list[AgeBucket] = list(get_args(AgeBucket))
 AGE_WORDS = {
@@ -42,11 +60,38 @@ HELP = (
 )
 # Fewer guests than this after the filters fail the run, as the real engine does.
 MIN_GUESTS = 5
+CATEGORY_WORDS = [
+    ("books", r"\b(read|reads|reading|books?|novels?|authors?)\b"),
+    ("tv", r"\b(tv|series|television|binge)\b"),
+    ("film", r"\b(watch|watches|films?|movies?|cinema)\b"),
+    ("music", r"\b(music|listen to|bands?|artists?|singers?|songs?|jazz|rock|pop|hip.hop)\b"),
+    ("brands", r"\b(brands?|buy|shop|wear)\b"),
+    ("podcasts", r"\bpodcasts?\b"),
+]
+TASTE_QUESTION = re.compile(r"^(what|which|who|where|show me)\b(?! about\b)")
+CATEGORY_WORDS_SHOWN = {
+    "books": "read",
+    "tv": "watch on TV",
+    "film": "watch",
+    "music": "listen to",
+    "brands": "buy",
+    "podcasts": "listen to",
+}
 
 
-def decide(guests: list[Guest], current: Filters, messages: list[Message]) -> ChatDecision:
+def decide(
+    guests: list[Guest],
+    current: Filters,
+    messages: list[Message],
+    audience_map: list[MapRow] | None = None,
+    taste: TasteFans | None = None,
+) -> ChatDecision:
     text = next((m.content for m in reversed(messages) if m.role == "user"), "").strip()
     said = " ".join(text.lower().split())
+    if taste is not None:
+        return about_taste(guests, taste)
+    if TASTE_QUESTION.match(said) and (focus := map_question(audience_map or [], said)):
+        return focus
     if re.search(r"\b(idea|funn|shorter|rewrite|punchier|lighter|serious)", said):
         return rewrite(guests, said)
     filters, unclear = changed(current, text, said)
@@ -61,6 +106,45 @@ def decide(guests: list[Guest], current: Filters, messages: list[Message]) -> Ch
         f"Mock mode: running again for {', '.join(phrases)}." if phrases else "Mock mode: running again for everyone."
     )
     return ChatDecision(reply=reply, action="rerun", filters=filters)
+
+
+def about_taste(guests: list[Guest], taste: TasteFans) -> ChatDecision:
+    names = {guest.ref: guest for guest in guests}
+    named = [names[fan.ref] for fan in taste.guests[:2] if fan.ref in names]
+    focus = MapFocus(category=taste.category, tastes=[taste.name])
+    if not named:
+        reply = f"Mock mode: Echo can't tell whose fans like {taste.name}, but an episode built on it could still work."
+        return ChatDecision(reply=reply, action="none", map=focus)
+    who = " and ".join(guest.name for guest in named)
+    reply = (
+        f"Mock mode: fans of {taste.name} tend to like {who} too. "
+        f"An episode built on {taste.name} with {named[0].name} could work."
+    )
+    return ChatDecision(reply=reply, action="none", map=focus, guest_refs=[guest.ref for guest in named])
+
+
+def map_question(audience_map: list[MapRow], said: str) -> ChatDecision | None:
+    category = next((key for key, pattern in CATEGORY_WORDS if re.search(pattern, said)), None)
+    age = age_in(said)
+    if age is None and re.search(r"\byoung", said):
+        age = "24_and_younger"
+    elif age is None and re.search(r"\bold(er)?\b", said):
+        age = "55_and_older"
+    country = country_in(said)
+    if not (category or age or country or re.search(r"\b(like|love|into)\b", said)):
+        return None
+    row = next((row for row in audience_map if row.category == category), None)
+    tastes = [item.name for item in row.items[:3]] if row and not (age or country) else []
+    who = "your listeners"
+    if age:
+        who += f" aged {AGE_WORDS[age]}"
+    if country:
+        who += f" in {country}"
+    what = CATEGORY_WORDS_SHOWN.get(category or "", "love")
+    reply = f"Mock mode: here's what {who} {what} most, on the taste map."
+    return ChatDecision(
+        reply=reply, action="none", map=MapFocus(category=category, tastes=tastes, age=age, country=country)
+    )
 
 
 def rewrite(guests: list[Guest], said: str) -> ChatDecision:
@@ -219,3 +303,57 @@ def guests_for(guests: list[Guest], filters: Filters) -> list[Guest]:
     for rank, guest in enumerate(pool, start=1):
         guest.ref = f"g{rank}"
     return pool
+
+
+def lens_map(audience_map: list[MapRow], age: AgeBucket | None, country: str | None) -> list[MapRow]:
+    if not age and not country:
+        return audience_map
+    seed = f"{age}|{(country or '').lower()}"
+    rows = []
+    for row in audience_map:
+        items = sorted(row.items, key=lambda item: crc32(f"{item.name}|{seed}".encode()))
+        kept = [
+            MapItem(name=item.name, image_url=item.image_url, affinity=round(0.95 - 0.04 * rank, 3), id=item.id)
+            for rank, item in enumerate(items[:-1])
+        ]
+        new = MapItem(name=f"Example {row.category} pick for {AGE_WORDS.get(age or '', country)}", affinity=0.97)
+        rows.append(MapRow(category=row.category, items=[new, *kept]))
+    return rows
+
+
+def bridge(ref: str, audience_map: list[MapRow], guest_map: list[MapRow], adds: list[MapRow]) -> GuestBridge:
+    theirs = {row.category: {item.name for item in row.items} for row in guest_map}
+    new = {row.category: {item.name for item in row.items} for row in adds}
+    both, yours = [], []
+    for row in audience_map:
+        shared = theirs.get(row.category, set()) - new.get(row.category, set())
+        both.append(MapRow(category=row.category, items=[i for i in row.items if i.name in shared]))
+        yours.append(MapRow(category=row.category, items=[i for i in row.items if i.name not in shared]))
+    rows = {
+        "both": [row for row in both if row.items],
+        "yours": [row for row in yours if row.items],
+        "theirs": [row for row in adds if row.items],
+    }
+    counts = {where: {row.category: len(row.items) for row in found} for where, found in rows.items()}
+    categories = {category for found in counts.values() for category in found}
+    totals = {
+        category: BridgeCount(**{where: counts[where].get(category, 0) for where in rows}) for category in categories
+    }
+    return GuestBridge(ref=ref, **rows, totals=totals)
+
+
+def taste_fans(guests: list[Guest], rows: list[MapRow], ask: TasteAsk) -> TasteFans | None:
+    item = next(
+        (i for row in rows if row.category == ask.category for i in row.items if i.name.lower() == ask.name.lower()),
+        None,
+    )
+    if item is None:
+        return None
+    if ask.category == "books":
+        return TasteFans(category=ask.category, name=item.name, guests=[])
+    ordered = sorted(guests, key=lambda guest: crc32(f"{guest.name}|{item.name}".encode()))
+    return TasteFans(
+        category=ask.category,
+        name=item.name,
+        guests=[TasteFan(ref=guest.ref, affinity=round(0.9 - 0.02 * rank, 3)) for rank, guest in enumerate(ordered)],
+    )

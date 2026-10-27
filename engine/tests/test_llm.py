@@ -17,11 +17,14 @@ from echo_engine.models import (
     EpisodeAbout,
     GuestMaps,
     InviteDetails,
+    MapFocus,
     MapItem,
     MapRow,
     Message,
     Person,
     Show,
+    TasteFan,
+    TasteFans,
 )
 
 IDEA = {
@@ -428,4 +431,35 @@ def test_every_schema_is_strict(fake, analysis):
     asyncio.run(llm.write_ideas(analysis))
     with pytest.raises(LlmError):
         asyncio.run(llm.write_drafts(analysis, analysis.guests[:1], DraftRequest(analysis_id="a", guest_refs=["g1"])))
-    assert [strict(call["schema"]) for call in llm_fake.calls] == [4, 2, 2]
+    assert [strict(call["schema"]) for call in llm_fake.calls] == [5, 2, 2]
+
+
+def test_the_chat_points_the_map_at_tastes_it_names(fake, analysis):
+    books = next(row for row in analysis.audience_map if row.category == "books")
+    named = [books.items[0].name, "Not On The Map"]
+    focus = {"category": "books", "tastes": named, "age": None, "country": None}
+    fake(chat_decision=decision(map=focus, guest_refs=["g2", "g99", "g2"]))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="What do my listeners read?")]))
+    assert result.action == "none"
+    assert result.map == MapFocus(category="books", tastes=[books.items[0].name])
+    assert result.guest_refs == ["g2"]
+
+
+def test_the_chat_drops_an_empty_map_focus(fake, analysis):
+    fake(chat_decision=decision(map={"category": "comics", "tastes": [], "age": None, "country": " "}))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="Hi")]))
+    assert result.map is None
+
+
+def test_the_chat_about_a_taste_names_its_fans_and_points_at_it(fake, analysis):
+    film = next(row for row in analysis.audience_map if row.category == "film").items[0]
+    taste = TasteFans(
+        category="film", name=film.name, guests=[TasteFan(ref="g3", affinity=0.8), TasteFan(ref="g1", affinity=0.7)]
+    )
+    llm_fake = fake(chat_decision=decision(guest_refs=["g3"]))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="Who shares it?")], taste))
+    asked = facts_of(llm_fake.calls[0])["the_host_asks_about_this_taste"]
+    assert asked["name"] == film.name
+    assert [guest["ref"] for guest in asked["guests_whose_fans_like_it_most"]] == ["g3", "g1"]
+    assert result.map == MapFocus(category="film", tastes=[film.name])
+    assert result.guest_refs == ["g3"]
