@@ -24,7 +24,7 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 | Find the show | Search by name | `/search`, podcasts |
 | Map the audience | What the show's listeners like more than most people, in six categories | `/v2/insights` with the show as signal, once per category |
 | Candidates | The people the show's listeners like most, with less famous ones mixed in | `/v2/insights`, `filter.type=urn:entity:person` |
-| Clean-up | Drop people who have died, the show's own hosts (Apple's author line, checked by the LLM), past guests (names in the last 200 episode titles on Apple) and near-duplicates | Apple's podcast lookup, not Qloo |
+| Clean-up | Drop people who have died, the show's own hosts (Apple's author line, checked by the LLM), past guests (names in the show's episode titles, from Apple and the show's RSS feed) and near-duplicates | Apple's podcast lookup, not Qloo |
 | Score | Fit, love back and reach for each guest, below | `/v2/insights` per guest, and lenses with `filter.results.entities` |
 | Evidence | The tastes both audiences share, the podcasts the guest's fans like that are new to the show, and the age groups their fans lean to | `/v2/insights` with `filter.type=urn:tag` (an allow-list of tag types) and `urn:demographics` |
 | Ideas | An episode idea for the top guests, from the evidence and the theme | LLM |

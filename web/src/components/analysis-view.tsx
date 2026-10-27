@@ -23,7 +23,7 @@ import { describe, type HostError } from "@/lib/errors";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
-import { stats as computeStats, noteIdeas } from "@/lib/stats";
+import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
@@ -32,7 +32,7 @@ import { AskSection, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
-import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM, shownSteps } from "./hud";
+import { Chip, FRAME, hue, Lamp, SectionHead, SHEET_ROOM } from "./hud";
 import { LabelSpectrum, LockHeader, requestFilters, ShowLock } from "./lock-header";
 import { PageNav } from "./page-nav";
 import { PickBar } from "./pick-bar";
@@ -52,6 +52,7 @@ type OpenAnalysis = {
   // Picks for this show that aren't in this run, and a way to drop them.
   missing: Pick[];
   onForget: () => void;
+  onUnpick: (id: string) => void;
   rerun: Rerun;
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
@@ -72,7 +73,7 @@ export function useOpenAnalysis(): OpenAnalysis {
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { id, guestRef, inviting } = readPath(usePathname());
-  const { analysis, error, retry, update } = useAnalysis(id, noteIdeas);
+  const { analysis, error, retry, update } = useAnalysis(id);
   const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
   const openId = analysis?.id ?? null;
   const showId = analysis?.show.id ?? null;
@@ -165,11 +166,22 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
       keep(
         saved.some(({ id }) => id === guest.id)
           ? saved.filter(({ id }) => id !== guest.id)
-          : [...saved, { id: guest.id, name: guest.name }],
+          : [
+              ...saved,
+              {
+                id: guest.id,
+                name: guest.name,
+                analysis: openId ?? undefined,
+                ref: guest.ref,
+                image_url: guest.image_url ?? undefined,
+                label: guest.label,
+              },
+            ],
       );
     },
-    [guests, saved, keep],
+    [guests, saved, keep, openId],
   );
+  const onUnpick = useCallback((id: string) => keep(saved.filter((pick) => pick.id !== id)), [saved, keep]);
   const onForget = useCallback(
     () => keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
     [guests, saved, keep],
@@ -219,6 +231,7 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         onPick,
         missing,
         onForget,
+        onUnpick,
         rerun,
         rewritten,
         onAskSlot: setAskSlot,
@@ -276,7 +289,7 @@ export function Console() {
           { id: "ask-echo", label: "Ask Echo" },
         ]}
       />
-      <Backdrop>
+      <Backdrop className="has-[[data-filters]]:z-20">
         <div id="show-head" className={`${FRAME} @container pt-10 pb-12 sm:pt-12`}>
           <LockHeader
             key={`lock-${analysis.id}`}
@@ -351,7 +364,7 @@ export function Console() {
         onOpen={onOpen}
         onClose={onClose}
       />
-      <PickBar analysis={analysis} picked={picked} beside={beside} />
+      <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>
   );
 }
@@ -469,8 +482,7 @@ export function ConsoleSkeleton() {
 
 // The run's steps beside echo rings sounding while Echo works. Fixed heights, so polling never moves
 // the page.
-function Rundown({ steps: all }: { steps: Step[] }) {
-  const steps = shownSteps(all);
+function Rundown({ steps }: { steps: Step[] }) {
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
   return (

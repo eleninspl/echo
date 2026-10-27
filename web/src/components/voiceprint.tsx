@@ -45,6 +45,17 @@ export function Voiceprint({
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+  useEffect(() => {
+    if (hovered === null) return;
+    const away = () => {
+      pointer.current = null;
+      setHovered(null);
+      onLobe?.(null);
+    };
+    window.addEventListener("scroll", away, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", away, { capture: true });
+  }, [hovered, onLobe]);
+
   function hover(lobe: number | null) {
     if (lobe === hovered) return;
     setHovered(lobe);

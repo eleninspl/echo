@@ -9,7 +9,7 @@ import { FRAME } from "./hud";
 import { Invite } from "./invite";
 
 export function InvitePage() {
-  const { analysis, picked, onPick } = useOpenAnalysis();
+  const { analysis, picked, missing, onUnpick } = useOpenAnalysis();
   return (
     <div className={`${FRAME} flex flex-1 flex-col gap-10 pt-8 pb-28`}>
       <title>{`Invitations · ${analysis.show.title} · Echo`}</title>
@@ -27,7 +27,7 @@ export function InvitePage() {
           <span className="truncate text-xs text-ink-dim">{analysis.show.title}</span>
         </span>
       </Link>
-      <Invite analysis={analysis} picked={picked} onToggle={onPick} />
+      <Invite analysis={analysis} picked={picked} earlier={missing} onUnpick={onUnpick} />
     </div>
   );
 }

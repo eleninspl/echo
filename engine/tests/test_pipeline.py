@@ -6,10 +6,10 @@ import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
-from echo_engine import apple, llm, wikidata
-from echo_engine.app import create_app
+from echo_engine import apple, llm, pipeline, wikidata
+from echo_engine.app import create_app, load_example
 from echo_engine.llm_client import LlmError, Reply
-from echo_engine.models import Filters
+from echo_engine.models import Analysis, Evidence, Filters, MapItem
 from echo_engine.qloo_client import QlooClient
 from scripts import warm
 from tests.fake_qloo import SHOW_ID, SHOW_TITLE, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler, person_id
@@ -144,6 +144,23 @@ def test_an_analysis_without_ideas_is_run_again_once_the_llm_is_ready(engine, mo
     assert first != second
 
 
+def test_an_analysis_from_an_older_pipeline_is_run_again(engine):
+    first = run(engine)
+    assert first["version"] == pipeline.VERSION
+    saved = asyncio.run(state(engine).analyses.get(first["id"]))
+    saved.version -= 1
+    asyncio.run(state(engine).analyses.put(saved))
+    assert run(engine)["id"] != first["id"]
+
+
+def test_the_ideas_step_is_listed_only_when_the_llm_is_set_up(engine, monkeypatch):
+    assert "ideas" not in [step["key"] for step in run(engine)["steps"]]
+    monkeypatch.setattr(llm, "ready", lambda: True)
+    steps = run(engine)["steps"]
+    assert steps[-1]["key"] == "ideas"
+    assert all(step["done"] for step in steps)
+
+
 def test_an_analysis_made_before_bios_is_run_again(engine):
     first = run(engine)
     saved = asyncio.run(state(engine).analyses.get(first["id"]))
@@ -159,7 +176,7 @@ def test_filters_change_the_lists_and_use_a_fit_lens(engine):
     params = [call["params"] for call in analysis["qloo_calls"] if call["path"] == "/v2/insights"]
     lists = [p for p in params if p["filter.type"] == "urn:entity:person" and "filter.results.entities" not in p]
     assert any(
-        p.get("filter.popularity.max") == "0.7" and p.get("signal.demographics.age") == "25_to_29" for p in lists
+        p.get("filter.popularity.max") == "0.6" and p.get("signal.demographics.age") == "25_to_29" for p in lists
     )
     assert any(p["filter.type"] == "urn:entity:person" and "filter.results.entities" in p for p in params)
 
@@ -194,6 +211,39 @@ def test_guest_details_without_the_llm(engine):
     assert details["episode"] is None
     assert details["audience_map"]
     assert all(row["items"] for row in details["adds"])
+
+
+def test_what_both_audiences_love_is_never_new_to_the_show(monkeypatch):
+    async def lists(client, entity_id, leave_out=None):
+        names = ["Shared Podcast", "Fresh Podcast"] if leave_out else ["Show Podcast"]
+        return {"podcasts": [MapItem(name=name, affinity=0.5) for name in names]}
+
+    monkeypatch.setattr(pipeline, "map_lists", lists)
+    analysis = Analysis.model_validate(load_example()["analysis"])
+    guest = analysis.guests[0].model_copy(update={"evidence": Evidence(shared_tastes=["Shared Podcast"])})
+    maps = asyncio.run(pipeline.guest_maps(None, analysis, guest))
+    assert [item.name for row in maps.adds for item in row.items] == ["Fresh Podcast"]
+
+
+def test_a_map_category_mostly_screened_out_is_left_out_whole():
+    class Books:
+        def __init__(self, screened: int) -> None:
+            self.screened = screened
+
+        async def insights(self, params):
+            kind = params["filter.type"]
+            names = [f"Example {i}" for i in range(20)]
+            if kind == "urn:entity:book":
+                names = [f"Example Politics {i}" for i in range(self.screened)] + names[self.screened :]
+            entities = [
+                {"entity_id": f"{kind}-{i}", "name": name, "query": {"affinity": 0.5}} for i, name in enumerate(names)
+            ]
+            return {"results": {"entities": entities}}
+
+    mostly = asyncio.run(pipeline.map_lists(Books(11), "show"))
+    assert mostly["books"] == [] and len(mostly["music"]) == 20
+    half = asyncio.run(pipeline.map_lists(Books(10), "show"))
+    assert len(half["books"]) == 10
 
 
 def test_a_guest_map_leaves_the_show_out(engine):
@@ -258,6 +308,7 @@ def test_an_llm_failure_is_an_llm_error_and_can_be_retried(engine, monkeypatch):
     async def broken(analysis):
         raise RuntimeError("the model timed out")
 
+    monkeypatch.setattr(llm, "ready", lambda: True)
     monkeypatch.setattr(llm, "write_ideas", broken)
     failed = run(engine)
     assert failed["status"] == "failed"
@@ -318,16 +369,29 @@ def test_a_run_with_the_llm_puts_ideas_on_the_top_guests(engine, monkeypatch):
                 data = {"host_ids": []}
             else:
                 refs = schema["properties"]["ideas"]["items"]["properties"]["ref"]["enum"]
-                ideas = [{"ref": ref, "reason": "Why.", "title": f"Idea {ref}", "pitch": "Two."} for ref in refs]
+                ideas = [
+                    {
+                        "ref": ref,
+                        "description_fits": ref != "g2",
+                        "reason": "Why.",
+                        "title": f"Idea {ref}",
+                        "pitch": "Two.",
+                    }
+                    for ref in refs
+                ]
                 data = {"ideas": ideas}
             return Reply(data=data, model="fake", input_tokens=0, output_tokens=0, cost_usd=None, duration_ms=0)
 
+    monkeypatch.setattr(llm, "ready", lambda: True)
     monkeypatch.setattr(llm, "client", Ideas)
     analysis = run(engine)
     assert analysis["status"] == "done"
     with_ideas = [guest["ref"] for guest in analysis["guests"] if guest["idea"]]
     assert with_ideas == [guest["ref"] for guest in analysis["guests"] if guest["evidence"]]
     assert analysis["guests"][0]["idea"]["title"] == f"Idea {analysis['guests'][0]['ref']}"
+    mixed_up = analysis["guests"][1]
+    assert mixed_up["description"] is None and mixed_up["bio"] is None and mixed_up["idea"]
+    assert analysis["guests"][0]["description"]
 
 
 def test_a_failed_llm_call_on_a_route_is_a_502_llm_error(engine, monkeypatch):

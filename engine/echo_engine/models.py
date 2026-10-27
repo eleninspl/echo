@@ -134,6 +134,7 @@ class Analysis(BaseModel):
     left_out: list[LeftOut] = []
     qloo_calls: list[QlooCall] = []
     error: ErrorBody | None = None
+    version: int = 0
 
 
 class AnalysisRequest(BaseModel):

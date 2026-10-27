@@ -170,12 +170,14 @@ class Engine:
         self.mock_fails(show.id, "start")
         if reuse and (existing := await self.earlier(show.id, filters)):
             return existing
+        writes_ideas = self.mock or llm.ready()
         analysis = Analysis(
             id=f"an_{uuid4().hex[:12]}",
             status="running",
             show=show,
             filters=filters,
-            steps=[Step(key=key, label=label) for key, label in pipeline.STEPS],
+            steps=[Step(key=key, label=label) for key, label in pipeline.STEPS if key != "ideas" or writes_ideas],
+            version=pipeline.VERSION,
         )
         await self.analyses.put(analysis)
         runner = self.run_mock if self.mock else self.run
@@ -243,6 +245,8 @@ class Engine:
 
 
 def up_to_date(analysis: Analysis) -> bool:
+    if analysis.version != pipeline.VERSION:
+        return False
     if analysis.status != "done":
         return True
     has_bios = any(guest.bio for guest in analysis.guests)

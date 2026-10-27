@@ -1,6 +1,9 @@
+import type { Label } from "./echo";
+
 // Picks are kept per show by the guest's entity ID, so they carry across reruns of the same show: a guest's
-// ref is only their place in one run. The name comes along to say who isn't in a later run.
-export type Pick = { id: string; name: string };
+// ref is only their place in one run. The name and picture come along to say who isn't in a later run, and the
+// run and ref they were picked in, so they can still be invited from it.
+export type Pick = { id: string; name: string; analysis?: string; ref?: string; image_url?: string; label?: Label };
 
 const key = (showId: string) => `echo.picks.${showId}`;
 
@@ -22,11 +25,18 @@ export function savePicks(showId: string, picks: Pick[]) {
   }
 }
 
+const LABELS: readonly Label[] = ["sweet_spot", "safe", "far", "long_shot", "balanced"];
+
 function isPick(value: unknown): value is Pick {
+  if (typeof value !== "object" || value === null) return false;
+  const pick = value as Record<string, unknown>;
+  const optional = (key: string) => pick[key] === undefined || typeof pick[key] === "string";
   return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Pick).id === "string" &&
-    typeof (value as Pick).name === "string"
+    typeof pick.id === "string" &&
+    typeof pick.name === "string" &&
+    optional("analysis") &&
+    optional("ref") &&
+    optional("image_url") &&
+    (pick.label === undefined || LABELS.includes(pick.label as Label))
   );
 }

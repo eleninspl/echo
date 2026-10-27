@@ -83,13 +83,14 @@ def ref_enum(schema: dict) -> list[str]:
 
 def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
     llm_fake = fake(ideas=lambda schema: {"ideas": [{"ref": ref, **IDEA} for ref in ref_enum(schema)]})
-    ideas = asyncio.run(llm.write_ideas(analysis))
+    ideas, mixed_up = asyncio.run(llm.write_ideas(analysis))
 
     call = llm_fake.calls[0]
     top = [guest.ref for guest in analysis.guests if guest.evidence][:10]
     assert len(llm_fake.calls) == 1
     assert ref_enum(call["schema"]) == top
     assert set(ideas) == set(top)
+    assert mixed_up == set()
     assert ideas["g1"].title == "On the road"
     facts = facts_of(call)
     assert facts["show"] == analysis.show.title
@@ -113,14 +114,32 @@ def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
 
 def test_ideas_ignore_refs_that_were_not_asked_for(fake, analysis):
     fake(ideas={"ideas": [{"ref": "g99", **IDEA}, {"ref": "g2", **IDEA}]})
-    assert set(asyncio.run(llm.write_ideas(analysis))) == {"g2"}
+    assert set(asyncio.run(llm.write_ideas(analysis))[0]) == {"g2"}
+
+
+def test_ideas_say_which_descriptions_belong_to_someone_else(fake, analysis):
+    llm_fake = fake(
+        ideas={
+            "ideas": [
+                {"ref": "g1", "description_fits": False, **IDEA},
+                {"ref": "g2", "description_fits": True, **IDEA},
+                {"ref": "g99", "description_fits": False, **IDEA},
+            ]
+        }
+    )
+    ideas, mixed_up = asyncio.run(llm.write_ideas(analysis))
+    assert set(ideas) == {"g1", "g2"}
+    assert mixed_up == {"g1"}
+    item = llm_fake.calls[0]["schema"]["properties"]["ideas"]["items"]
+    assert item["properties"]["description_fits"] == {"type": "boolean"}
+    assert "description_fits" in item["required"]
 
 
 def test_no_guests_with_evidence_means_no_call(fake, analysis):
     llm_fake = fake()
     for guest in analysis.guests:
         guest.evidence = None
-    assert asyncio.run(llm.write_ideas(analysis)) == {}
+    assert asyncio.run(llm.write_ideas(analysis)) == ({}, set())
     assert llm_fake.calls == []
 
 

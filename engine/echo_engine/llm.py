@@ -73,6 +73,10 @@ it's worth hearing, built on what the two audiences share. No talk of fans or au
 
 IDEAS_TASK = f"""For each guest below, write:
 {IDEA_SHAPE}
+- description_fits: false when the guest's description and known_facts plainly belong to someone other than the \
+person their shared tastes and new podcasts point to, such as a botanist whose fans love real estate and business \
+podcasts; otherwise true. When it's false, write the idea from the tastes alone and never use the description or \
+known_facts.
 Give every guest a different angle. Vary how the reasons open and how the titles are built: not every reason should \
 start with the guest's fans. When the host gave an episode theme, every title and pitch is about that theme, seen \
 through what this guest and the two audiences share. Answer for every ref. {SCORES}"""
@@ -135,6 +139,7 @@ you know about the show, return the ids of the people who host or regularly co-h
 don't count. When unsure, leave them out."""
 
 TEXT: Schema = {"type": "string"}
+BOOLEAN: Schema = {"type": "boolean"}
 
 
 def obj(**properties: Schema) -> Schema:
@@ -251,19 +256,21 @@ async def find_hosts(show: Show, people: list[Person]) -> set[str]:
     return set(data["host_ids"]) & set(ids)
 
 
-async def write_ideas(analysis: Analysis) -> dict[str, Idea]:
+async def write_ideas(analysis: Analysis) -> tuple[dict[str, Idea], set[str]]:
     guests = [guest for guest in analysis.guests if guest.evidence is not None][:IDEA_GUESTS]
     if not guests:
-        return {}
+        return {}, set()
     refs = [guest.ref for guest in guests]
     facts = {**show_facts(analysis), "guests": [guest_facts(guest) for guest in guests]}
-    schema = obj(ideas=array(obj(ref=one_of(refs), reason=TEXT, title=TEXT, pitch=TEXT)))
+    schema = obj(ideas=array(obj(ref=one_of(refs), description_fits=BOOLEAN, reason=TEXT, title=TEXT, pitch=TEXT)))
     data = await ask(RULES, IDEAS_TASK, facts, schema, "ideas")
-    ideas = {}
+    ideas, mixed_up = {}, set()
     for item in data["ideas"]:
         if item["ref"] in refs:
             ideas[item["ref"]] = checked(Idea, {key: item[key] for key in ("reason", "title", "pitch")})
-    return ideas
+            if item.get("description_fits") is False:
+                mixed_up.add(item["ref"])
+    return ideas, mixed_up
 
 
 async def write_episode(analysis: Analysis, guest: Guest, maps: GuestMaps) -> Episode:

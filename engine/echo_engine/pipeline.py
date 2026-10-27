@@ -3,9 +3,10 @@ import logging
 import math
 import re
 from collections import Counter
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from difflib import SequenceMatcher
 from itertools import zip_longest
 from statistics import fmean
 from typing import Any, get_args
@@ -51,8 +52,11 @@ MAP_TYPES = [
     ("brands", "brand"),
     ("podcasts", "podcast"),
 ]
+SEARCH_FILLER = frozenset({"a", "an", "and", "by", "for", "in", "of", "on", "podcast", "show", "the", "this", "with"})
+TYPO_RATIO = 0.8
 MAP_TAKE = 20
 MAP_SHOWN = 8
+MAP_SCREENED = 1 / 2
 LIST_TAKE = 50
 POOL_SIZE = 20
 EXPLAINED = 10
@@ -62,11 +66,12 @@ MIN_SCORED = 5
 # Each guest's top podcasts for reach and new podcasts: at least this many, more when they fit (reach_width).
 REACH_PODCASTS = 10
 CHUNK = 50
-FAME_CAP = {"any": None, "less_famous": 0.7, "rising": 0.4}
+FAME_CAP = {"any": None, "less_famous": 0.6, "rising": 0.4}
 SECOND_LIST_CAP = 0.7
 AGE_DELTA = 0.2
 SHARED_SHOWN = 5
 SHARED_PODCASTS = 2
+STRONGEST_PODCASTS = 10
 # Shared tastes leave out the tags more than half the top guests have, and the podcasts more than a third of them
 # have: they say nothing about one guest.
 COMMON_TAGS = 1 / 2
@@ -79,6 +84,10 @@ NEW_PODCASTS_SHOWN = 3
 EPISODE_TITLES = 200
 # Trailers and cross-promotions name people who weren't guests ("INTRODUCING: Another Show with Ann Example").
 PROMO_TITLE = re.compile(r"^\W*(introducing|trailer|preview|sneak peek|coming soon)\b", re.IGNORECASE)
+TITLE_BREAK = re.compile(r"[:|()\[\]–—]|\s-\s")
+HONORIFIC = re.compile(r"^(?:dr|prof|professor) ")
+GUEST_AFTER = {"on", "of", "returns"}
+GUEST_BEFORE = {"with", "featuring", "feat", "ft", "w"}
 AGE_ORDER = list(get_args(AgeBucket))
 LINKS = {
     "imdb": ("imdb_id", "https://www.imdb.com/name/{}/"),
@@ -92,7 +101,12 @@ BIO_NAME_LENGTH = 80
 # Instruments that only say the person sings, and a birth year in the description ("Ann Example (born 1970)").
 NOT_INSTRUMENTS = frozenset({"voice", "vocals", "singing"})
 BORN = re.compile(r"\s*\((?:born|b\.)[^)]*\)", re.IGNORECASE)
+BUSINESS_ROLE = re.compile(
+    r"\b(?:business(?:man|woman|person)|entrepreneur|investor|venture.capitalist|executive|founder|ceo)\b",
+    re.IGNORECASE,
+)
 
+VERSION = 1
 STEPS = [
     ("map", "Mapping your audience"),
     ("candidates", "Finding guests"),
@@ -172,9 +186,24 @@ def itunes_id_of(entity: dict) -> str | None:
     return ((properties(entity).get("external") or {}).get("itunes") or {}).get("id")
 
 
+def word_found(word: str, words: set[str], joined: str) -> bool:
+    if word in words:
+        return True
+    if len(word) >= 4 and (word in joined or any(other.startswith(word) for other in words)):
+        return True
+    return len(word) >= 5 and any(SequenceMatcher(None, word, other).ratio() >= TYPO_RATIO for other in words)
+
+
+def matches_search(show: Show, q: str) -> bool:
+    wanted = [word for word in normalize(q).split() if word not in SEARCH_FILLER]
+    text = normalize(f"{show.title} {show.description or ''}")
+    words = set(text.split())
+    return not wanted or any(word_found(word, words, text.replace(" ", "")) for word in wanted)
+
+
 async def search_shows(client: QlooClient, q: str) -> list[Show]:
     results = await client.search(q, types=PODCAST, take=5)
-    return [show_from(result) for result in results]
+    return [show for show in (show_from(result) for result in results) if matches_search(show, q)]
 
 
 async def get_show(client: QlooClient, show_id: str) -> Show:
@@ -208,10 +237,12 @@ async def map_lists(client: QlooClient, entity_id: str, leave_out: str | None = 
             if error.status == 400:
                 return []
             raise
+        listed = [e for e in entities_of(data) if (e.get("entity_id") or "").upper() not in skip]
+        kept = [e for e in listed if clean_entity(e)]
+        if len(listed) - len(kept) > len(listed) * MAP_SCREENED:
+            return []
         return [
-            MapItem(name=e["name"].strip(), image_url=image_of(e), affinity=round(affinity(e) or 0.0, 3))
-            for e in entities_of(data)
-            if (e.get("entity_id") or "").upper() not in skip and clean_entity(e)
+            MapItem(name=e["name"].strip(), image_url=image_of(e), affinity=round(affinity(e) or 0.0, 3)) for e in kept
         ]
 
     lists = await asyncio.gather(*(one(kind) for _, kind in MAP_TYPES))
@@ -359,20 +390,47 @@ async def llm_step(work: Awaitable[Any], fallback: Any, what: str) -> Any:
         raise AnalysisFailed("llm_error", f"Echo couldn't write {what}. Try again in a minute.") from error
 
 
-async def episode_titles(itunes_id: str | None) -> list[str]:
-    return await optional(apple.episode_titles(itunes_id, EPISODE_TITLES), []) if itunes_id else []
+async def episode_titles(itunes_id: str | None) -> tuple[list[str], list[str]]:
+    if not itunes_id:
+        return [], []
+    recent, every = await asyncio.gather(
+        optional(apple.episode_titles(itunes_id, EPISODE_TITLES), []), optional(apple.feed_titles(itunes_id), [])
+    )
+    seen = set(recent)
+    return recent, [title for title in every if title not in seen]
 
 
 async def author_of(itunes_id: str | None) -> str | None:
     return await optional(apple.author(itunes_id), None) if itunes_id else None
 
 
-def past_guest_ids(episode_titles: list[str], pool: list[dict]) -> set[str]:
+def title_parts(title: str) -> list[str]:
+    parts = (HONORIFIC.sub("", normalize(part)) for part in TITLE_BREAK.split(title))
+    return [part for part in parts if part]
+
+
+def names_as_guest(parts: list[str], name: str) -> bool:
+    for part in parts:
+        if part == name:
+            return True
+        if part.startswith(f"{name} ") and part[len(name) + 1 :].split()[0] in GUEST_AFTER:
+            return True
+        before = part.removesuffix(f" {name}")
+        if before != part and before.split()[-1] in GUEST_BEFORE:
+            return True
+    return False
+
+
+def past_guest_ids(episode_titles: list[str], pool: list[dict], older_titles: Sequence[str] = ()) -> set[str]:
     titles = [f" {normalize(title)} " for title in episode_titles if not PROMO_TITLE.match(title)]
+    older = [title_parts(title) for title in older_titles if not PROMO_TITLE.match(title)]
     found = set()
     for person in pool:
         name = normalize(person["name"])
-        if len(name.split()) > 1 and any(f" {name} " in title for title in titles):
+        if len(name.split()) < 2:
+            continue
+        bare = HONORIFIC.sub("", name)
+        if any(f" {name} " in title for title in titles) or any(names_as_guest(parts, bare) for parts in older):
             found.add(person["entity_id"])
     return found
 
@@ -423,13 +481,15 @@ def since_year(person: dict, today: datetime) -> int | None:
     return year if year and 1900 <= year <= today.year else None
 
 
-def known_facts(person: dict, today: datetime | None = None) -> list[str]:
+def known_facts(person: dict, today: datetime | None = None, description: str | None = None) -> list[str]:
     """Public, work-only facts about a person as plain sentences, best first. Never gender, birth date,
     citizenship, family, partners, lifestyle or political office: only the keys read here."""
     works = fact_names(person, "notable_work", 3)
     awards = fact_names(person, "award_received", 2)
     nominations = [] if awards else fact_names(person, "nominated_for", 2)
     employers = fact_names(person, "employer", 2)
+    if len(employers) == 1 and BUSINESS_ROLE.search(description or ""):
+        employers = []
     teams = [] if employers else fact_names(person, "member_of_sports_team", 3)
     instruments = [name.removesuffix(" instrument") for name in fact_names(person, "instrument", 2, NOT_INSTRUMENTS)]
     year = since_year(person, today or datetime.now(UTC))
@@ -446,7 +506,7 @@ def known_facts(person: dict, today: datetime | None = None) -> list[str]:
 
 
 def bio_of(person: dict, description: str | None, today: datetime | None = None) -> str | None:
-    facts = known_facts(person, today)
+    facts = known_facts(person, today, description)
     if not facts:
         return None
     return " ".join(part for part in [sentence(BORN.sub("", description or "")), *facts] if part)
@@ -560,26 +620,47 @@ def loved_threshold(reach_scores: dict[str, float]) -> float:
 
 
 def shared_podcasts(
-    love: LoveBack, width: int, reach_scores: dict[str, float], shared_by: Counter[str], compared: int
+    love: LoveBack,
+    width: int,
+    reach_scores: dict[str, float],
+    shared_by: Counter[str],
+    compared: int,
+    shown: Collection[str] = (),
 ) -> list[str]:
     """IDs of the guest's podcasts that the show's listeners love too, the ones fewest other guests have first,
-    then the show's strongest. Those most guests have are left out."""
+    then the show's strongest. Those most guests have are left out, unless that leaves fewer than two: then the
+    guest's own strongest loved podcasts fill in, first those not `shown` on another guest's card."""
     threshold = loved_threshold(reach_scores)
-    scored = sorted(
-        (shared_by[p], -reach_scores[p], p)
+    loved = [
+        p
         for p in love.podcasts[:width]
-        if reach_scores.get(p, -math.inf) >= threshold and shared_by[p] <= compared * COMMON_PODCASTS
+        if reach_scores.get(p, -math.inf) >= threshold and clean_name(love.names.get(p, ""))
+    ]
+    rare = sorted((shared_by[p], -reach_scores[p], p) for p in loved if shared_by[p] <= compared * COMMON_PODCASTS)
+    ids = [p for _, _, p in rare][:SHARED_PODCASTS]
+    strongest = [p for p in loved[:STRONGEST_PODCASTS] if p not in ids]
+    fill = [p for p in strongest if p not in shown] + [p for p in strongest if p in shown]
+    return ids + fill[: SHARED_PODCASTS - len(ids)]
+
+
+def tag_label(name: str) -> str:
+    return (
+        name if any(ch.isupper() for ch in name) else " ".join(word[:1].upper() + word[1:] for word in name.split(" "))
     )
-    ids = [p for _, _, p in scored if clean_name(love.names.get(p, ""))]
-    return ids[:SHARED_PODCASTS]
 
 
 def shared_tastes(podcasts: list[str], tags: list[str]) -> list[str]:
     """Named podcasts both audiences love, then shared tags, without repeats."""
-    names: list[str] = []
-    for name in [*podcasts, *tags]:
-        if name.lower() not in {n.lower() for n in names}:
-            names.append(name)
+    names: list[str] = list(dict.fromkeys(podcasts))
+    tag_words: list[set[str]] = []
+    for tag in tags:
+        words = set(normalize(tag).split())
+        if not words or normalize(tag) in {normalize(name) for name in names}:
+            continue
+        if any(words <= other or other <= words for other in tag_words):
+            continue
+        tag_words.append(words)
+        names.append(tag_label(tag.strip()))
     return names[:SHARED_SHOWN]
 
 
@@ -654,9 +735,13 @@ async def run_analysis(client: QlooClient, analysis: Analysis, progress: Progres
     except BaseExceptionGroup as error:
         raise first_error(error) from None
 
-    ideas = await llm_step(llm.write_ideas(analysis), {}, "the episode ideas")
+    if "ideas" not in steps:
+        return
+    ideas, mixed_up = await llm_step(llm.write_ideas(analysis), ({}, set()), "the episode ideas")
     for guest in analysis.guests:
         guest.idea = ideas.get(guest.ref)
+        if guest.ref in mixed_up:
+            guest.description = guest.bio = None
     await done("ideas")
 
 
@@ -678,7 +763,7 @@ async def fill_guests(
     client: QlooClient, analysis: Analysis, done: Callable[[str], Awaitable[None]], itunes_id: str | None
 ) -> None:
     show, filters = analysis.show, analysis.filters
-    (anchor, (c1, c2, c3)), author, titles = await asyncio.gather(
+    (anchor, (c1, c2, c3)), author, (titles, older_titles) = await asyncio.gather(
         people_lists(client, show.id, filters), author_of(itunes_id), episode_titles(itunes_id)
     )
     if filters.episode_about:
@@ -695,7 +780,7 @@ async def fill_guests(
     people = [
         Person(id=p["entity_id"], name=p["name"], description=person_description(p)) for p in pool[: POOL_SIZE * 2]
     ]
-    past = past_guest_ids(titles, pool)
+    past = past_guest_ids(titles, pool, older_titles)
     kept, left_out = [], []
     for person in pool:
         if is_host(person["name"]):
@@ -768,8 +853,10 @@ async def fill_guests(
     tag_guests = Counter(key for tags in guest_tags for key in {tag_key(tag) for tag in tags})
     shared_by = Counter(p for s in scored for p in set(s.love.podcasts[:width]))
     top_podcasts = Counter(p for s in top for p in set(s.love.podcasts[:width]))
+    shown: set[str] = set()
     for guest, item, tags in zip(analysis.guests, top, guest_tags, strict=False):
-        podcasts = shared_podcasts(item.love, width, reach_scores, top_podcasts, len(top))
+        podcasts = shared_podcasts(item.love, width, reach_scores, top_podcasts, len(top), shown)
+        shown.update(podcasts)
         guest.evidence = Evidence(
             shared_tastes=shared_tastes(
                 [item.love.names[p] for p in podcasts], shared_tags(show_ranks, tags, tag_guests, len(top))
@@ -784,8 +871,9 @@ async def guest_maps(client: QlooClient, analysis: Analysis, guest: Guest) -> Gu
     show_lists, guest_lists = await asyncio.gather(
         map_lists(client, analysis.show.id), map_lists(client, guest.id, analysis.show.id)
     )
+    shared = {normalize(name) for name in (guest.evidence.shared_tastes if guest.evidence else [])}
     adds = {}
     for category, items in guest_lists.items():
-        known = {normalize(item.name) for item in show_lists.get(category, [])}
+        known = shared | {normalize(item.name) for item in show_lists.get(category, [])}
         adds[category] = [item for item in items if normalize(item.name) not in known]
     return GuestMaps(audience_map=rows_of(guest_lists), adds=rows_of(adds))
