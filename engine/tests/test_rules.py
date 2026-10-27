@@ -1,14 +1,16 @@
 from collections import Counter
 from datetime import UTC, date, datetime
 
-from echo_engine import scoring
+from echo_engine import apple, scoring
 from echo_engine.cleanup import dedupe, host_matcher, is_dead, is_minor, is_public_figure, normalize, person_description
+from echo_engine.models import Show
 from echo_engine.pipeline import (
     LoveBack,
     bio_of,
     guest_description,
     known_facts,
     links_of,
+    matches_search,
     new_podcasts,
     past_guest_ids,
     reach_width,
@@ -160,6 +162,17 @@ def test_screen_keeps_ordinary_culture_and_drops_sensitive_signals():
     assert clean_entity(genre("Comedy")) and clean_entity(genre("Progressive Rock"))
 
 
+def test_screen_drops_titles_about_a_people_or_a_conflict():
+    for name in (
+        "An Example Guide to Anti-Semitism",
+        "Antisemitism: An Example History",
+        "Example Letters to a Palestinian Friend",
+        "Example Israel: A Short Account",
+        "The Example Jewish Cookbook",
+    ):
+        assert not clean_name(name), name
+
+
 def test_screen_drops_hardship_tags_but_keeps_their_neighbours():
     for name in ("Suffering", "Inner Struggle", "Social Alienation", "Grief", "Drug Use", "Not Applicable", "N/A"):
         assert not clean_tag_name(name), name
@@ -256,9 +269,28 @@ def test_shared_podcasts_are_loved_by_the_show_and_rare_among_the_top_guests():
     assert shared_podcasts(love, 4, scores, top_guests, 10) == ["b", "c"]
 
 
+def test_shared_podcasts_fill_in_with_the_guests_strongest_loved_ones_shown_on_no_other_card():
+    love = LoveBack(0.5, None, ["a", "b", "c", "d"], {p: p.upper() for p in "abcd"})
+    # The top half of the show's affinities starts at 0.7: b isn't loved.
+    scores = {"a": 0.9, "b": 0.2, "c": 0.8, "d": 0.7, "x": 0.1, "y": 0.6}
+    everyone = Counter({p: 10 for p in "abcd"})
+    assert shared_podcasts(love, 4, scores, everyone, 10) == ["a", "c"]
+    assert shared_podcasts(love, 4, scores, everyone, 10, shown={"a"}) == ["c", "d"]
+    assert shared_podcasts(love, 4, scores, everyone, 10, shown={"a", "c", "d"}) == ["a", "c"]
+    one_rare = Counter({"a": 10, "c": 10, "d": 1})
+    assert shared_podcasts(love, 4, scores, one_rare, 10) == ["d", "a"]
+
+
 def test_shared_tastes_put_named_podcasts_first_without_repeats():
     tastes = shared_tastes(["Ann's Podcast"], ["satire", "ann's podcast", "a", "b", "c"])
-    assert tastes == ["Ann's Podcast", "satire", "a", "b", "c"]
+    assert tastes == ["Ann's Podcast", "Satire", "A", "B", "C"]
+
+
+def test_shared_tastes_drop_near_repeats_and_capitalise_tags():
+    tastes = shared_tastes(
+        [], ["Business", "satire comedy", "satire", "Business Strategy", "rock 'n' roll", "iPhone Apps"]
+    )
+    assert tastes == ["Business", "Satire Comedy", "Rock 'n' Roll", "iPhone Apps"]
 
 
 def test_past_guests_skip_trailers_and_cross_promotions():
@@ -271,6 +303,42 @@ def test_past_guests_skip_trailers_and_cross_promotions():
         "Introductions: a talk about Bo Sample",
     ]
     assert past_guest_ids(titles, pool) == {"p1", "p2"}
+
+
+def test_older_titles_count_a_name_only_where_a_guest_is_named():
+    names = ["Ann Example", "Bo Sample", "Cy Person", "Dee Other", "Eli Name", "Fay Doctor", "Gus Newsworthy"]
+    pool = [{"entity_id": f"p{i}", "name": name} for i, name in enumerate(names)]
+    older = [
+        "Example Company: Ann Example (Part 1 of 2)",
+        "Bo Sample on building things | E1234",
+        "Cy Person of Example Co",
+        "Why Dee Other's plan failed",
+        "A conversation with Eli Name",
+        "How to Build Things | Dr. Fay Doctor",
+        "BREAKING: Gus Newsworthy steps down, and more | E99",
+        "INTRODUCING: Dee Other",
+    ]
+    assert past_guest_ids([], pool, older) == {"p0", "p1", "p2", "p4", "p5"}
+    assert past_guest_ids(["BREAKING: Gus Newsworthy steps down"], pool) == {"p6"}
+
+
+def test_feed_titles_come_from_each_item():
+    feed = (
+        "<rss><channel><title>The Show</title>"
+        "<item><itunes:title>Short</itunes:title><title><![CDATA[Ann Example: Part 1]]></title></item>"
+        "<item><title>Bo &amp; Cy\n  Talk</title></item>"
+        "<item><description>No title</description></item>"
+        "<item><title>Cut off"
+    )
+    assert apple.item_titles(feed) == ["Ann Example: Part 1", "Bo & Cy Talk"]
+
+
+def test_a_search_result_shares_a_word_with_the_query():
+    show = Show(id="x", title="Example Interview Show", description="Comedians talk about road trips.")
+    for q in ("example interview", "exampel", "exampleinterview", "road trip stories", "the show"):
+        assert matches_search(show, q), q
+    assert not matches_search(show, "qzxv show")
+    assert not matches_search(show, "zzzz")
 
 
 def invented_person(**props) -> dict:
@@ -322,6 +390,15 @@ def test_the_bio_leaves_out_sensitive_facts_and_screened_names():
     # Only sensitive facts left: nothing beyond the description, so no bio.
     del person["properties"]["notable_work"]
     assert bio_of(person, "Writer", TODAY) is None
+
+
+def test_a_lone_employer_is_left_out_of_a_businessperson_bio():
+    one = invented_person(employer=["Example Search Co"])
+    for description in ("American businessperson", "Example co-founder and investor", "Venture capitalist"):
+        assert bio_of(one, description, TODAY) is None, description
+    assert bio_of(one, "Journalist", TODAY) == "Journalist. Has worked for Example Search Co."
+    two = invented_person(employer=["Example Search Co", "Example Pay Co"])
+    assert bio_of(two, "Entrepreneur", TODAY) == "Entrepreneur. Has worked for Example Search Co and Example Pay Co."
 
 
 def test_the_bio_skips_odd_values():

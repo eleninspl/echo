@@ -4,7 +4,7 @@ import type { Draft, DraftText, InviteDetails } from "./echo";
 import { describe, type HostError } from "./errors";
 import { isRecord, stringsOf, useStored } from "./stored";
 
-// What the invite page keeps in this browser, never on the engine: the drafts per analysis and guest (they carry
+// What the invite page keeps in this browser, never on the engine: the drafts per show and guest (they carry
 // the host's name, notes and details), the notes, the practical details, and the guests' emails. Echo never looks an email up or sends one anywhere.
 
 // `changed`: the host edited it or asked Echo to rewrite it, so writing everyone again asks before replacing it.
@@ -42,12 +42,12 @@ const noDrafts = (drafts: Drafts) => Object.keys(drafts).length === 0;
 const noNotes = (notes: Notes) => !notes.forAll && !Object.values(notes.perGuest).some(Boolean);
 const noEmails = (emails: Record<string, string>) => !Object.values(emails).some(Boolean);
 
-export function useDrafts(analysisId: string) {
-  return useStored(`echo.drafts.${analysisId}`, parseDrafts, noDrafts);
+export function useDrafts(showId: string) {
+  return useStored(`echo.drafts.${showId}`, parseDrafts, noDrafts);
 }
 
-export function useNotes(analysisId: string) {
-  return useStored(`echo.notes.${analysisId}`, parseNotes, noNotes);
+export function useNotes(showId: string) {
+  return useStored(`echo.notes.${showId}`, parseNotes, noNotes);
 }
 
 // By the guest's entity ID, not their ref, so an email typed once stays with the guest across runs.

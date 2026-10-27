@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useId, useState, type CSSProperties, type FormEvent } from "react";
 
 import { echo, type Analysis, type Draft, type Guest, type InviteDetails } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
@@ -23,7 +23,8 @@ import {
   type SavedDraft,
 } from "@/lib/invitations";
 import { analysisPath } from "@/lib/paths";
-import { rewrittenIdea } from "@/lib/rewrites";
+import type { Pick as SavedPick } from "@/lib/picks";
+import { readRewrites, rewrittenIdea, withRewrites } from "@/lib/rewrites";
 
 import { Briefing } from "./briefing";
 import { CopyButton } from "./copy-button";
@@ -40,106 +41,148 @@ const input = "field w-full px-3 py-2";
 const TITLE = "font-display text-[clamp(2rem,4vw,3.25rem)] leading-[1.02] font-semibold text-balance";
 
 // Asked to write drafts the host has changed: from the form (`all`) or from one guest's card.
-type Confirm = { refs: string[]; from: "all" | string };
+type Confirm = { ids: string[]; from: "all" | string };
+
+type Invitee = { analysisId: string; guest: Guest };
+
+function useEarlierRuns(picks: SavedPick[]): Invitee[] {
+  const ids = [...new Set(picks.flatMap(({ analysis }) => analysis ?? []))].sort().join(",");
+  const [runs, setRuns] = useState<Record<string, Analysis>>({});
+
+  useEffect(() => {
+    const controller = new AbortController();
+    for (const id of ids.split(",").filter(Boolean)) {
+      echo
+        .analysis(id, controller.signal)
+        .then((run) => {
+          if (run.status === "done") setRuns((current) => ({ ...current, [id]: withRewrites(run, readRewrites(id)) }));
+        })
+        .catch(() => undefined);
+    }
+    return () => controller.abort();
+  }, [ids]);
+
+  return picks.flatMap(({ id, analysis, ref }) => {
+    const guest = analysis ? runs[analysis]?.guests.find((each) => each.ref === ref && each.id === id) : undefined;
+    return guest && analysis ? [{ analysisId: analysis, guest }] : [];
+  });
+}
 
 // The invite page: a card per picked guest with their email, a note for them, the draft and the briefing. Drafts,
 // notes and emails stay in this browser. Echo sends nothing: the host opens each draft in their own email.
 export function Invite({
   analysis,
   picked,
-  onToggle,
+  earlier,
+  onUnpick,
 }: {
   analysis: Analysis;
   picked: string[];
-  onToggle: (ref: string) => void;
+  earlier: SavedPick[];
+  onUnpick: (id: string) => void;
 }) {
   const savedName = useHostName();
   const [typed, setTyped] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const hostName = (typed ?? savedName).trim() || undefined;
-  const [drafts, setDrafts] = useDrafts(analysis.id);
-  const [notes, setNotes] = useNotes(analysis.id);
+  const [drafts, setDrafts] = useDrafts(analysis.show.id);
+  const [notes, setNotes] = useNotes(analysis.show.id);
   const [emails, setEmails] = useEmails();
   const [writing, setWriting] = useState<string[]>([]);
   const [problem, setProblem] = useState<HostError | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const notSetUp = problem?.code === "not_implemented";
-  const guests = picked
-    .map((ref) => analysis.guests.find((guest) => guest.ref === ref))
-    .filter((guest): guest is Guest => guest !== undefined);
-  const missing = guests.filter((guest) => !drafts[guest.ref]).map((guest) => guest.ref);
+  const fromEarlier = useEarlierRuns(earlier);
+  const invitees: Invitee[] = [
+    ...picked.flatMap((ref) => {
+      const guest = analysis.guests.find((each) => each.ref === ref);
+      return guest ? [{ analysisId: analysis.id, guest }] : [];
+    }),
+    ...fromEarlier,
+  ];
+  const guests = invitees.map(({ guest }) => guest);
+  const missing = guests.filter((guest) => !drafts[guest.id]).map((guest) => guest.id);
   const [details, setDetails] = useDetails(analysis.show.id);
-  const noteFor = (ref: string) => notes.perGuest[ref]?.trim().slice(0, NOTE_LIMIT) || undefined;
+  const noteFor = (id: string) => notes.perGuest[id]?.trim().slice(0, NOTE_LIMIT) || undefined;
   const forAll = notes.forAll.trim() || undefined;
   const sharedDetails = cleanDetails(details.forAll);
   // A guest's own dates and fee are kept by their entity ID, like their email.
-  const ownDetails = (ref: string) => {
-    const guest = guests.find((each) => each.ref === ref);
-    return guest ? cleanDetails(details.perGuest[guest.id]) : undefined;
-  };
+  const ownDetails = (id: string) => cleanDetails(details.perGuest[id]);
 
-  async function write(refs: string[]) {
+  async function write(ids: string[]) {
     setConfirm(null);
-    if (!refs.length) return;
-    setWriting((current) => [...current, ...refs]);
+    if (!ids.length) return;
+    setWriting((current) => [...current, ...ids]);
     setProblem(null);
     if (hostName) saveHostName(hostName);
     setRenaming(false);
-    const batches = Array.from({ length: Math.ceil(refs.length / BATCH) }, (_, index) =>
-      refs.slice(index * BATCH, (index + 1) * BATCH),
-    );
+    const chosen = invitees.filter(({ guest }) => ids.includes(guest.id));
+    const runs = [...new Set(chosen.map(({ analysisId }) => analysisId))];
+    const batches = runs.flatMap((analysisId) => {
+      const inRun = chosen.filter((invitee) => invitee.analysisId === analysisId).map(({ guest }) => guest);
+      return Array.from({ length: Math.ceil(inRun.length / BATCH) }, (_, index) => ({
+        analysisId,
+        guests: inRun.slice(index * BATCH, (index + 1) * BATCH),
+      }));
+    });
     const results = await Promise.allSettled(
-      batches.map((guest_refs) =>
-        echo.drafts({
-          analysis_id: analysis.id,
-          guest_refs,
+      batches.map(async ({ analysisId, guests: batch }) => {
+        const { drafts: written } = await echo.drafts({
+          analysis_id: analysisId,
+          guest_refs: batch.map((guest) => guest.ref),
           host_name: hostName,
           note: forAll,
           notes: Object.fromEntries(
-            guest_refs.flatMap((ref) => [[ref, noteFor(ref) ?? ""]]).filter(([, note]) => note),
+            batch.flatMap((guest) => {
+              const note = noteFor(guest.id);
+              return note ? [[guest.ref, note]] : [];
+            }),
           ),
           details: sharedDetails,
           details_by_ref: Object.fromEntries(
-            guest_refs.flatMap((ref) => {
-              const own = ownDetails(ref);
-              return own ? [[ref, own]] : [];
+            batch.flatMap((guest) => {
+              const own = ownDetails(guest.id);
+              return own ? [[guest.ref, own]] : [];
             }),
           ),
           ideas: Object.fromEntries(
-            guests.flatMap((guest) => {
-              const idea = guest_refs.includes(guest.ref) ? rewrittenIdea(guest) : undefined;
+            batch.flatMap((guest) => {
+              const idea = rewrittenIdea(guest);
               return idea ? [[guest.ref, idea]] : [];
             }),
           ),
-        }),
-      ),
+        });
+        return written.flatMap((draft) => {
+          const guest = batch.find((each) => each.ref === draft.guest_ref);
+          return guest ? [[guest.id, saved(draft)] as const] : [];
+        });
+      }),
     );
-    const written = results.flatMap((result) => (result.status === "fulfilled" ? result.value.drafts : []));
+    const written = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
     const failed = results.find((result) => result.status === "rejected");
-    if (written.length) {
-      setDrafts((current) => ({
-        ...current,
-        ...Object.fromEntries(written.map((draft) => [draft.guest_ref, saved(draft)])),
-      }));
-    }
+    if (written.length) setDrafts((current) => ({ ...current, ...Object.fromEntries(written) }));
     if (failed) setProblem(writingProblem(failed.reason, "invitations"));
-    setWriting((current) => current.filter((ref) => !refs.includes(ref)));
+    setWriting((current) => current.filter((id) => !ids.includes(id)));
   }
 
   // Writes again, but asks first when that would replace a draft the host changed.
-  function writeAgain(refs: string[], from: Confirm["from"]) {
-    if (refs.some((ref) => drafts[ref]?.changed)) setConfirm({ refs, from });
-    else void write(refs);
+  function writeAgain(ids: string[], from: Confirm["from"]) {
+    if (ids.some((id) => drafts[id]?.changed)) setConfirm({ ids, from });
+    else void write(ids);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (missing.length) void write(missing);
-    else writeAgain(picked, "all");
+    else
+      writeAgain(
+        guests.map((guest) => guest.id),
+        "all",
+      );
   }
 
-  function update(ref: string, draft: SavedDraft) {
-    setDrafts((current) => ({ ...current, [ref]: draft }));
+  function update(id: string, draft: SavedDraft) {
+    setDrafts((current) => ({ ...current, [id]: draft }));
   }
 
   if (!guests.length) {
@@ -157,7 +200,7 @@ export function Invite({
   }
 
   const one = guests.length === 1;
-  const changed = confirm ? confirm.refs.filter((ref) => drafts[ref]?.changed) : [];
+  const changed = confirm ? confirm.ids.filter((id) => drafts[id]?.changed) : [];
   const label = writing.length
     ? "Writing…"
     : notSetUp
@@ -251,8 +294,8 @@ export function Invite({
         {confirm?.from === "all" && (
           <Ask
             question={`You changed ${changed.length === 1 ? "one of these" : `${changed.length} of these`}. Replace ${changed.length === 1 ? "it" : "them"} too?`}
-            onReplace={() => write(confirm.refs)}
-            onKeep={() => write(confirm.refs.filter((ref) => !drafts[ref]?.changed))}
+            onReplace={() => write(confirm.ids)}
+            onKeep={() => write(confirm.ids.filter((id) => !drafts[id]?.changed))}
             onCancel={() => setConfirm(null)}
           />
         )}
@@ -262,21 +305,21 @@ export function Invite({
 
       <section aria-label="Guests to invite" className="flex flex-col gap-5">
         <ol className={`grid grid-cols-1 items-start gap-5 ${one ? "max-w-3xl" : "xl:grid-cols-2"}`}>
-          {guests.map((guest, index) => (
+          {invitees.map(({ analysisId, guest }, index) => (
             <GuestCard
-              key={guest.ref}
-              analysisId={analysis.id}
+              key={guest.id}
+              analysisId={analysisId}
               guest={guest}
               order={index}
-              draft={drafts[guest.ref]}
-              writing={writing.includes(guest.ref)}
+              draft={drafts[guest.id]}
+              writing={writing.includes(guest.id)}
               email={emails[guest.id] ?? ""}
               onEmail={(email) => setEmails((current) => ({ ...current, [guest.id]: email }))}
-              note={notes.perGuest[guest.ref] ?? ""}
+              note={notes.perGuest[guest.id] ?? ""}
               onNote={(note) =>
                 setNotes((current) => ({
                   ...current,
-                  perGuest: { ...current.perGuest, [guest.ref]: note },
+                  perGuest: { ...current.perGuest, [guest.id]: note },
                 }))
               }
               sharedDetails={details.forAll}
@@ -291,20 +334,20 @@ export function Invite({
               revise={{
                 hostName,
                 note: forAll,
-                guestNote: noteFor(guest.ref),
+                guestNote: noteFor(guest.id),
                 details: sharedDetails,
-                guestDetails: ownDetails(guest.ref),
+                guestDetails: ownDetails(guest.id),
               }}
               notSetUp={notSetUp}
-              onChange={(draft) => update(guest.ref, draft)}
-              onWriteAgain={() => writeAgain([guest.ref], guest.ref)}
-              confirming={confirm?.from === guest.ref}
-              onConfirm={(replace) => (replace ? write([guest.ref]) : setConfirm(null))}
-              onRemove={() => onToggle(guest.ref)}
+              onChange={(draft) => update(guest.id, draft)}
+              onWriteAgain={() => writeAgain([guest.id], guest.id)}
+              confirming={confirm?.from === guest.id}
+              onConfirm={(replace) => (replace ? write([guest.id]) : setConfirm(null))}
+              onRemove={() => onUnpick(guest.id)}
             />
           ))}
         </ol>
-        {guests.length < analysis.guests.length && (
+        {picked.length < analysis.guests.length && (
           <Link
             href={analysisPath(analysis.id)}
             className="flex items-center gap-3 self-start rounded-full py-1 pr-3 text-sm text-ink-soft hover:text-ink"
@@ -649,10 +692,16 @@ const FORMATS = [
   { value: "remote", name: "Remote" },
 ] as const;
 
+function fridayInTwoWeeks(): string {
+  const day = new Date();
+  day.setDate(day.getDate() + 14 + ((12 - day.getDay()) % 7));
+  return day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
 const TEXT_FIELDS = [
-  { key: "length", label: "Length", placeholder: "e.g. 60 min" },
-  { key: "release", label: "Release", placeholder: "e.g. March" },
-  { key: "reply_by", label: "Reply by", placeholder: "e.g. Fri 7 Nov" },
+  { key: "length", label: "Length", placeholder: () => "e.g. 60 min" },
+  { key: "release", label: "Release", placeholder: () => "e.g. March" },
+  { key: "reply_by", label: "Reply by", placeholder: () => `e.g. ${fridayInTwoWeeks()}` },
 ] as const;
 
 // The details every invitation states: a compact grid, every field optional.
@@ -717,7 +766,7 @@ function SharedDetails({
             value={details[field.key] ?? ""}
             onChange={(event) => onChange({ [field.key]: event.target.value })}
             maxLength={DETAIL_LIMITS[field.key]}
-            placeholder={field.placeholder}
+            placeholder={field.placeholder()}
             className={small}
           />
         </label>

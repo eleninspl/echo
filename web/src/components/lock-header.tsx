@@ -297,7 +297,10 @@ function FilterControls({
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
           <span>
             {missing.length === 1 ? "Your pick" : "Your picks"} {listNames(missing.map(({ name }) => name))}{" "}
-            {missing.length === 1 ? "isn't" : "aren't"} in this run.
+            {missing.length === 1 ? "isn't" : "aren't"} in this run
+            {missing.every((pick) => pick.analysis && pick.ref)
+              ? `. You can still invite ${missing.length === 1 ? "them" : "all of them"}.`
+              : "."}
           </span>
           <button type="button" onClick={onForget} className="text-ink underline underline-offset-4 hover:text-brand">
             Unpick
@@ -332,6 +335,7 @@ function FilterForm({
 
   return (
     <form
+      data-filters
       onSubmit={submit}
       onKeyDown={(event) => event.key === "Escape" && onCancel()}
       className="rise mt-2 flex w-full flex-col sm:absolute sm:top-full sm:left-0 sm:z-30 sm:w-[34rem] gap-4 rounded-2xl bg-deck p-4 shadow-pop ring-1 ring-steel sm:p-5"

@@ -3,18 +3,37 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
-import type { Analysis, Guest } from "@/lib/echo";
+import type { Analysis } from "@/lib/echo";
 import { invitePath } from "@/lib/paths";
+import type { Pick as SavedPick } from "@/lib/picks";
 
 import { Picture } from "./guest-list";
 import { LABEL_HUE, SHEET_ROOM } from "./hud";
 
 const FACES = 5;
 
-export function PickBar({ analysis, picked, beside }: { analysis: Analysis; picked: string[]; beside: boolean }) {
-  const guests = picked
-    .map((ref) => analysis.guests.find((guest) => guest.ref === ref))
-    .filter((guest): guest is Guest => guest !== undefined);
+export function PickBar({
+  analysis,
+  picked,
+  earlier,
+  beside,
+}: {
+  analysis: Analysis;
+  picked: string[];
+  earlier: SavedPick[];
+  beside: boolean;
+}) {
+  const guests = [
+    ...picked.flatMap((ref) => analysis.guests.find((guest) => guest.ref === ref) ?? []),
+    ...earlier
+      .filter((pick) => pick.analysis && pick.ref)
+      .map(({ id, name, image_url, label }) => ({
+        id,
+        name,
+        image_url: image_url ?? null,
+        label: label ?? "balanced",
+      })),
+  ];
   const shown = guests.length > 0;
   const faces = guests.slice(0, FACES);
   return (
@@ -30,7 +49,7 @@ export function PickBar({ analysis, picked, beside }: { analysis: Analysis; pick
         <ol aria-label="Picked to invite" className="flex shrink-0 -space-x-3">
           {faces.map((guest, index) => (
             <li
-              key={guest.ref}
+              key={guest.id}
               title={guest.name}
               className="rise relative size-10 overflow-hidden rounded-full bg-well sm:size-11"
               style={

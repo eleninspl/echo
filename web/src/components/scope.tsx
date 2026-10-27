@@ -588,9 +588,10 @@ function Region({
 type Box = { left: number; top: number; right: number; bottom: number };
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-// Where to name the best guests and the one in focus: beside each dot on the first side that clears the
-// other names and dots and stays inside the plot, or for a guest without reach inside the plot and its lane. A
-// name with no clear side is left to the hover.
+// Where to name the best guests, the sweet spots and the one in focus: beside each dot on the first side that
+// clears the other names and dots and stays inside the plot, or for a guest without reach inside the plot and its
+// lane. A dot on the plot's edge has its name moved inside. A sweet spot's or the focused guest's name may cover
+// other dots when nothing else fits; any other name with no clear side is left to the hover.
 function placeNames(
   guests: Guest[],
   focus: string | null,
@@ -602,30 +603,40 @@ function placeNames(
 ) {
   const placed: Box[] = [...reserved];
   const out: { guest: Guest; x: number; y: number; anchor: "start" | "end" }[] = [];
+  const rankOf = (guest: Guest, i: number) =>
+    guest.ref === focus ? -2 * guests.length + i : guest.label === "sweet_spot" ? i - guests.length : i;
   const order = guests
     .map((guest, i) => ({ guest, i }))
-    .filter(({ guest, i }) => i < named || guest.ref === focus)
-    .sort((a, b) => Number(b.guest.ref === focus) - Number(a.guest.ref === focus) || a.i - b.i);
+    .filter(({ guest, i }) => i < named || guest.ref === focus || guest.label === "sweet_spot")
+    .sort((a, b) => rankOf(a.guest, a.i) - rankOf(b.guest, b.i));
   for (const { guest, i } of order) {
     const { cx, cy } = position(guest);
     const r = (dots[i].right - dots[i].left) / 2;
     const left = guest.scores.reach === null ? plot.lane : plot.left;
     const w = 22 + guest.name.length * 6.6;
     const h = 15;
+    const level = Math.min(Math.max(cy + 4, plot.top + h - 3), plot.bottom - 3);
+    const across = Math.min(Math.max(cx - w / 2, left + 2), plot.right - 2 - w);
     const sides = [
-      { x: cx + r + 7, y: cy + 4, anchor: "start" as const, box: { left: cx + r + 5, right: cx + r + 7 + w } },
-      { x: cx - r - 7, y: cy + 4, anchor: "end" as const, box: { left: cx - r - 7 - w, right: cx - r - 5 } },
-      { x: cx - w / 2, y: cy - r - 7, anchor: "start" as const, box: { left: cx - w / 2, right: cx + w / 2 } },
-      { x: cx - w / 2, y: cy + r + 15, anchor: "start" as const, box: { left: cx - w / 2, right: cx + w / 2 } },
+      { x: cx + r + 7, y: level, anchor: "start" as const, box: { left: cx + r + 5, right: cx + r + 7 + w } },
+      { x: cx - r - 7, y: level, anchor: "end" as const, box: { left: cx - r - 7 - w, right: cx - r - 5 } },
+      { x: across, y: cy - r - 7, anchor: "start" as const, box: { left: across, right: across + w } },
+      { x: across, y: cy + r + 15, anchor: "start" as const, box: { left: across, right: across + w } },
     ];
-    for (const side of sides) {
+    const fits = (side: (typeof sides)[number], overDots: boolean) => {
       const box = { ...side.box, top: side.y - h + 3, bottom: side.y + 3 };
       const inside =
         box.left >= left + 2 && box.right <= plot.right - 2 && box.top >= plot.top && box.bottom <= plot.bottom;
       const clear =
-        !placed.some((other) => overlaps(box, other)) && !dots.some((dot, d) => d !== i && overlaps(box, dot));
-      if (inside && clear) {
-        placed.push(box);
+        !placed.some((other) => overlaps(box, other)) &&
+        (overDots || !dots.some((dot, d) => d !== i && overlaps(box, dot)));
+      return inside && clear ? box : null;
+    };
+    const must = guest.label === "sweet_spot" || guest.ref === focus;
+    for (const overDots of must ? [false, true] : [false]) {
+      const side = sides.find((each) => fits(each, overDots));
+      if (side) {
+        placed.push(fits(side, overDots) as Box);
         out.push({ guest, x: side.x, y: side.y, anchor: side.anchor });
         break;
       }

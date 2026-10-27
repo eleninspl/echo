@@ -266,7 +266,15 @@ function sources(url: string | null, small: boolean): string[] {
   return small || large === url ? [url] : [large, url];
 }
 
-export function Picture({ guest, sizes, small = false }: { guest: Guest; sizes: string; small?: boolean }) {
+export function Picture({
+  guest,
+  sizes,
+  small = false,
+}: {
+  guest: Pick<Guest, "name" | "image_url" | "label">;
+  sizes: string;
+  small?: boolean;
+}) {
   const [broken, setBroken] = useState<string[]>([]);
   const url = sources(guest.image_url, small).find((source) => !broken.includes(source));
   const markBroken = (source: string) => setBroken((failed) => [...failed, source]);

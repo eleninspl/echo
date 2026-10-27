@@ -177,12 +177,17 @@ export function TasteMap({ analysis, rerun }: { analysis: Analysis; rerun: Rerun
             ref={stage}
             role="group"
             aria-label="Your listeners' tastes around your show"
-            className="relative mx-auto"
+            className="relative isolate mx-auto"
             style={{ width: side, height: side }}
           >
             {map && (
               <>
-                <svg aria-hidden width={side} height={side} className="absolute inset-0 overflow-visible">
+                <svg
+                  aria-hidden
+                  width={side}
+                  height={side}
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                >
                   {rows.map((row, k) => {
                     const middle = middleOf(k, map.wedge);
                     const on = focus === row.category || picked?.category === row.category;
@@ -240,17 +245,23 @@ export function TasteMap({ analysis, rerun }: { analysis: Analysis; rerun: Rerun
 
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute rounded-full motion-reduce:hidden"
+                  className="pointer-events-none absolute overflow-hidden rounded-full motion-reduce:hidden"
                   style={{
                     left: map.centre - map.outer,
                     top: map.centre - map.outer,
                     width: map.outer * 2,
                     height: map.outer * 2,
-                    background:
-                      "conic-gradient(from 0deg, transparent 0turn, transparent 0.8turn, color-mix(in srgb, var(--brand) 14%, transparent) 1turn)",
-                    animation: "spin 14s linear infinite",
                   }}
-                />
+                >
+                  <span
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background:
+                        "conic-gradient(from 0deg, transparent 0turn, transparent 0.8turn, color-mix(in srgb, var(--brand) 14%, transparent) 1turn)",
+                      animation: "spin 14s linear infinite",
+                    }}
+                  />
+                </span>
 
                 <span
                   aria-hidden
@@ -324,7 +335,7 @@ export function TasteMap({ analysis, rerun }: { analysis: Analysis; rerun: Rerun
                       onPointerLeave={() => setHovered(null)}
                       onFocus={() => setHovered(spot.key)}
                       onBlur={() => setHovered(null)}
-                      className={`absolute rounded-full ${near ? "z-10" : ""}`}
+                      className={`absolute rounded-full before:absolute before:inset-0 before:-z-10 before:rounded-full before:content-[''] pointer-coarse:before:-inset-3 ${near ? "z-10" : ""}`}
                       style={{
                         left: spot.x - spot.size,
                         top: spot.y - spot.size,

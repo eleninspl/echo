@@ -68,7 +68,7 @@ export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
                 </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-2.5">
-                    <span className="readout text-sm text-ink-dim">{rank(guests.indexOf(guest))}</span>
+                    <span className="readout text-sm text-ink-dim">Rank {rank(guests.indexOf(guest))}</span>
                     <Chip color={color}>{LABELS[guest.label].name}</Chip>
                   </span>
                   <span className="mt-1 block font-display text-2xl leading-tight font-semibold text-balance decoration-1 underline-offset-4 group-hover:underline">

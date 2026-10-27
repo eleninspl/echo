@@ -1,8 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { Label, Step } from "@/lib/echo";
+import type { Label } from "@/lib/echo";
 import { describe } from "@/lib/errors";
-import { ideasOff } from "@/lib/stats";
 import type { Rerun } from "@/lib/use-analysis";
 
 // The panel parts shared by every zone: hues, lamps, level bars, gauges and zone heads.
@@ -255,11 +254,6 @@ export function voiceBars(fit: number, love: number, reach: number | null, bars:
   });
 }
 
-// A run's steps as the host sees them: without "Writing episode ideas" when the engine writes none.
-export function shownSteps(steps: Step[]): Step[] {
-  return ideasOff() ? steps.filter((step) => step.key !== "ideas") : steps;
-}
-
 // A rerun's progress, or why it failed, in place of the control that started it. The page keeps the guests
 // from before until the new run is done.
 export function RerunStatus({ rerun, from, className = "" }: { rerun: Rerun; from: string; className?: string }) {
@@ -274,7 +268,7 @@ export function RerunStatus({ rerun, from, className = "" }: { rerun: Rerun; fro
     );
   }
   if (!rerun.busy) return null;
-  const steps = shownSteps(rerun.running?.steps ?? []);
+  const steps = rerun.running?.steps ?? [];
   const done = steps.filter((step) => step.done).length;
   const current = steps.find((step) => !step.done);
   return (

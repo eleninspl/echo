@@ -96,6 +96,7 @@ NAME_TERMS = (
     )
     | terms("lgbt lgbtq lgbtqia transgender erotic porn")
     | terms("racism racist racial whiteness blackness ethnicity ethnic")
+    | terms("antisemitism semitism semitic jewish jews jewishness israel israeli palestine palestinian zionism zionist")
     | POLITICS
     | HEALTH
     | MONEY_TROUBLE

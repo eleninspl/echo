@@ -36,24 +36,3 @@ export function stats(analysis: Analysis) {
     withAges,
   };
 }
-
-// Whether the engine writes episode ideas. Without a writing model every idea comes back null, and that
-// doesn't change between runs, so the last finished run's answer is kept for the next run's step list.
-const IDEAS = "echo.ideas";
-
-export function noteIdeas(analysis: Analysis) {
-  if (analysis.status !== "done" || !analysis.guests.length) return;
-  try {
-    window.sessionStorage.setItem(IDEAS, analysis.guests.some((guest) => guest.idea) ? "on" : "off");
-  } catch {
-    return;
-  }
-}
-
-export function ideasOff(): boolean {
-  try {
-    return window.sessionStorage.getItem(IDEAS) === "off";
-  } catch {
-    return false;
-  }
-}

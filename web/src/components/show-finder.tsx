@@ -179,7 +179,14 @@ export function ShowFinder() {
         (search.state !== "idle" || startError) &&
         createPortal(
           <SidePanel key={search.state === "idle" ? "idle" : search.query} search={search}>
-            {shows.length > 0 && <Matches shows={shows} pending={pending} onRun={run} />}
+            {shows.length > 0 && (
+              <Matches
+                shows={shows}
+                query={search.state === "idle" ? "" : search.query}
+                pending={pending}
+                onRun={run}
+              />
+            )}
             {problems}
           </SidePanel>,
           slot,
@@ -334,7 +341,50 @@ function along(index: number, total: number): string {
     : `color-mix(in srgb, var(--reach) ${Math.round((at - 0.5) * 200)}%, var(--love))`;
 }
 
-function Matches({ shows, pending, onRun }: { shows: Show[]; pending: string | null; onRun: (id: string) => void }) {
+const FILLER = new Set(["a", "an", "and", "by", "for", "in", "of", "on", "podcast", "show", "the", "this", "with"]);
+
+const plainWords = (text: string) =>
+  text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+function oneEditApart(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
+}
+
+function coversQuery(show: Show, query: string): boolean {
+  const words = plainWords(`${show.title} ${show.description ?? ""}`);
+  const joined = words.join("");
+  return plainWords(query)
+    .filter((word) => !FILLER.has(word))
+    .every(
+      (word) =>
+        words.includes(word) ||
+        (word.length >= 4 && (joined.includes(word) || words.some((other) => other.startsWith(word)))) ||
+        (word.length >= 5 && words.some((other) => oneEditApart(word, other))),
+    );
+}
+
+function Matches({
+  shows,
+  query,
+  pending,
+  onRun,
+}: {
+  shows: Show[];
+  query: string;
+  pending: string | null;
+  onRun: (id: string) => void;
+}) {
+  const sure = coversQuery(shows[0], query);
   return (
     <ol className="relative flex flex-col gap-1.5 pr-7">
       <span
@@ -381,9 +431,9 @@ function Matches({ shows, pending, onRun }: { shows: Show[]; pending: string | n
               </span>
               <span className="min-w-0 flex-1">
                 {top && (
-                  <span className="tag mb-1 flex items-center gap-1.5 text-sweet">
-                    <span aria-hidden className="size-1.5 rounded-full bg-sweet" />
-                    Top match
+                  <span className={`tag mb-1 flex items-center gap-1.5 ${sure ? "text-sweet" : "text-ink-dim"}`}>
+                    <span aria-hidden className={`size-1.5 rounded-full ${sure ? "bg-sweet" : "bg-ink-dim"}`} />
+                    {sure ? "Top match" : "Closest match"}
                   </span>
                 )}
                 <span
