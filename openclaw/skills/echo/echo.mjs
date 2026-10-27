@@ -21,7 +21,7 @@ const LABELS = {
   sweet_spot:
     "Sweet spot: your listeners tend to love them, and their fans are new to you and likely to enjoy the show",
   safe: "Safe: your listeners are likely to enjoy it, but few new ones come",
-  far: "Far: brings new people who may not stay",
+  far: "One-way: your listeners like them and their fans are new to you, but those fans may not stay",
   long_shot: "Long shot: their fans might come, but your listeners aren't into them",
   balanced: "Balanced: decent on each score, top on none",
 };
@@ -61,7 +61,8 @@ const USAGE = `Usage: node echo.mjs <command> [arguments]
       --about <title or name> --about-type ${ABOUT_TYPES.join("|")}
       --theme <the episode's theme, up to ${THEME_CHARS} characters>
   results <analysis_id>             the ranked guests again
-  guest <analysis_id> <ref>         a guest's full episode plan and their fans' tastes
+  guest <analysis_id> <ref> [--length <episode length>]
+                                    a guest's full episode plan and their fans' tastes
   ask <analysis_id> <message>       ask Echo's agent about the results, or to rerun them
   invite <analysis_id> <ref>... [--host-name <name>] [--note <text>] [details]
                                     an invitation draft for each guest
@@ -70,7 +71,8 @@ const USAGE = `Usage: node echo.mjs <command> [arguments]
       --length <episode length> --release <when it's out> --reply-by <date>
   revise <analysis_id> <ref> <instruction>
                                     rewrite the last draft for a guest
-  brief <analysis_id> <ref>         a briefing to read before recording`;
+  brief <analysis_id> <ref> [--length <episode length>]
+                                    a briefing to read before recording`;
 
 export class EchoError extends Error {}
 
@@ -195,15 +197,17 @@ function guestLines(guest, index, links, rewritten) {
   return lines;
 }
 
-function analysisText(analysis, config, rewrites = {}) {
+function analysisText(analysis, config, rewrites = {}, left = []) {
   if (analysis.status === "failed") throw new EchoError(analysis.error?.message ?? "The analysis failed.");
   const links = {
     analysis: `${config.web}/analyses/${encodeURIComponent(analysis.id)}`,
     guest: (ref) => `${config.web}/analyses/${encodeURIComponent(analysis.id)}/guests/${encodeURIComponent(ref)}`,
   };
   const phrases = filterPhrases(analysis.filters);
+  const leftIds = new Set(left.map((guest) => guest.id));
+  const guests = analysis.guests.filter((guest) => !leftIds.has(guest.id));
   const lines = [
-    `${analysis.show.title}: ${analysis.guests.length} guests${phrases.length ? `, ${phrases.join(", ")}` : ""}`,
+    `${analysis.show.title}: ${guests.length} guests${phrases.length ? `, ${phrases.join(", ")}` : ""}`,
     `Analysis ID: ${analysis.id}`,
     `See the chart in Echo: ${links.analysis}`,
   ];
@@ -211,12 +215,13 @@ function analysisText(analysis, config, rewrites = {}) {
   if (about && !about.used) lines.push(`Echo couldn't use "${about.query}" as the topic, so these guests ignore it.`);
   if (!analysis.guests.some((guest) => guest.idea))
     lines.push("No episode ideas: the engine had no writing side when this analysis ran.");
-  analysis.guests.forEach((guest, index) => lines.push("", ...guestLines(guest, index, links, rewrites[guest.ref])));
+  guests.forEach((guest, index) => lines.push("", ...guestLines(guest, index, links, rewrites[guest.ref])));
   const hosts = analysis.left_out.filter((person) => person.why === "host").map((person) => person.name);
   const past = analysis.left_out.filter((person) => person.why === "past_guest").map((person) => person.name);
-  if (hosts.length || past.length) lines.push("");
+  if (hosts.length || past.length || left.length) lines.push("");
   if (hosts.length) lines.push(`Left out as the show's hosts: ${hosts.join(", ")}.`);
   if (past.length) lines.push(`Left out as past guests: ${past.join(", ")}.`);
+  if (left.length) lines.push(`Left out by the host: ${left.map((guest) => guest.name).join(", ")}.`);
   return lines.join("\n");
 }
 
@@ -287,13 +292,15 @@ const COMMANDS = {
     return featured.map((item) => `${item.show.title}: analysis ${item.analysis_id}`).join("\n");
   },
 
-  async analyze({ positionals, values, call, report }) {
+  async analyze({ positionals, values, call, saved, report }) {
     needs(positionals, 1, "the show_id (from find)");
     const filters = { fame: values.fame ?? "any" };
     if (values.age) filters.age = values.age;
     if (values.country) filters.country = values.country;
     if (values.about) filters.episode_about = { query: values.about, type: values["about-type"] ?? "movie" };
     if (values.theme) filters.theme = values.theme;
+    const left = await saved.load("left", positionals[0], []);
+    if (left.length) filters.exclude = left.map((guest) => guest.id);
     const started = await call("POST", "/analyses", { show_id: positionals[0], filters });
     return report(await finished(call, started.id));
   },
@@ -303,13 +310,15 @@ const COMMANDS = {
     return report(await finished(call, positionals[0]));
   },
 
-  async guest({ positionals, call, config, saved }) {
+  async guest({ positionals, values, call, config, saved }) {
     needs(positionals, 2, "the analysis ID and the guest's ref");
     const [id, ref] = positionals;
     const analysis = await finished(call, id);
     const guest = guestOf(analysis, ref);
     const idea = (await saved.load("ideas", id, {}))[ref];
-    const query = idea ? `?${new URLSearchParams({ title: idea.title, pitch: idea.pitch, reason: idea.reason })}` : "";
+    const params = new URLSearchParams(idea ? { title: idea.title, pitch: idea.pitch, reason: idea.reason } : {});
+    if (values.length) params.set("length", values.length);
+    const query = params.size ? `?${params}` : "";
     const details = await call("GET", path("analyses", id, "guests", ref) + query);
     const lines = [`${guest.name} on ${analysis.show.title}`];
     if (guest.bio) lines.push(guest.bio);
@@ -318,7 +327,8 @@ const COMMANDS = {
     if (episode) {
       lines.push("", `Episode: ${episode.title}`, episode.summary);
       episode.segments.forEach((segment, index) => {
-        lines.push("", `${index + 1}. ${segment.title}`, ...segment.points.map((point) => `   - ${point}`));
+        const minutes = segment.minutes ? ` (${segment.minutes} min)` : "";
+        lines.push("", `${index + 1}. ${segment.title}${minutes}`, ...segment.points.map((point) => `   - ${point}`));
       });
       if (episode.questions.length)
         lines.push("", "Questions to ask:", ...episode.questions.map((question) => `- ${question}`));
@@ -335,9 +345,13 @@ const COMMANDS = {
   async ask({ positionals, call, saved, report }) {
     needs(positionals, 2, "the analysis ID and the message");
     const [id, ...words] = positionals;
+    const analysis = await finished(call, id);
+    const left = await saved.load("left", analysis.show.id, []);
     const history = await saved.load("chat", id, []);
     history.push({ role: "user", content: words.join(" ").slice(0, MESSAGE_CHARS) });
-    const reply = await call("POST", "/chat", { analysis_id: id, messages: history.slice(-HISTORY) });
+    const body = { analysis_id: id, messages: history.slice(-HISTORY) };
+    if (left.length) body.exclude = left.map((guest) => guest.id);
+    const reply = await call("POST", "/chat", body);
     history.push({ role: "assistant", content: reply.reply.slice(0, MESSAGE_CHARS) });
     const lines = [`Echo: ${reply.reply}`];
     if (reply.action === "rerun" && reply.analysis_id) {
@@ -350,6 +364,19 @@ const COMMANDS = {
       );
     } else {
       await saved.save("chat", id, history.slice(-HISTORY));
+    }
+    if (reply.action === "leave_out" && reply.guest_ref) {
+      const guest = guestOf(analysis, reply.guest_ref);
+      const why = reply.why ?? "not_for_us";
+      await saved.save("left", analysis.show.id, [
+        ...left.filter((other) => other.id !== guest.id),
+        { id: guest.id, name: guest.name, why },
+      ]);
+      lines.push(
+        "",
+        `Left out ${guest.name} (${guest.ref}) as ${why === "had_on" ? "a past guest" : "not right for the show"}.`,
+        "Results and reruns for this show leave them out from now on.",
+      );
     }
     if (reply.action === "rewrite" && reply.guest_ref && reply.idea) {
       const rewrites = await saved.load("ideas", id, {});
@@ -405,12 +432,13 @@ const COMMANDS = {
     return draftText(draft, guestOf(analysis, ref));
   },
 
-  async brief({ positionals, call, saved }) {
+  async brief({ positionals, values, call, saved }) {
     needs(positionals, 2, "the analysis ID and the guest's ref");
     const [id, ref] = positionals;
     const idea = (await saved.load("ideas", id, {}))[ref];
     const body = { analysis_id: id, guest_ref: ref };
     if (idea) body.idea = idea;
+    if (values.length) body.length = values.length;
     const { markdown } = await call("POST", "/briefings", body);
     return markdown;
   },
@@ -454,7 +482,13 @@ export async function run(argv, env = process.env) {
   }
   const config = settings(env);
   const saved = store(config);
-  const report = async (analysis) => analysisText(analysis, config, await saved.load("ideas", analysis.id, {}));
+  const report = async (analysis) =>
+    analysisText(
+      analysis,
+      config,
+      await saved.load("ideas", analysis.id, {}),
+      await saved.load("left", analysis.show.id, []),
+    );
   return COMMANDS[command]({ positionals, values, config, call: client(config), saved, report });
 }
 

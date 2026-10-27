@@ -25,6 +25,7 @@ from .cleanup import (
 from .models import (
     AgeBucket,
     Analysis,
+    AnchorType,
     EpisodeAbout,
     Evidence,
     Filters,
@@ -95,6 +96,7 @@ LINKS = {
     "musicbrainz": ("musicbrainz_artist_id", "https://musicbrainz.org/artist/{}"),
 }
 WEBSITE = re.compile(r"^https?://[^\s/?#]+\.[^\s]+$", re.IGNORECASE)
+WIKIPEDIA = re.compile(r"^https://en\.wikipedia\.org/wiki/\S+$")
 # The bio: the description, then up to this many fact sentences. A listed name longer than this is left out.
 BIO_FACTS = 3
 BIO_NAME_LENGTH = 80
@@ -106,7 +108,8 @@ BUSINESS_ROLE = re.compile(
     re.IGNORECASE,
 )
 
-VERSION = 1
+VERSION = 2
+DATED: frozenset[AnchorType] = frozenset({"movie", "tv_show", "videogame"})
 STEPS = [
     ("map", "Mapping your audience"),
     ("candidates", "Finding guests"),
@@ -256,6 +259,12 @@ def rows_of(lists: dict[str, list[MapItem]]) -> list[MapRow]:
 async def resolve_anchor(client: QlooClient, about: EpisodeAbout) -> dict | None:
     results = await client.search(about.query, types=f"urn:entity:{about.type}", take=1)
     return results[0] if results else None
+
+
+def anchor_name(anchor: dict, kind: AnchorType) -> str:
+    name = " ".join(anchor["name"].split())
+    year = str(properties(anchor).get("release_year") or "")[:4] if kind in DATED else ""
+    return f"{name} ({year})" if year.isdigit() and year not in name else name
 
 
 def list_params(show_id: str, filters: Filters) -> dict[str, Any]:
@@ -450,7 +459,10 @@ def links_of(person: dict) -> dict[str, str]:
 
 
 def fact_names(person: dict, key: str, most: int, skip: frozenset[str] = frozenset()) -> list[str]:
-    values = properties(person).get(key)
+    return screened_names(person, properties(person).get(key), most, skip)
+
+
+def screened_names(person: dict, values: Any, most: int, skip: frozenset[str] = frozenset()) -> list[str]:
     if not isinstance(values, list):
         return []
     own = normalize(person.get("name") or "")
@@ -481,19 +493,27 @@ def since_year(person: dict, today: datetime) -> int | None:
     return year if year and 1900 <= year <= today.year else None
 
 
-def known_facts(person: dict, today: datetime | None = None, description: str | None = None) -> list[str]:
+def known_facts(
+    person: dict, today: datetime | None = None, description: str | None = None, work: wikidata.Work | None = None
+) -> list[str]:
     """Public, work-only facts about a person as plain sentences, best first. Never gender, birth date,
-    citizenship, family, partners, lifestyle or political office: only the keys read here."""
-    works = fact_names(person, "notable_work", 3)
+    citizenship, family, partners, lifestyle or political office: only the keys read here, and from Wikidata
+    only what they founded, ran and are known for."""
+    work = work or wikidata.Work()
+    founded = screened_names(person, work.founded, 3)
+    led = screened_names(person, work.led, 2)
+    works = screened_names(person, fact_names(person, "notable_work", 3) + work.works, 3)
     awards = fact_names(person, "award_received", 2)
     nominations = [] if awards else fact_names(person, "nominated_for", 2)
-    employers = fact_names(person, "employer", 2)
+    employers = [] if founded or led else fact_names(person, "employer", 2)
     if len(employers) == 1 and BUSINESS_ROLE.search(description or ""):
         employers = []
     teams = [] if employers else fact_names(person, "member_of_sports_team", 3)
     instruments = [name.removesuffix(" instrument") for name in fact_names(person, "instrument", 2, NOT_INSTRUMENTS)]
     year = since_year(person, today or datetime.now(UTC))
     facts = [
+        founded and f"A founder of {joined(founded)}.",
+        led and f"Has been chief executive of {joined(led)}.",
         works and f"Known for {joined(works)}.",
         awards and f"Received {joined(awards)}.",
         nominations and f"Nominated for {joined(nominations)}.",
@@ -502,11 +522,13 @@ def known_facts(person: dict, today: datetime | None = None, description: str | 
         year and f"Active since {year}.",
         instruments and f"Plays {joined(instruments)}.",
     ]
-    return [fact for fact in facts if fact][:BIO_FACTS]
+    return [re.sub(r"\.{2,}$", ".", fact) for fact in facts if fact][:BIO_FACTS]
 
 
-def bio_of(person: dict, description: str | None, today: datetime | None = None) -> str | None:
-    facts = known_facts(person, today, description)
+def bio_of(
+    person: dict, description: str | None, today: datetime | None = None, work: wikidata.Work | None = None
+) -> str | None:
+    facts = known_facts(person, today, description, work)
     if not facts:
         return None
     return " ".join(part for part in [sentence(BORN.sub("", description or "")), *facts] if part)
@@ -767,12 +789,15 @@ async def fill_guests(
         people_lists(client, show.id, filters), author_of(itunes_id), episode_titles(itunes_id)
     )
     if filters.episode_about:
-        filters.episode_about.used = anchor["name"] if anchor and c3 else None
+        filters.episode_about.used = anchor_name(anchor, filters.episode_about.type) if anchor and c3 else None
     await done("candidates")
 
     today = datetime.now(UTC).date()
+    excluded = set(filters.exclude)
 
     def keep(person: dict) -> bool:
+        if person["entity_id"] in excluded:
+            return False
         return not is_dead(person) and not is_minor(person, today) and is_public_figure(person) and clean_person(person)
 
     pool = merge([p for p in c1 if keep(p)], [p for p in c2 if keep(p)], [p for p in c3 if keep(p)])
@@ -844,10 +869,11 @@ async def fill_guests(
     await done("score")
 
     top = ranked[:EXPLAINED]
-    show_ranks, guest_tags, ages = await asyncio.gather(
+    show_ranks, guest_tags, ages, work = await asyncio.gather(
         show_tag_ranks(client, show.id),
         asyncio.gather(*(tags_of(client, item.person["entity_id"]) for item in top)),
         age_profiles(client, [show.id] + [item.person["entity_id"] for item in top]),
+        optional(wikidata.work_of([item.person for item in top]), {}),
     )
     show_age = ages.get(show.id, {})
     tag_guests = Counter(key for tags in guest_tags for key in {tag_key(tag) for tag in tags})
@@ -857,10 +883,14 @@ async def fill_guests(
     for guest, item, tags in zip(analysis.guests, top, guest_tags, strict=False):
         podcasts = shared_podcasts(item.love, width, reach_scores, top_podcasts, len(top), shown)
         shown.update(podcasts)
+        if found := work.get(item.person["entity_id"]):
+            guest.bio = bio_of(item.person, guest.description, work=found) or guest.bio
+            if found.page and WIKIPEDIA.match(found.page):
+                guest.links = {"wikipedia": found.page, **guest.links}
+        podcast_names = list(dict.fromkeys(item.love.names[p] for p in podcasts))
         guest.evidence = Evidence(
-            shared_tastes=shared_tastes(
-                [item.love.names[p] for p in podcasts], shared_tags(show_ranks, tags, tag_guests, len(top))
-            ),
+            shared_tastes=shared_tastes(podcast_names, shared_tags(show_ranks, tags, tag_guests, len(top))),
+            shared_podcasts=podcast_names,
             new_podcasts=new_podcasts(item.love, width, reach_scores, shared_by, podcasts),
             ages=over_index(ages.get(item.person["entity_id"], {}), show_age),
         )

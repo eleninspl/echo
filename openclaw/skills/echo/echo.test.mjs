@@ -229,3 +229,32 @@ test("runs when called through a symlink", async () => {
     return true;
   });
 });
+
+test("a guest left out in chat stays out of the results, reruns and new analyses of the show", async () => {
+  const third = example.analysis.guests[2];
+  routes["POST /chat"] = () =>
+    reply(200, { reply: "Left them out.", action: "leave_out", guest_ref: third.ref, why: "had_on" });
+  const text = await run(["ask", "an_example", "We've", "had", "them", "on"], env);
+  assert.match(text, new RegExp(`Left out ${third.name} \\(${third.ref}\\) as a past guest\\.`));
+  const results = await run(["results", "an_example"], env);
+  assert.doesNotMatch(results, new RegExp(`\\(${third.ref}\\)`));
+  assert.match(results, new RegExp(`Left out by the host: ${third.name}\\.`));
+  routes["POST /chat"] = () => reply(200, { reply: "Sure.", action: "none" });
+  await run(["ask", "an_example", "Thanks"], env);
+  assert.deepEqual(requests.at(-1).body.exclude, [third.id]);
+  await run(["analyze", example.analysis.show.id], env);
+  const started = requests.find((request) => request.method === "POST" && request.pathname === "/analyses");
+  assert.deepEqual(started.body.filters.exclude, [third.id]);
+});
+
+test("the episode plan and the briefing are timed to a length", async () => {
+  const timed = structuredClone(example.guest_details);
+  timed.episode.segments[0].minutes = 12;
+  routes["GET /analyses/an_example/guests/g1"] = () => reply(200, { ...timed, ref: "g1" });
+  routes["POST /briefings"] = () => reply(200, { markdown: "# Briefing" });
+  const text = await run(["guest", "an_example", "g1", "--length", "45 min"], env);
+  assert.equal(new URLSearchParams(requests.at(-1).search).get("length"), "45 min");
+  assert.match(text, new RegExp(`1\\. ${timed.episode.segments[0].title} \\(12 min\\)`));
+  await run(["brief", "an_example", "g1", "--length", "45 min"], env);
+  assert.equal(requests.at(-1).body.length, "45 min");
+});

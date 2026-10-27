@@ -29,14 +29,14 @@ Run every command in a shell as `node {baseDir}/echo.mjs <command> ...`, where `
 3. **Report briefly:** say who the top 3 to 5 are, what they do, why they fit and their episode idea's title. Link the chart in Echo. Then offer more guests, a guest's episode plan, invitations or a briefing.
 4. **Follow up** on what the host asks, always with the latest analysis ID:
    - `results <analysis_id>`: the ranking again.
-   - `guest <analysis_id> <ref>`: a guest's full episode plan, questions, and what their fans love.
-   - `ask <analysis_id> "<the host's words>"`: anything else about the results, such as why someone ranks where they do, a new idea for a guest, or other filters ("younger listeners", "an episode about Dune"). Echo's own agent answers. When it reruns, the new ranking prints with a new analysis ID: use that one from then on. When it rewrites an idea, the skill keeps it, and `results`, `guest`, `invite`, `revise` and `brief` use it from then on.
+   - `guest <analysis_id> <ref> [--length "45 min"]`: a guest's full episode plan, questions, and what their fans love. With the episode length the host gave, each segment gets its minutes.
+   - `ask <analysis_id> "<the host's words>"`: anything else about the results, such as why someone ranks where they do, a new idea for a guest, or other filters ("younger listeners", "an episode about Dune"). Echo's own agent answers. When it reruns, the new ranking prints with a new analysis ID: use that one from then on. When it rewrites an idea, the skill keeps it, and `results`, `guest`, `invite`, `revise` and `brief` use it from then on. When the host says a guest has been on the show or isn't right ("we've had Ann Example on"), pass it to `ask` too: Echo leaves them out, and the skill keeps them out of `results`, reruns and new analyses of that show.
    - `invite <analysis_id> <ref> [<ref> ...] --host-name "<name>" [--note "<what the host wants said>"]`: an invitation draft for each guest. Ask for the name to sign with once, and reuse it. Add the practical details only when the host gives them; Echo invents none:
      - `--dates "<recording dates>"`, `--fee "<fee>"` or `--unpaid`
      - `--format remote` or `--format in_person` with `--place "<where>"`
      - `--length "<episode length>"`, `--release "<when it's out>"`, `--reply-by "<date>"`
    - `revise <analysis_id> <ref> "<what to change>"`: rewrites the last draft for that guest, keeping its details.
-   - `brief <analysis_id> <ref>`: a briefing to read before recording.
+   - `brief <analysis_id> <ref> [--length "45 min"]`: a briefing to read before recording, with the same length as the episode plan.
 
 ## Sending
 

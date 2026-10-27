@@ -6,6 +6,7 @@ from echo_engine.cleanup import dedupe, host_matcher, is_dead, is_minor, is_publ
 from echo_engine.models import Show
 from echo_engine.pipeline import (
     LoveBack,
+    anchor_name,
     bio_of,
     guest_description,
     known_facts,
@@ -19,7 +20,7 @@ from echo_engine.pipeline import (
     shared_tastes,
 )
 from echo_engine.screen import clean_entity, clean_name, clean_person, clean_tag_name
-from echo_engine.wikidata import confirmed, queries
+from echo_engine.wikidata import Work, confirmed, queries, work_queries, works_from
 
 TODAY = datetime(2026, 10, 26, tzinfo=UTC)
 
@@ -212,6 +213,9 @@ def test_echo_score_and_labels():
     assert scoring.echo_score(1, 1, 0) < scoring.echo_score(0.6, 0.6, 0.6)
     assert scoring.label(0.6, 0.4, 0.4) == "sweet_spot"
     assert scoring.label(0.6, 0.2, 0.8) == "far"
+    assert scoring.label(0.9, 0.2, 0.5) == "far"
+    assert scoring.label(0.4, 0.1, 0.9) == "balanced"
+    assert scoring.label(0.2, 0.1, 0.9) == "long_shot"
     assert scoring.label(0.2, 0.9, 0.5) == "long_shot"
     assert scoring.label(0.6, 0.9, 0.1) == "safe"
     assert scoring.label(0.4, 0.4, 0.5) == "balanced"
@@ -432,3 +436,67 @@ def test_a_description_that_names_who_someone_is_is_left_out():
     for text in ("Example transgender activist", "Example gay rights activist", "Example NAACP organizer"):
         assert guest_description(english(text)) is None, text
     assert guest_description(invented_person()) is None
+
+
+def test_wikidata_work_comes_by_id_or_name_and_only_from_the_same_person():
+    people = [
+        {"entity_id": "A", "name": "Ann Example", "properties": {"date_of_birth": "1975-07-11"},
+         "external": {"library_of_congress_authority_id": [{"id": "n1"}]}},
+        {"entity_id": "B", "name": "Bo Sample", "properties": {"date_of_birth": "1966-06-13"}},
+    ]  # fmt: skip
+    by_id, by_name = work_queries(people)
+    assert '("A" "n1")' in by_id and "wdt:P244" in by_id and "wdt:P112" in by_id and "wdt:P800" in by_id
+    assert '("B" "Bo Sample"@en 1966)' in by_name
+    rows = [
+        ["A", "1975-07-11T00:00:00Z", "page", "https://en.wikipedia.org/wiki/Ann_Example", None],
+        ["A", "1975-07-11T00:00:00Z", "founded", "Example Pay Co", "94"],
+        ["A", "1975-07-11T00:00:00Z", "founded", "Example Robots", "6"],
+        ["A", "1975-07-11T00:00:00Z", "founded", "Example Side Project", "1"],
+        ["A", "1975-07-11T00:00:00Z", "led", "Example Robots", "6"],
+        ["A", "1966-07-28T00:00:00Z", "founded", "A Namesake's Company", "50"],
+        ["B", None, "work", "Example Book", "12"],
+        ["X", None, "work", "Nobody's Book", "12"],
+    ]
+    found = works_from(people, rows)
+    assert found["A"] == Work(
+        "https://en.wikipedia.org/wiki/Ann_Example", ["Example Pay Co", "Example Robots"], ["Example Robots"], []
+    )
+    assert found["B"] == Work(None, [], [], ["Example Book"])
+    assert "X" not in found
+
+
+def test_the_bio_names_what_they_founded_and_led_before_any_employer():
+    person = invented_person(employer=["Example Search Co"], notable_work=["Example Memoir"])
+    work = Work(
+        "https://en.wikipedia.org/wiki/Ann_Example",
+        ["Example Pay Co", "Example Robots"],
+        ["Example Robots"],
+        ["Example Book"],
+    )
+    assert bio_of(person, "American businessperson", TODAY, work) == (
+        "American businessperson. A founder of Example Pay Co and Example Robots. Has been chief executive of Example "
+        "Robots. Known for Example Memoir and Example Book."
+    )
+    assert bio_of(person, "Writer", TODAY) == "Writer. Known for Example Memoir. Has worked for Example Search Co."
+    assert known_facts(invented_person(), TODAY, None, Work(None, ["Example Co Inc."], [], [])) == [
+        "A founder of Example Co Inc."
+    ]
+    screened = Work(None, ["Example Politics Hour"], [], [])
+    assert bio_of(invented_person(), "Writer", TODAY, screened) is None
+
+
+def test_a_film_or_show_subject_carries_its_year():
+    film = {"name": "Example  Film", "properties": {"release_year": 2014}}
+    assert anchor_name(film, "tv_show") == "Example Film (2014)"
+    assert anchor_name(film, "brand") == "Example Film"
+    assert anchor_name({"name": "Example Film (2014)", "properties": {"release_year": 2014}}, "movie") == (
+        "Example Film (2014)"
+    )
+    assert anchor_name({"name": "Example Game"}, "videogame") == "Example Game"
+
+
+def test_one_way_guests_are_the_box_without_love_back():
+    assert scoring.label(0.5, 0.32, 0.33) == "far"
+    assert scoring.label(0.5, 0.33, 0.33) == "sweet_spot"
+    assert scoring.label(0.49, 0.1, 1.0) == "balanced"
+    assert scoring.label(0.9, 0.1, 0.32) == "safe"

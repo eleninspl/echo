@@ -2,10 +2,10 @@
 
 import type { CSSProperties } from "react";
 
-import type { Guest } from "@/lib/echo";
+import type { Guest, LeaveOutWhy } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
 
-import { PickButton, Scores, TasteChips } from "./dossier";
+import { LeaveOutButton, PickButton, Scores, TasteChips } from "./dossier";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, rank, SectionHead } from "./hud";
 
@@ -21,11 +21,12 @@ type Props = {
   picked: string[];
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
+  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
 };
 
 // The sweet spots, best Echo score first; with none, the guests that come closest, so the labels on this
 // section always agree with its title.
-export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
+export function TopPicks({ guests, ideas, picked, onPick, onOpen, onLeaveOut }: Props) {
   const sweet = guests.filter((guest) => guest.label === "sweet_spot");
   const top = sweet.length ? sweet.slice(0, MOST) : guests.slice(0, CLOSEST);
   const more = sweet.length - top.length;
@@ -114,6 +115,7 @@ export function TopPicks({ guests, ideas, picked, onPick, onOpen }: Props) {
                     <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
                   </svg>
                 </button>
+                <LeaveOutButton guestName={guest.name} onLeaveOut={(why) => onLeaveOut(guest.ref, why)} compact />
               </div>
             </li>
           );

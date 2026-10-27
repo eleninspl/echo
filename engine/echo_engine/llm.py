@@ -1,5 +1,5 @@
 import json
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from textwrap import indent
 from typing import Any
 
@@ -32,8 +32,9 @@ Rules for everything you write:
 - Use only the facts in the input. A person's one-line description and known_facts are all you know about them: add \
 no books, shows, roles, quotes, awards or life events that aren't given there, even if you think you know them. \
 Shared tastes are things both audiences like, never facts about the guest's life or work.
-- known_facts name some of a person's work, not all of it and not always the main part: an employer listed there can \
-be an early job. Never make one of them the subject of an episode, a title or a pitch.
+- known_facts are about a person's work. What they founded, led or are known for is why a host would book them: build \
+on it. An employer listed there can be an early job, so never make an employer the subject of an episode, a title or \
+a pitch.
 - Echo knows nothing about anyone's gender: call a guest by name or "they", never "he", "she", "him", "his" or "her", \
 and use neutral words for what they do (businessperson, not businessman).
 - Tastes describe groups of listeners, never one person. Say it the way a person would: "your listeners tend to love", \
@@ -47,14 +48,19 @@ A broad tag such as humor, dance or celebrity culture is not a reason on its own
 - A guest's fans can have tastes that belong to someone else with the same name, such as car brands for a comedian. \
 Leave out anything that doesn't fit the guest's description.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
-- If the host gave an episode theme, build on it wherever it fits the guest, without forcing it.
+- An episode subject from the host (the_host_wants_an_episode_about) is the named film, TV show, artist, brand or \
+game, never a place or a thing that shares its name. An episode theme is a lens on the episode: with a subject too, \
+it's the subject seen through the theme. Build on them wherever they fit the guest, without forcing them.
 - Never quote scores or other numbers (age groups are the one exception), and never say where the data comes from.
 - Plain, warm, specific English. No hype words and no em dashes."""
 
 LABELS = {
     "sweet_spot": "sweet spot: your listeners like them, their fans would like the show, their audience is new to you",
     "safe": "safe: your listeners like them, but their fans mostly listen to you already",
-    "far": "far: their audience is new to you, but less likely to enjoy the show",
+    "far": (
+        "one-way: your listeners like them and their audience is new to you, but their fans are less likely to enjoy "
+        "the show"
+    ),
     "long_shot": "long shot: a weaker fit with your listeners",
     "balanced": "balanced: in between on fit, love back and reach",
 }
@@ -77,30 +83,43 @@ IDEAS_TASK = f"""For each guest below, write:
 person their shared tastes and new podcasts point to, such as a botanist whose fans love real estate and business \
 podcasts; otherwise true. When it's false, write the idea from the tastes alone and never use the description or \
 known_facts.
-Give every guest a different angle. Vary how the reasons open and how the titles are built: not every reason should \
-start with the guest's fans. When the host gave an episode theme, every title and pitch is about that theme, seen \
-through what this guest and the two audiences share. Answer for every ref. {SCORES}"""
+Give every guest a different angle, one only they could take: build it on what their known_facts and description say \
+they founded, led, made or are known for, and on their strongest shared tastes. Vary how the reasons open and how the \
+titles are built: not every reason should start with the guest's fans, and no two titles share their wording or shape. \
+When the host wants an episode about a subject, every idea is about that subject. A theme is a lens, not a title: each \
+idea finds a different side of it through this guest's own work, and most titles don't repeat the theme's words. With \
+both, each idea is the subject seen through the theme. Answer for every ref. {SCORES}"""
 
-EPISODE_TASK = """Plan one episode of the show with this guest:
-- title: under 70 characters.
+EPISODE_TASK = """Plan one episode of the show with this guest, built on their idea when they have one:
+- title: the idea's title, word for word, when there is an idea; otherwise one under 70 characters.
 - summary: two or three sentences on the episode and why both audiences would care.
-- segments: three or four, each with a title and two or three talking points.
-- questions: five questions the host could ask, about the guest's work and tastes in general terms.
-Build each segment on a strong shared taste or on something specific the guest's fans bring, never on a broad tag. \
+- segments: three or four, each with a title, two or three talking points, and minutes. One segment is on the guest's \
+own work, what their known_facts and description say they founded, led, made or are known for; one is on the \
+strongest shared taste, a named show, film or book when there is one. A podcast both audiences love can give a \
+segment its subject, never its name. Never build a segment on a broad tag (consumer electronics, aging, digital \
+culture) or on an employer from known_facts.
+- minutes: when the host gave an episode_length, each segment's share of it, adding up to it less a few minutes for \
+the open and the close; otherwise null.
+- questions: five questions only this guest could answer, at least two about their own work from known_facts and \
+the description. None that would fit any guest.
 Talking points are things to talk about on air, not facts about the audiences, and never plug another podcast."""
 
 CHAT_TASK = f"""You are Echo, talking with the host about this list of guests. Pick one action:
+- leave_out: the host doesn't want one of these guests, such as someone who has already been on the show or isn't \
+right for it. Give guest_ref, and why: had_on when they've been on the show, else not_for_us. Echo leaves them out of \
+this page and of every run after it.
 - rerun: the host wants different guests. Give the complete filters to use: start from the current filters and \
 change only what the host asked for. fame is any, less_famous or rising. age is one of the buckets or null. country is \
 an English country name or null. episode_about is {{query, type}} for an episode about one named movie, tv_show, \
 artist, brand or videogame, or null. theme is a topic for the episode in a few plain words (road trips, first jobs, \
 burnout), up to {THEME_LENGTH} characters, or null: use it for any subject that isn't one named title.
 - rewrite: the host wants a different idea for one guest, such as funnier or shorter. Give guest_ref (the first idea \
-is the first guest listed) and the new idea in the same shape as every idea, keeping what the host didn't ask to \
-change:
+is the first guest listed with one) and the new idea in the same shape as every idea, keeping what the host didn't \
+ask to change:
 {indent(IDEA_SHAPE, "  ")}
 - none: just answer, for questions about the guests or how Echo works.
-reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null.
+reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null, \
+and never say you can't leave a guest out.
 {SCORES}"""
 
 DRAFTS_TASK = """Write an invitation email from the host to each guest below, one per ref.
@@ -116,9 +135,13 @@ asks, over the length and style above, keeping the idea, the ask, the sign-off a
 - practical_details, when a guest has them: state each one plainly in that guest's email, in a sentence or two near \
 the ask, with dates, fees and lengths exactly as given (the rule on numbers doesn't apply to them). Never invent a \
 date, fee, format, place, length, release or deadline that isn't given: leave out what's missing.
+- What the guest gains, in one sentence after the why: when their love_back is 50 or more, their own fans tend to \
+enjoy shows like ours (name one or two from podcasts_both_audiences_love as shows like ours, when there are any), so \
+it's an episode worth sharing with them; when their reach is 50 or more, many of our listeners would be new to them. \
+Say it of groups of listeners, never as a promise.
 Write as the host, to the guest. Mention one or two shared tastes the way a person would ("our listeners are big \
-Kids in the Hall fans too"), with no talk of audiences, data, scores or tools, and don't flatter beyond the facts. \
-Never tell the guest what their own fans listen to or like."""
+Kids in the Hall fans too"), with no other talk of their fans, audiences, data, scores or tools, and don't flatter \
+beyond the facts."""
 
 REVISE_TASK = """Rewrite this invitation email as the host asks. Keep everything the instruction doesn't touch, \
 including what the host's notes asked for and the practical details, and keep the same rules."""
@@ -126,13 +149,16 @@ including what the host's notes asked for and the practical details, and keep th
 BRIEFING_TASK = """Write a one-page briefing in Markdown for the host to read before recording with this guest, \
 with these sections:
 # <guest name>
-## Who they are (only the description and known facts given)
+## Who they are (only the description and known facts given, then the read_up line word for word when there is \
+one. Never apologise for what's missing)
 ## Where your audiences meet
 ## What their audience adds
 ## The episode
 ## Questions to ask (five, numbered)
-Short bullets, no tables. If the episode was already planned (the_episode), follow it. The questions are about the \
-guest's work and tastes in general terms, never about their fans or either audience."""
+Short bullets, no tables. Where the audiences meet is named shows, films, books and podcasts, never broad tags such \
+as consumer electronics or digital culture. If the episode was already planned (the_episode), follow it and use its \
+title. The questions are ones only this guest could answer, about their own work and tastes, never about their fans \
+or either audience."""
 
 HOSTS_SYSTEM = """You check a podcast's guest list for its own hosts. From the show's title and description and what \
 you know about the show, return the ids of the people who host or regularly co-host it. Guests who appeared once \
@@ -159,6 +185,15 @@ def nullable(schema: Schema) -> Schema:
 
 
 IDEA = obj(reason=TEXT, title=TEXT, pitch=TEXT)
+KINDS = {
+    "movie": "the film",
+    "tv_show": "the TV show",
+    "artist": "the artist",
+    "brand": "the brand",
+    "videogame": "the video game",
+}
+LEAVE_OUT_WHY = ["had_on", "not_for_us"]
+READ_MORE = {"wikipedia": "Wikipedia", "website": "their website", "imdb": "IMDb"}
 AGES = ["24_and_younger", "25_to_29", "30_to_34", "35_to_44", "45_to_54", "55_and_older"]
 FILTERS = obj(
     fame=one_of(["any", "less_famous", "rising"]),
@@ -202,7 +237,7 @@ def show_facts(analysis: Analysis) -> dict[str, Any]:
     }
     about = analysis.filters.episode_about
     if about and about.used:
-        facts["the_host_wants_an_episode_about"] = about.used
+        facts["the_host_wants_an_episode_about"] = f"{KINDS[about.type]} {about.used}"
     if analysis.filters.theme:
         facts["episode_theme_from_the_host"] = analysis.filters.theme
     return facts
@@ -220,6 +255,7 @@ def guest_facts(guest: Guest) -> dict[str, Any]:
         "love_back": percent(guest.scores.love_back),
         "reach": percent(guest.scores.reach),
         "shared_tastes_strongest_first": evidence.shared_tastes,
+        "podcasts_both_audiences_love": evidence.shared_podcasts,
         "new_podcasts_their_fans_bring": evidence.new_podcasts,
         "age_groups_where_their_fans_stand_out": [age.replace("_", " ") for age in evidence.ages],
     }
@@ -273,29 +309,37 @@ async def write_ideas(analysis: Analysis) -> tuple[dict[str, Idea], set[str]]:
     return ideas, mixed_up
 
 
-async def write_episode(analysis: Analysis, guest: Guest, maps: GuestMaps) -> Episode:
-    facts = {**show_facts(analysis), "guest": guest_with_maps(guest, maps)}
-    schema = obj(title=TEXT, summary=TEXT, segments=array(obj(title=TEXT, points=array(TEXT))), questions=array(TEXT))
-    return checked(Episode, await ask(RULES, EPISODE_TASK, facts, schema, "episode"))
+async def write_episode(analysis: Analysis, guest: Guest, maps: GuestMaps, length: str | None = None) -> Episode:
+    facts = {**show_facts(analysis), "guest": guest_with_maps(guest, maps), "episode_length": length}
+    segment = obj(title=TEXT, points=array(TEXT), minutes=nullable({"type": "integer"}))
+    schema = obj(title=TEXT, summary=TEXT, segments=array(segment), questions=array(TEXT))
+    episode = checked(Episode, await ask(RULES, EPISODE_TASK, facts, schema, "episode"))
+    if guest.idea:
+        episode.title = guest.idea.title
+    if not length:
+        for part in episode.segments:
+            part.minutes = None
+    return episode
 
 
-async def chat(analysis: Analysis, messages: list[Message]) -> ChatDecision:
-    refs = [guest.ref for guest in analysis.guests if guest.idea is not None] or [g.ref for g in analysis.guests]
+async def chat(analysis: Analysis, messages: list[Message], exclude: Collection[str] = ()) -> ChatDecision:
+    guests = [guest for guest in analysis.guests if guest.id not in exclude]
+    refs = [guest.ref for guest in guests]
+    with_ideas = {guest.ref for guest in guests if guest.idea is not None}
     facts = {
         **show_facts(analysis),
-        "current_filters": analysis.filters.model_dump(exclude={"episode_about": {"used"}}),
+        "current_filters": analysis.filters.model_dump(exclude={"episode_about": {"used"}, "exclude": True}),
         "age_buckets": AGES,
-        "guests": [
-            {**guest_facts(guest), "idea_title": guest.idea.title if guest.idea else None} for guest in analysis.guests
-        ],
+        "guests": [{**guest_facts(guest), "idea_title": guest.idea.title if guest.idea else None} for guest in guests],
         "conversation": [message.model_dump() for message in messages],
     }
     schema = obj(
         reply=TEXT,
-        action=one_of(["rerun", "rewrite", "none"]),
+        action=one_of(["rerun", "rewrite", "leave_out", "none"]),
         filters=nullable(FILTERS),
         guest_ref=nullable(one_of(refs)),
         idea=nullable(IDEA),
+        why=nullable(one_of(LEAVE_OUT_WHY)),
     )
     data = await ask(RULES, CHAT_TASK, facts, schema, "chat_decision")
     if isinstance(theme := (data.get("filters") or {}).get("theme"), str):
@@ -303,8 +347,12 @@ async def chat(analysis: Analysis, messages: list[Message]) -> ChatDecision:
     decision = checked(ChatDecision, data)
     if decision.action == "rerun" and decision.filters is None:
         decision.action = "none"
-    if decision.action == "rewrite" and (decision.guest_ref not in refs or decision.idea is None):
+    if decision.action == "rewrite" and (decision.guest_ref not in with_ideas or decision.idea is None):
         decision.action = "none"
+    if decision.action == "leave_out":
+        if decision.guest_ref not in refs:
+            decision.action = "none"
+        decision.why = decision.why or "not_for_us"
     return decision
 
 
@@ -350,8 +398,17 @@ async def write_drafts(analysis: Analysis, guests: list[Guest], request: DraftRe
     ]
 
 
+def read_up(guest: Guest) -> str | None:
+    if guest.bio:
+        return None
+    site = next((site for site in READ_MORE if guest.links.get(site)), None)
+    if site is None:
+        return "Read up on them before you record."
+    return f"Read up before you record: [{READ_MORE[site]}]({guest.links[site]})"
+
+
 async def write_briefing(analysis: Analysis, guest: Guest, maps: GuestMaps, episode: Episode | None = None) -> str:
-    facts = {**show_facts(analysis), "guest": guest_with_maps(guest, maps)}
+    facts = {**show_facts(analysis), "guest": {**guest_with_maps(guest, maps), "read_up": read_up(guest)}}
     if episode is not None:
         facts["the_episode"] = episode.model_dump()
     data = await ask(RULES, BRIEFING_TASK, facts, obj(markdown=TEXT), "briefing")

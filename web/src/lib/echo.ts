@@ -15,6 +15,7 @@ export type Filters = {
   episode_about: EpisodeAbout | null;
   // A topic for the episode in the host's words, for the writing only: the guests don't change for it.
   theme?: string | null;
+  exclude?: string[];
 };
 
 // The engine's limit on a theme's length.
@@ -24,7 +25,12 @@ export type Step = { key: string; label: string; done: boolean };
 export type MapItem = { name: string; image_url: string | null; affinity: number };
 export type MapRow = { category: string; items: MapItem[] };
 export type Scores = { fit: number; love_back: number; reach: number | null; echo: number };
-export type Evidence = { shared_tastes: string[]; new_podcasts: string[]; ages: AgeBucket[] };
+export type Evidence = {
+  shared_tastes: string[];
+  shared_podcasts?: string[];
+  new_podcasts: string[];
+  ages: AgeBucket[];
+};
 // `rewritten` is the web app's own mark on an idea Echo rewrote for this browser (lib/rewrites.ts), never the engine's.
 export type Idea = { reason: string; title: string; pitch: string; rewritten?: boolean };
 
@@ -36,7 +42,7 @@ export type Guest = {
   // A few plain sentences from the guest's public facts, the description first. Null when there's nothing more.
   bio: string | null;
   image_url: string | null;
-  // Keys: imdb, spotify, musicbrainz, website.
+  // Keys: wikipedia, imdb, spotify, musicbrainz, website.
   links: Record<string, string>;
   label: Label;
   scores: Scores;
@@ -71,19 +77,22 @@ export type Analysis = {
 export type Episode = {
   title: string;
   summary: string;
-  segments: { title: string; points: string[] }[];
+  segments: { title: string; points: string[]; minutes?: number | null }[];
   questions: string[];
 };
 
 export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]; episode: Episode | null };
 export type Message = { role: "user" | "assistant"; content: string };
 
+export type LeaveOutWhy = "had_on" | "not_for_us";
+
 export type ChatReply = {
   reply: string;
-  action: "rerun" | "rewrite" | "none";
+  action: "rerun" | "rewrite" | "leave_out" | "none";
   analysis_id: string | null;
   guest_ref: string | null;
   idea: Idea | null;
+  why?: LeaveOutWhy | null;
 };
 
 export type DraftText = { subject: string; body: string };
@@ -167,21 +176,25 @@ export const echo = {
     call<{ id: string; status: Status }>("/analyses", { show_id, filters }),
   analysis: (id: string, signal?: AbortSignal) =>
     call<Analysis>(`/analyses/${encodeURIComponent(id)}`, undefined, signal),
-  // With a rewritten idea, the episode is written for it.
-  guest: (id: string, ref: string, idea?: Idea, signal?: AbortSignal) =>
-    call<GuestDetails>(
-      `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}${idea ? `?${new URLSearchParams(plain(idea))}` : ""}`,
+  // With a rewritten idea, the episode is written for it; with a length, timed to it.
+  guest: (id: string, ref: string, idea?: Idea, length?: string, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ ...(idea && plain(idea)), ...(length && { length }) }).toString();
+    return call<GuestDetails>(
+      `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}${query ? `?${query}` : ""}`,
       undefined,
       signal,
-    ),
-  chat: (analysis_id: string, messages: Message[]) => call<ChatReply>("/chat", { analysis_id, messages }),
+    );
+  },
+  chat: (analysis_id: string, messages: Message[], exclude: string[]) =>
+    call<ChatReply>("/chat", { analysis_id, messages, exclude }),
   drafts: (request: DraftRequest) =>
     call<{ drafts: Draft[] }>("/drafts", {
       ...request,
-      ideas: request.ideas && Object.fromEntries(Object.entries(request.ideas).map(([ref, idea]) => [ref, plain(idea)])),
+      ideas:
+        request.ideas && Object.fromEntries(Object.entries(request.ideas).map(([ref, idea]) => [ref, plain(idea)])),
     }),
-  briefing: (analysis_id: string, guest_ref: string, idea?: Idea) =>
-    call<{ markdown: string }>("/briefings", { analysis_id, guest_ref, idea: idea && plain(idea) }),
+  briefing: (analysis_id: string, guest_ref: string, idea?: Idea, length?: string) =>
+    call<{ markdown: string }>("/briefings", { analysis_id, guest_ref, idea: idea && plain(idea), length }),
 };
 
 // An idea as the engine takes it, without the web app's own mark.

@@ -14,7 +14,7 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 
 1. Type a podcast's name and pick it, or open one of the featured shows. Add an episode theme if you like ("road trips").
 2. In under a minute Echo ranks 20 guests by fit, love back and reach, and puts the sweet spots first, each with the tastes both audiences share and an episode idea.
-3. Open a guest for the full episode, what their fans add to yours and a briefing. Ask Echo for "less famous guests", "younger listeners" or "make this idea funnier".
+3. Open a guest for the full episode, what their fans add to yours and a briefing. Ask Echo for "less famous guests", "younger listeners" or "make this idea funnier". Leave out anyone you've already had on.
 4. Pick guests and write the invitations, with your dates, fee and a note for each. Echo sends nothing: open each draft in your own email.
 
 ## How a request becomes a result
@@ -24,9 +24,9 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 | Find the show | Search by name | `/search`, podcasts |
 | Map the audience | What the show's listeners like more than most people, in six categories | `/v2/insights` with the show as signal, once per category |
 | Candidates | The people the show's listeners like most, with less famous ones mixed in | `/v2/insights`, `filter.type=urn:entity:person` |
-| Clean-up | Drop people who have died, the show's own hosts (Apple's author line, checked by the LLM), past guests (names in the show's episode titles, from Apple and the show's RSS feed) and near-duplicates | Apple's podcast lookup, not Qloo |
+| Clean-up | Drop people who have died (Qloo, then Wikidata), the show's own hosts (Apple's author line, checked by the LLM), past guests (names in the show's episode titles, from Apple and the show's RSS feed), near-duplicates and anyone the host left out | Apple's podcast lookup and Wikidata, not Qloo |
 | Score | Fit, love back and reach for each guest, below | `/v2/insights` per guest, and lenses with `filter.results.entities` |
-| Evidence | The tastes both audiences share, the podcasts the guest's fans like that are new to the show, and the age groups their fans lean to | `/v2/insights` with `filter.type=urn:tag` (an allow-list of tag types) and `urn:demographics` |
+| Evidence | The tastes both audiences share, the podcasts the guest's fans like that are new to the show, the age groups their fans lean to, and who the guest is: what they founded, led and are known for, with their Wikipedia page | `/v2/insights` with `filter.type=urn:tag` (an allow-list of tag types) and `urn:demographics`; Wikidata |
 | Ideas | An episode idea for the top guests, from the evidence and the theme | LLM |
 | On a guest | The guest's own audience map next to the show's, then the full episode and the briefing | `/v2/insights` with the guest as signal; LLM |
 | Invitations | One draft per picked guest, from what the audiences share, the idea and your details | LLM |
@@ -38,7 +38,8 @@ browser ──> web app (Next.js, Vercel) ──> engine (FastAPI, Vercel) ─�
                                              │   ├─ Neon Postgres: analyses, writings and a private cache of Qloo answers
                                              │   ├─ Upstash Redis: the shared Qloo throttle and daily cap
                                              │   └─ OpenRouter (gpt-oss-120b): ideas, episodes, chat, drafts, briefings
-                                             └─> Apple's podcast lookup: hosts and past guests
+                                             ├─> Apple's podcast lookup: hosts and past guests
+                                             └─> Wikidata: people who have died, and what a guest founded or is known for
 ```
 
 An analysis runs in the background: `POST /analyses` answers at once, and the web app polls until each step is saved. The engine's API is in [docs/plan.md](docs/plan.md#api), and its interactive reference at [/docs](https://echo-qloo.vercel.app/docs).

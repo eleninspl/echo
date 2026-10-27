@@ -486,7 +486,7 @@ export function TasteMap({ analysis, rerun }: { analysis: Analysis; rerun: Rerun
   );
 }
 
-function TasteImage({ item, color, large = false }: { item: MapItem; color: string; large?: boolean }) {
+export function TasteImage({ item, color, large = false }: { item: MapItem; color: string; large?: boolean }) {
   const [broken, setBroken] = useState(false);
   if (item.image_url && !broken) {
     return (

@@ -14,8 +14,8 @@ const SHAPES = [
     reach: 0.85,
   },
   { label: "safe", name: "Safe", means: "Loved both ways, few new listeners.", fit: 0.85, love: 0.85, reach: 0.08 },
-  { label: "far", name: "Far", means: "New listeners who may not stay.", fit: 0.55, love: 0.12, reach: 0.9 },
-  { label: "balanced", name: "Balanced", means: "Decent on each, not top on any.", fit: 0.55, love: 0.45, reach: 0.5 },
+  { label: "far", name: "One-way", means: "Their fans are new, but may not stay.", fit: 0.7, love: 0.12, reach: 0.9 },
+  { label: "balanced", name: "Balanced", means: "Decent on each, not top on any.", fit: 0.42, love: 0.45, reach: 0.5 },
   {
     label: "long_shot",
     name: "Long shot",

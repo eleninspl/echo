@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import type { Analysis, Guest } from "@/lib/echo";
+import type { Analysis, Guest, LeaveOutWhy } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
+import { useEpisodeLength } from "@/lib/invitations";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
 import { Briefing } from "./briefing";
-import { AgeLamps, GuestLinks, PickButton, Scores, TasteChips } from "./dossier";
+import { AgeLamps, GuestLinks, LeaveOutButton, PickButton, Scores, TasteChips } from "./dossier";
 import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
@@ -21,9 +22,10 @@ type Props = {
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
   onClose: () => void;
+  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
 };
 
-export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOpen, onClose }: Props) {
+export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOpen, onClose, onLeaveOut }: Props) {
   const { guests } = analysis;
   const [last, setLast] = useState(guestRef);
   if (guestRef !== null && guestRef !== last) setLast(guestRef);
@@ -92,7 +94,12 @@ export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOp
           </Round>
         </div>
         {guest && (
-          <PickButton guestName={guest.name} picked={picked.includes(guest.ref)} onPick={() => onPick(guest.ref)} />
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <LeaveOutButton guestName={guest.name} onLeaveOut={(why) => onLeaveOut(guest.ref, why)} place="right-0" />
+            </div>
+            <PickButton guestName={guest.name} picked={picked.includes(guest.ref)} onPick={() => onPick(guest.ref)} />
+          </div>
         )}
       </div>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
@@ -103,6 +110,7 @@ export function GuestSheet({ analysis, guestRef, picked, rewritten, onPick, onOp
             guest={guest}
             rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
+            onLeaveOut={(why) => onLeaveOut(guest.ref, why)}
           />
         ) : (
           <p className="px-5 pt-8 font-display text-2xl font-semibold sm:px-8">This guest isn&apos;t in this run.</p>
@@ -117,15 +125,18 @@ function GuestBody({
   guest,
   rewritten,
   heading,
+  onLeaveOut,
 }: {
   analysis: Analysis;
   guest: Guest;
   rewritten: boolean;
   heading: RefObject<HTMLHeadingElement | null>;
+  onLeaveOut: (why: LeaveOutWhy) => void;
 }) {
   const { scores, idea, evidence } = guest;
   const color = LABEL_HUE[guest.label];
   const sweet = guest.label === "sweet_spot";
+  const length = useEpisodeLength(analysis.show.id);
   return (
     <div className="rise flex flex-col gap-10 px-5 pt-7 pb-28 sm:px-8">
       <header className="flex flex-col gap-6">
@@ -167,6 +178,9 @@ function GuestBody({
           {labelMeans(guest.label, scores.reach === null)}
         </p>
         <GuestLinks links={guest.links} />
+        <div className="sm:hidden">
+          <LeaveOutButton guestName={guest.name} onLeaveOut={onLeaveOut} />
+        </div>
       </header>
 
       <Part
@@ -218,9 +232,11 @@ function GuestBody({
                 <span className="text-sm text-ink-dim">None new to you.</span>
               )}
             </Fact>
-            <Fact term="Their fans' age groups" className="sm:col-span-2">
-              <AgeLamps ages={evidence.ages} />
-            </Fact>
+            {evidence.ages.length > 0 && (
+              <Fact term="Their fans' age groups" className="sm:col-span-2">
+                <AgeLamps ages={evidence.ages} />
+              </Fact>
+            )}
           </dl>
         </Part>
       )}
@@ -231,6 +247,8 @@ function GuestBody({
         id={analysis.id}
         guestRef={guest.ref}
         idea={rewrittenIdea(guest)}
+        length={length}
+        ideaTitle={guest.idea?.title}
         showMap={analysis.audience_map}
       />
 
@@ -241,6 +259,7 @@ function GuestBody({
           guestRef={guest.ref}
           guestName={guest.name}
           idea={rewrittenIdea(guest)}
+          length={length}
         />
       </Part>
     </div>

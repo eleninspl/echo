@@ -48,10 +48,8 @@ def label(fit_pct: float, love_pct: float, reach_pct: float | None) -> Label:
         if fit_pct >= 0.5 and love_pct >= 0.5:
             return "sweet_spot"
         return "long_shot" if fit_pct < 0.33 else "balanced"
-    if fit_pct >= 0.5 and love_pct >= 0.33 and reach_pct >= 0.33:
-        return "sweet_spot"
-    if reach_pct >= 0.67 and love_pct < 0.33:
-        return "far"
+    if fit_pct >= 0.5 and reach_pct >= 0.33:
+        return "sweet_spot" if love_pct >= 0.33 else "far"
     if fit_pct < 0.33:
         return "long_shot"
     if reach_pct < 0.33:

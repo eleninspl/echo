@@ -7,7 +7,10 @@ export const LABELS: Record<Label, { name: string; means: string }> = {
     means: "Your listeners tend to love them; their fans are new to you and likely to enjoy the show.",
   },
   safe: { name: "Safe", means: "Your audience is likely to enjoy it; few new listeners." },
-  far: { name: "Far", means: "Brings new people who may not stay." },
+  far: {
+    name: "One-way",
+    means: "Your listeners like them and their fans are new to you, but those fans are less likely to enjoy the show.",
+  },
   long_shot: { name: "Long shot", means: "Their fans might come, but your listeners aren't into them." },
   balanced: { name: "Balanced", means: "Decent on each, not top on any." },
 };
@@ -51,7 +54,8 @@ export function filterPhrases(filters: Filters): string[] {
   if (filters.country) phrases.push(`In ${filters.country}`);
   if (filters.episode_about)
     phrases.push(`An episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
-  if (filters.theme) phrases.push(`An episode on ${filters.theme}`);
+  if (filters.theme)
+    phrases.push(filters.episode_about ? `Through ${filters.theme}` : `An episode on ${filters.theme}`);
   return phrases;
 }
 

@@ -85,7 +85,12 @@ export type Rerun = {
 
 // Runs the show of the analysis on the page (`openId`) again and keeps that page until the new run is done, then
 // calls `onDone` with it, as a chat rerun does (W8). Its progress and errors belong to the page it started on.
-export function useRerun(showId: string, openId: string | null, onDone: (analysis: Analysis) => void): Rerun {
+export function useRerun(
+  showId: string,
+  openId: string | null,
+  onDone: (analysis: Analysis) => void,
+  exclude: string[] = [],
+): Rerun {
   const [runId, setRunId] = useState<string | null>(null);
   const [source, setSource] = useState<{ from: string; on: string | null } | null>(null);
   const [starting, setStarting] = useState(false);
@@ -107,14 +112,14 @@ export function useRerun(showId: string, openId: string | null, onDone: (analysi
       setRunId(null);
       setStarting(true);
       try {
-        const { id } = await echo.startAnalysis(showId, filters);
+        const { id } = await echo.startAnalysis(showId, { ...filters, exclude });
         setRunId(id);
       } catch (caught) {
         setFailed(caught instanceof EchoError ? caught : new EchoError(0, "unknown", "Try again in a minute."));
       }
       setStarting(false);
     },
-    [showId, openId],
+    [showId, openId, exclude],
   );
 
   const error =
