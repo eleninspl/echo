@@ -2,9 +2,10 @@ from collections import Counter
 from datetime import date
 
 from echo_engine import scoring
-from echo_engine.cleanup import dedupe, host_matcher, is_minor, is_public_figure, normalize
+from echo_engine.cleanup import dedupe, host_matcher, is_dead, is_minor, is_public_figure, normalize, person_description
 from echo_engine.pipeline import LoveBack, new_podcasts, past_guest_ids, reach_width, shared_tastes
-from echo_engine.screen import clean_entity, clean_name, clean_tag_name
+from echo_engine.screen import clean_entity, clean_name, clean_person, clean_tag_name
+from echo_engine.wikidata import confirmed, queries
 
 
 def test_normalize_handles_accents_quotes_and_ampersands():
@@ -38,6 +39,99 @@ def test_public_figures_minors_and_duplicates():
     assert not is_minor({}, date(2026, 10, 23))
     people = [{"name": "Ann Example", "a": 0.5}, {"name": "Bo Sample", "a": 0.7}, {"name": "ann example", "a": 0.9}]
     assert [p["name"] for p in dedupe(people, lambda p: p["a"])] == ["ann example", "Bo Sample"]
+
+
+def described(text: str, born: str | None = None) -> dict:
+    properties = {"short_descriptions": [{"language": "en", "value": text}]}
+    return {"name": "Ann Example", "properties": {**properties, "date_of_birth": born} if born else properties}
+
+
+def test_descriptions_never_show_a_birth_year():
+    for text in (
+        "American actor, comedian, writer (born 1970)",
+        "Canadian actor (b. 1963)",
+        "English footballer born 1991",
+        "American comedian (1970-)",
+        "American poet 1898-1980",
+    ):
+        cleaned = person_description(described(text))
+        assert cleaned and not any(ch.isdigit() for ch in cleaned), (text, cleaned)
+    assert person_description(described("American actor, comedian, writer (born 1970)")) == (
+        "American actor, comedian, writer"
+    )
+    assert person_description(described("Computer scientist, Ph.D. 2017")) == "Computer scientist, Ph.D. 2017"
+    assert person_description(described("researcher")) is None
+    assert person_description(described("researcher (ORCID 0000-0003-0000-0000)")) is None
+    jobs = [
+        {"type": "urn:tag:occupation:person", "name": n} for n in ("Lawyer", "Reality Television Participant", "Dj")
+    ]
+    assert person_description({"name": "Ann Example", "tags": jobs}) == "Lawyer and reality television participant"
+
+
+def test_a_lifespan_in_the_description_means_they_have_died():
+    assert is_dead({"properties": {"date_of_death": "2021-12-31"}})
+    assert is_dead(described("American actor (1929–2021)", born="1929-11-15"))
+    assert is_dead(described("American poet 1898-1980"))
+    assert not is_dead(described("American actor (1929–2021)", born="1975-01-01"))
+    assert not is_dead(described("Ambassador of Example (2013–2017)"))
+    assert not is_dead(described("American actor (born 1970)", born="1970"))
+
+
+def test_politicians_and_convicts_are_never_suggested():
+    for text in (
+        "American politician",
+        "United States Representative from New York since 2019",
+        "U.S. Representative from California",
+        "President of the United States from 1993 to 2001",
+        "American television news host and political commentator",
+        "American entrepreneur, attorney and political candidate",
+        "United States Secretary of Transportation since 2021",
+        "American football player and felon",
+        "Entrepreneur convicted of fraud",
+    ):
+        assert not clean_person(described(text)), text
+    for text in (
+        "American stand-up comedian and television host",
+        "American investor and entrepreneur",
+        "American comedian, writer, producer, activist, and television host",
+        "Sports executive, president of an example team",
+        "Brand ambassador and model",
+    ):
+        assert clean_person(described(text)), text
+    tagged = {"name": "Ann Example", "tags": [{"type": "urn:tag:occupation:person", "name": "Politician"}]}
+    assert not clean_person(tagged)
+    assert clean_person({**tagged, **described("American investor")})
+    assert not clean_tag_name("Occultism") and not clean_tag_name("Anti-Religion")
+
+
+def test_the_screen_drops_stereotypes_and_tags_that_say_nothing():
+    for name in ("Social Inequality", "Poverty", "Street Life", "Hustling", "Totalitarianism", "Patriotism"):
+        assert not clean_tag_name(name), name
+    for name in ("teenage girl", "boy", "love", "Audiobook", "Contemporary", "Good Times", "Societal Challenges"):
+        assert not clean_tag_name(name), name
+    for name in ("Sports Analysis", "satire comedy", "Small Town Life", "Basketball", "Friendship", "Humor"):
+        assert clean_tag_name(name), name
+    assert not clean_name("A Book About Whiteness") and clean_name("Black Mirror")
+    assert not clean_name("Why Progressives Ruin Example City") and not clean_name("How Covid Changed Example Town")
+    assert clean_entity(genre("Progressive Rock"))
+
+
+def test_the_death_check_asks_wikidata_by_id_or_by_name_and_birth_year():
+    people = [
+        {"entity_id": "A", "name": "Ann Example", "external": {"imdb_id": [{"id": "nm1"}]}},
+        {"entity_id": "B", "name": 'Bo "The Quote" Sample', "properties": {"date_of_birth": "1942-03-28"}},
+        {"entity_id": "C", "name": "Cy Nobody"},
+    ]
+    by_id, by_name = queries(people)
+    assert '("A" "nm1")' in by_id and "wdt:P345" in by_id and "wdt:P570" in by_id
+    assert '("B" "Bo \\"The Quote\\" Sample"@en 1942)' in by_name
+    assert '"C"' not in by_id + by_name
+    assert queries([people[2]]) == []
+    rows = [["A", None], ["B", "1942-03-28T00:00:00Z"], ["B", "1950-01-01T00:00:00Z"], ["X", None]]
+    assert confirmed(people, rows) == {"A", "B"}
+    assert confirmed(people, [["B", "1950-01-01T00:00:00Z"]]) == set()
+    assert confirmed(people, [["B", "1942-10-14T00:00:00Z"]]) == set()
+    assert confirmed(people, [["B", "1942-01-01T00:00:00Z"]]) == {"B"}
 
 
 def genre(name: str) -> dict:

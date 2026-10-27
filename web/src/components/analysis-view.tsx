@@ -455,7 +455,7 @@ function Rundown({ steps }: { steps: Step[] }) {
         </ol>
         <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
       </div>
-      <p className="px-5 pb-5 text-sm text-ink-soft">It usually takes a few seconds.</p>
+      <p className="px-5 pb-5 text-sm text-ink-soft">It usually takes under a minute.</p>
       <p aria-live="polite" className="sr-only">
         {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
       </p>

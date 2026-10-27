@@ -98,7 +98,7 @@ export function Dossier({ analysisId, guest, index, picked, full, rewritten, onP
               )}
               {evidence.ages.length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                  <dt className="tag text-ink-dim">Their fans skew</dt>
+                  <dt className="tag text-ink-dim">Their fans&apos; ages</dt>
                   <dd>
                     <AgeLamps ages={evidence.ages} />
                   </dd>

@@ -10,8 +10,17 @@ from itertools import zip_longest
 from statistics import fmean
 from typing import Any, get_args
 
-from . import apple, llm, scoring
-from .cleanup import dedupe, host_matcher, is_dead, is_minor, is_public_figure, normalize, properties
+from . import apple, llm, scoring, wikidata
+from .cleanup import (
+    dedupe,
+    host_matcher,
+    is_dead,
+    is_minor,
+    is_public_figure,
+    normalize,
+    person_description,
+    properties,
+)
 from .models import (
     AgeBucket,
     Analysis,
@@ -28,7 +37,7 @@ from .models import (
     Show,
 )
 from .qloo_client import QlooClient, QlooError
-from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_name, clean_tag_name
+from .screen import TAG_TYPES, THEME_TAGS, clean_entity, clean_name, clean_person, clean_tag_name
 
 log = logging.getLogger("echo.pipeline")
 
@@ -383,12 +392,11 @@ def score(scored: list[Scored]) -> list[Scored]:
 
 
 def guest_of(item: Scored, ref: str) -> Guest:
-    props = properties(item.person)
     return Guest(
         ref=ref,
         id=item.person["entity_id"],
         name=item.person["name"],
-        description=english(props.get("short_descriptions")) or props.get("short_description"),
+        description=person_description(item.person),
         image_url=image_of(item.person),
         links=links_of(item.person),
         label=scoring.label(item.fit_pct, item.love_pct, item.reach_pct),
@@ -544,38 +552,53 @@ async def fill_guests(
     today = datetime.now(UTC).date()
 
     def keep(person: dict) -> bool:
-        return not is_dead(person) and not is_minor(person, today) and is_public_figure(person)
+        return not is_dead(person) and not is_minor(person, today) and is_public_figure(person) and clean_person(person)
 
     pool = merge([p for p in c1 if keep(p)], [p for p in c2 if keep(p)], [p for p in c3 if keep(p)])
     is_host = host_matcher(show.title, author, show.description)
     people = [
-        Person(id=p["entity_id"], name=p["name"], description=english(properties(p).get("short_descriptions")))
-        for p in pool[: POOL_SIZE * 2]
+        Person(id=p["entity_id"], name=p["name"], description=person_description(p)) for p in pool[: POOL_SIZE * 2]
     ]
-    llm_hosts = await llm_step(llm.find_hosts(show, people), set(), "the host check")
     past = past_guest_ids(titles, pool)
     kept, left_out = [], []
     for person in pool:
-        if is_host(person["name"]) or person["entity_id"] in llm_hosts:
+        if is_host(person["name"]):
             left_out.append(LeftOut(name=person["name"], why="host"))
         elif person["entity_id"] in past:
             left_out.append(LeftOut(name=person["name"], why="past_guest"))
         else:
             kept.append(person)
     kept = dedupe(kept, lambda person: affinity(person) or 0.0)
-    analysis.left_out = left_out
-    if len(kept) < MIN_SCORED and (filters.age or filters.country or filters.fame != "any"):
+    narrowed = bool(filters.age or filters.country or filters.fame != "any")
+    if len(kept) < MIN_SCORED and narrowed:
+        raise AnalysisFailed("filters_too_narrow", "No guests match those filters. Try a broader one.")
+    selected, reserve = kept[:POOL_SIZE], kept[POOL_SIZE:]
+
+    async def loves_of(batch: list[dict]) -> list[LoveBack | None]:
+        return await asyncio.gather(*(love_back(client, p["entity_id"], show.id) for p in batch))
+
+    async with asyncio.TaskGroup() as group:
+        hosts = group.create_task(llm_step(llm.find_hosts(show, people), set(), "the host check"))
+        dead = group.create_task(optional(wikidata.died(pool[: POOL_SIZE * 2]), set()))
+        loves = group.create_task(loves_of(selected))
+    llm_hosts = hosts.result()
+    gone = llm_hosts | dead.result()
+    analysis.left_out = left_out + [LeftOut(name=p["name"], why="host") for p in kept if p["entity_id"] in llm_hosts]
+    if len([p for p in kept if p["entity_id"] not in gone]) < MIN_SCORED and narrowed:
         raise AnalysisFailed("filters_too_narrow", "No guests match those filters. Try a broader one.")
     await done("clean")
 
-    selected, reserve = kept[:POOL_SIZE], kept[POOL_SIZE:]
-    loves = await asyncio.gather(*(love_back(client, p["entity_id"], show.id) for p in selected))
-    scored = [Scored(p, lb) for p, lb in zip(selected, loves, strict=True) if lb and lb.love is not None]
+    scored = [
+        Scored(p, lb)
+        for p, lb in zip(selected, loves.result(), strict=True)
+        if lb and lb.love is not None and p["entity_id"] not in gone
+    ]
+    reserve = [p for p in reserve if p["entity_id"] not in gone]
     refills = 0
     while len(scored) < POOL_SIZE and reserve and refills < MAX_REFILLS:
         batch = [reserve.pop(0) for _ in range(min(POOL_SIZE - len(scored), MAX_REFILLS - refills, len(reserve)))]
         refills += len(batch)
-        results = await asyncio.gather(*(love_back(client, p["entity_id"], show.id) for p in batch))
+        results = await loves_of(batch)
         scored += [Scored(p, lb) for p, lb in zip(batch, results, strict=True) if lb and lb.love is not None]
     if len(scored) < MIN_SCORED:
         raise AnalysisFailed("show_unusable", "Echo can't analyse this show yet: too few guests could be scored.")

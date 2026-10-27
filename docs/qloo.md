@@ -24,6 +24,9 @@ Sources: the [hackathon developer guide](https://docs.qloo.com/reference/qloo-ll
 - Lists over about 210 IDs in one URL fail with 414. Chunk `filter.results.entities` into 50s.
 - `/entities` can't look up iTunes IDs. External IDs are under `properties.external`.
 - Insights returns people who have died and a show's own hosts. A person never appears in their own list, and a show never appears in its own podcast list.
+- `date_of_death` is missing for some people who have died (a philosopher who died in 2024 had only a birth date). Person results carry no Wikidata ID, but many have an IMDb, MusicBrainz or Library of Congress ID.
+- English descriptions often end in a birth year or a lifespan: "(born 1970)", "(b. 1963)", "(1951–2024)", "born 1991".
+- One record can mix two people with the same name: a comedian whose fans' brands were all car makers and whose music was metal, from a car writer with his name.
 - Thin data: shows below popularity 0.6 mostly have no demographics block, and people with null popularity can't be scored.
 - Explainability gives near-equal scores to every input, and compare between a podcast and a person shares few tags. Neither is used for reasons.
 - Trending stops in September 2025 and is empty for people. Not used.
@@ -60,19 +63,20 @@ Measured on 7 real shows: 43 to 67 calls and 8 to 16 s fresh, under 1 s cached. 
 
 ### Clean-up, before scoring
 
-1. Died: `properties.date_of_death` is set.
+1. Died: `properties.date_of_death` is set, or the English description has a lifespan that starts in the birth year. Then Wikidata (`wikidata.py`, for the top 40 of the pool, cached a week): a date of death (P570) on the item with the candidate's IMDb, MusicBrainz, Library of Congress, Goodreads or Spotify ID, or on an item with the same English name and birth year, and the item's birth date must agree with Qloo's (an ID in Qloo can point to someone else with the same name: a living CEO's Library of Congress ID led to a namesake who died in 2014). One small query per ID type and one by name, in parallel, 5 s each: Wikidata's query service is fast but erratic (the same query took 0.3 s and then over 30 s), so a slow query only loses its own matches. It runs beside the LLM host check and the first love back calls; if Wikidata fails, the run goes on without it. Over 1,161 cached people Qloo lists as alive, it found 9 who have died (2023 to 2026).
 2. Minors: `properties.date_of_birth` less than 18 years ago. Read for this check only, never shown or kept.
 3. Not a public figure: no `urn:tag:occupation:person` tag and no `imdb_id`, `wikidata`, `musicbrainz_artist_id`, `spotify_artist_id`, `library_of_congress_authority_id` or `goodreads_author_id`. Social handles don't count.
 4. Hosts: a candidate's full name in the title or Apple's author line, or the names after "with" in the title ("with Ann & Bo Surname" means Ann Surname and Bo Surname; a list of single names, like "with Ann, Bo & Cy", matches first or last names). Or a candidate's full name in Qloo's description of the show (`short_description`), which often names the hosts when the author line is a network and the title names nobody; it names hosts, not guests. Plus the LLM host check (L1) when it's built, for the rest.
 5. Past guests: a candidate whose full name appears in one of the last 200 episode titles on Apple. Titles that start with "Introducing", "Trailer", "Preview", "Sneak peek" or "Coming soon" (any case) are skipped: trailers and cross-promotions name people who weren't guests.
 6. Duplicates: the same normalised name, keep the higher affinity.
-7. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
+7. Politicians and convicts: an English description that names a political role ("politician", "political commentator", "U.S. Representative", "Secretary of", "governor", "ambassador to"...) or a conviction ("felon", "convicted"); without a description, a Politician, Statesperson, Diplomat, Governor, Political Pundit, Political Activist or Convict occupation tag. The tags alone aren't used when there is a description: they mark investors and actors as politicians. Comedians and hosts who talk about politics stay.
+8. Can't be an input: the love back call returns the "invalid" 400. Drop, take the next candidate (at most 5 refills).
 
 ### Evidence for the top 10
 
-- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks, with tags that more than half of the top 10 guests have going last. A person's list is often all themes while a show's has few (on the investor judge's show, 8 of the top 10 guests had only themes and the show 2), so the show's tags are its allow-list call plus its themes call, each tag at its better rank. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo`. The style and plot types are left out: their tags are vague moods that say nothing on a card. Then a word screen (`engine/echo_engine/screen.py`, generic words written by hand) drops tags about religion, sexuality, gender, ethnicity, health, disability, addiction, drug use, politics, money trouble and hardship (suffering, grief, struggle, alienation), and placeholder tags like "Not Applicable", because the allowed types still contain them.
+- **Shared tastes:** tag IDs in both the show's and the guest's tag lists, ordered by the sum of their ranks, with tags that more than half of the top 10 guests have going last. A person's list is often all themes while a show's has few (on the investor judge's show, 8 of the top 10 guests had only themes and the show 2), so the show's tags are its allow-list call plus its themes call, each tag at its better rank. Allow-list: `urn:tag:keyword:media, urn:tag:genre:media, urn:tag:genre:music, urn:tag:theme:qloo`. The style and plot types are left out: their tags are vague moods that say nothing on a card. Then a word screen (`engine/echo_engine/screen.py`, generic words written by hand) drops tags about religion and the occult, sexuality, gender (including "boy" and "teenage girl"), ethnicity, health, disability, addiction, drug use, politics (including patriotism, totalitarianism and inequality), money trouble (including poverty) and hardship (suffering, grief, struggle, alienation), tags that read as stereotypes next to a guest ("Street Life", "Hustling", gangs), placeholder tags like "Not Applicable", and tags that say nothing on a card ("love", "secret", "Audiobook", "Contemporary", "Good Times"), because the allowed types still contain them. On a basketball show the top guests shared "Social Inequality", "Poverty" and "Street Life" before this.
 - **New podcasts:** from the guest's top podcasts used for reach, those the fewest other guests have, then the lowest show affinity from the reach call; top 3, screened.
-- **Screening shown items** (map items and new podcasts): on the name, and on the item's genre and subgenre tags only. Keyword tags on films and TV describe plot points, not the audience, and screening them dropped 18 of 20 films. Political podcasts are often tagged only "News", so a podcast whose genres are only News is dropped too.
+- **Screening shown items** (map items and new podcasts): on the name (including words about race, so a book title about it is dropped, while "Black" alone is kept for titles like a well-known TV series), and on the item's genre and subgenre tags only. Keyword tags on films and TV describe plot points, not the audience, and screening them dropped 18 of 20 films. Political podcasts are often tagged only "News", so a podcast whose genres are only News is dropped too.
 - **Ages:** `delta[b] = guest.age[b] - show.age[b]`. Show the up to 2 buckets with the largest delta above 0.2. With no show block, the guest's own buckets of at least 0.2. Many less famous guests have no block: say so.
 
 ## Scoring
@@ -101,7 +105,7 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
 
 ## Keep out
 
-- Person fields: `/entities` and insights return gender, birth date, citizenship, spouse and children. Echo shows name, short description, image and links only.
+- Person fields: `/entities` and insights return gender, birth date, citizenship, spouse and children. Echo shows name, short description (birth years and lifespans cut out), image and links only.
 - Never filter or pick guests by gender. Never use the political, beliefs, communities, global issues, investing or spending audience types.
 - Copy says what a group likes more than most people do ("your listeners tend to love", "more than most"), never "over-index" (jargon, dropped in the 25 Oct UI review), and never says anything about one listener or one guest's fans as people.
 
@@ -131,11 +135,18 @@ With null reach: `sweet_spot` if fit ≥ 0.5 and love ≥ 0.5, `long_shot` if fi
   - Shared tastes are often empty for sports and tech guests, whose tags barely overlap the show's. Fixed in Q17, below.
   - Filters: "less famous" changed 9 of 20 guests; age and country change the list; a made-up country gives `unknown_country`. "Atlantis" resolves to a real town with no people, which gives `filters_too_narrow`.
   - The film anchor changes the list, but the results are mixed (on a music show, "episode about Dune" moved a politician up). Check it before using it in the demo.
-  - Candidate lists include politicians. Echo doesn't drop them.
+  - Candidate lists include politicians. Dropped since 25 Oct (clean-up, 7).
 - **23 Oct, Q17, evidence per guest** (the investor judge's show, checked against two comedy shows), 26 fresh calls:
   - Cause of the repeated reach and new podcasts: the top 20 guests' top 10 podcasts were 18 podcasts in all, 5 of them in every list; 15 of the 45 pairs among the top 10 had the same top 20. On the comedy shows the top 10s overlap about 0.1. The lists differ from about position 20 to 50, all of which the love back call already returns.
   - Cause of the single shared taste: the guests' tag lists were all themes and the show's mostly music and media genres; the show's own list of themes overlaps each guest's in 15 to 24 tags.
   - After the fix, on the investor judge's show: 17 reach values in 20 (8 before), 9 different sets of new podcasts in the top 10 (5), and 10 different sets of 5 shared tastes (3, mostly 1 tag). The comedy shows were already distinct and stay so. One call more per analysis.
+- **25 to 26 Oct, QA runs on 9 shows** (comedy, sports, true crime, health, music, culture, business, science, a talk show), with the LLM, through `engine/scripts/qa.py`:
+  - People who have died without `date_of_death`: 9 of 1,161 cached people, among them a philosopher and a football player who died in 2024. Wikidata catches them (clean-up, 1).
+  - Descriptions: about 1 in 10 English person descriptions carries a birth year or lifespan; 31 of 954 people have none, most of them with occupation tags; 4 are only "researcher", from a scholar with the same name.
+  - Same-name mix-ups in a record: on 3 of 9 shows a top-10 guest's description or fans belonged partly to someone else (a car writer's fans on a comedian, a botanist's description on an investor, "noblewoman" on a songwriter). Echo can't fix the record; the prompts leave out what doesn't fit the description.
+  - Tags: on the sports show, the basketball players' shared tastes were "Social Inequality", "Poverty", "Street Life" and "Hustling"; elsewhere "boy", "teenage girl", "love", "Totalitarianism" and "Audiobook". All screened now.
+  - The true crime show's top guests are reality TV contestants: its audience really does love them, but it is a weak demo show.
+  - Politicians and political commentators came back on the talk and business shows, and a political book and a pandemic book in one show's own audience map. Both screened now.
 - **23 Oct, Q16, end to end on the deployed engine** (`https://echo-qloo.vercel.app`, empty production cache): the 7 test shows and the investor judge's second show, default filters, one at a time, about 416 fresh calls in all.
   - Every run finished. `POST /analyses` answered 202 in 0.3 to 0.5 s, and the runs were done in 4.8 to 9.9 s with 44 to 67 calls (32 to 64 fresh), faster than locally. A poll takes about 0.3 s. Guest details took 3.6 s fresh and 0.4 s cached.
   - 1 to 4 sweet spots per show, as before.

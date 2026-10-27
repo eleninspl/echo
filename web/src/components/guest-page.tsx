@@ -137,14 +137,9 @@ export function GuestPage({ guestRef }: { guestRef: string }) {
                 </dd>
               </div>
               <div className="flex flex-col gap-2 sm:col-span-2 xl:col-span-1">
-                <dt className="tag text-ink-dim">Their fans skew</dt>
+                <dt className="tag text-ink-dim">Their fans&apos; ages</dt>
                 <dd className="flex flex-col gap-2">
                   <AgeLamps ages={evidence.ages} />
-                  {!evidence.ages.length && (
-                    <span aria-hidden className="text-sm text-ink-dim">
-                      No age data yet.
-                    </span>
-                  )}
                 </dd>
               </div>
             </dl>
