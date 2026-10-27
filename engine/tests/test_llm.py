@@ -7,6 +7,7 @@ from echo_engine import llm
 from echo_engine.app import load_example
 from echo_engine.config import Settings
 from echo_engine.llm import client as real_client
+from echo_engine.llm import ready as real_ready
 from echo_engine.llm_client import LlmError, Reply
 from echo_engine.models import (
     Analysis,
@@ -132,10 +133,20 @@ def test_the_episode_wanted_is_passed_on(fake, analysis):
 
 def test_without_an_openrouter_key_the_llm_parts_stay_unbuilt(monkeypatch):
     monkeypatch.setattr(llm, "get_settings", Settings)
+    monkeypatch.setattr(llm, "ready", real_ready)
     monkeypatch.setenv("ECHO_LLM", "openrouter")
     monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    assert not llm.ready()
     with pytest.raises(NotImplementedError, match="OPENROUTER_API_KEY"):
         real_client()
+
+
+@pytest.mark.parametrize(("backend", "key"), [("openrouter", "test-key"), ("claude-cli", "")])
+def test_the_llm_is_ready_with_a_key_or_the_local_wrapper(monkeypatch, backend, key):
+    monkeypatch.setattr(llm, "get_settings", Settings)
+    monkeypatch.setenv("ECHO_LLM", backend)
+    monkeypatch.setenv("OPENROUTER_API_KEY", key)
+    assert real_ready()
 
 
 def test_hosts_are_only_ids_that_were_asked_about(fake):

@@ -30,14 +30,20 @@ RULES = """You write for Echo, a tool that helps a podcast host find guests thei
 Rules for everything you write:
 - Use only the facts in the input. A person's one-line description and known_facts are all you know about them: add \
 no books, shows, roles, quotes, awards or life events that aren't given there, even if you think you know them.
+- known_facts name some of a person's work, not all of it and not always the main part: an employer listed there can \
+be an early job. Never make one of them the subject of an episode, a title or a pitch.
+- Echo knows nothing about anyone's gender: call a guest by name or "they", never "he", "she", "him", "his" or "her", \
+and use neutral words for what they do (businessperson, not businessman).
 - Tastes describe groups of listeners, never one person. Say it the way a person would: "your listeners tend to love", \
 "their fans tend to like". Never use analytics words like over-index, affinity, skew, overlap, percentile or audience \
 data, and never say that a listener will do something.
+- Age groups are where a guest's fans stand out next to the show's listeners, not where most of them are: say \
+"their fans stand out among people 25 to 34", never that they are mostly that age.
 - Shared tastes are listed strongest first. Build on the first ones and on named shows, films, artists and podcasts. \
 A broad tag such as humor, dance or celebrity culture is not a reason on its own: leave it out rather than build on it.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
 - If the host gave an episode theme, build on it wherever it fits the guest, without forcing it.
-- Never quote scores or numbers, and never say where the data comes from.
+- Never quote scores or other numbers (age groups are the one exception), and never say where the data comes from.
 - Plain, warm, specific English. No hype words and no em dashes."""
 
 LABELS = {
@@ -83,9 +89,11 @@ reply: one or two sentences to the host saying what you did, or the answer. Set 
 
 DRAFTS_TASK = """Write an invitation email from the host to each guest below, one per ref.
 - subject: under 70 characters.
-- body: 100 to 160 words. Who the host is and what the show is, from its description; why this guest, through what \
-the two audiences share, in plain words; the episode idea; a clear ask; a sign-off with the host's name, or \
-"[Your name]" if it isn't given. Use the host's note if there is one, in every email. A guest may also \
+- body: 100 to 160 words. What the show is, from its description, as "we" ("On the show we talk with founders \
+about..."); why this guest, through what the two audiences share, in plain words; the episode idea; a clear ask; a \
+sign-off with the host's name, or "[Your name]" if it isn't given. The sign-off is the only place the sender is named: \
+whoever signs may not be a host the description names, so never introduce them by name and never name the show's \
+hosts or anyone else from the description. Use the host's note if there is one, in every email. A guest may also \
 have their own note from the host (note_for_this_guest): use it in that guest's email only, as the host's own angle.
 - A note can be something to say or a way to write (a length, a tone, a style). Say what it gives; write the way it \
 asks, over the length and style above, keeping the idea, the ask, the sign-off and the practical details.
@@ -93,7 +101,8 @@ asks, over the length and style above, keeping the idea, the ask, the sign-off a
 the ask, with dates, fees and lengths exactly as given (the rule on numbers doesn't apply to them). Never invent a \
 date, fee, format, place, length, release or deadline that isn't given: leave out what's missing.
 Write as the host, to the guest. Mention one or two shared tastes the way a person would ("our listeners are big \
-Kids in the Hall fans too"), with no talk of audiences, data, scores or tools, and don't flatter beyond the facts."""
+Kids in the Hall fans too"), with no talk of audiences, data, scores or tools, and don't flatter beyond the facts. \
+Never tell the guest what their own fans listen to or like."""
 
 REVISE_TASK = """Rewrite this invitation email as the host asks. Keep everything the instruction doesn't touch, \
 including what the host's notes asked for and the practical details, and keep the same rules."""
@@ -142,9 +151,13 @@ FILTERS = obj(
 )
 
 
-def client() -> LlmClient:
+def ready() -> bool:
     settings = get_settings()
-    if settings.llm_backend == "openrouter" and not settings.openrouter_api_key:
+    return settings.llm_backend != "openrouter" or bool(settings.openrouter_api_key)
+
+
+def client() -> LlmClient:
+    if not ready():
         raise NotImplementedError("The LLM isn't set up: OPENROUTER_API_KEY is missing")
     return LlmClient.from_settings()
 

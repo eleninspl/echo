@@ -79,7 +79,7 @@ Each message is the one the real engine sends. Outside mock mode the engine igno
 
 - The daily cap is checked by the Qloo client before every fresh call, so it covers every route; cached calls, like a featured show's, still work.
 - `usable()`: a top person with no love back affinity moves on to the next of three, instead of failing the show.
-- A running analysis is registered under its request key, so the same show and filters don't start a second run.
+- A running analysis is registered under its request key, so the same show and filters don't start a second run. A finished one is reused only if its guests have bios and, when the LLM is set up now, ideas: older runs are made again.
 - A saved analysis that doesn't validate is skipped and logged, not a crash at startup.
 - `optional()` catches only `NotImplementedError`; any other LLM error fails the step with `llm_error`.
 - Duplicate names keep the higher affinity, as qloo.md says.
@@ -98,7 +98,7 @@ Every Q task is done when its tests pass against the fake Qloo and the local sto
 | L6 | Briefing | 0.25 | first version |
 | L7 | Past guests whose names Q10's exact match misses (could; Q10 already catches most) | 0.25 | could |
 
-Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. Next: compare models on OpenRouter and tune the prompts. Without `OPENROUTER_API_KEY` the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
+Q1 to Q17 are done and deployed. L1 to L6 have a first version (25 Oct, Leonidas): prompts in `llm.py`, one call each with a strict schema, checked end to end through the Claude wrapper on a real show. After the 25 Oct QA run the prompts ask for plain words (no "over-index" or other analytics terms) and for the strongest shared tastes, never a broad tag on its own. After trying the OpenClaw agent on the investor judge's show (27 Oct) they also: call a guest by name or "they", never "he" or "she", with neutral words for their work; never make a bio fact the subject of an episode (Qloo's employer list can hold only an early job, which became two founders' episode ideas); say age groups are where a guest's fans stand out, not their main ages; and in drafts, say "we" for the show, name the sender only in the sign-off and never name the hosts from the show's description (a draft signed by someone else named the host from the description as well), and never tell a guest what their own fans like. Next: compare models on OpenRouter and tune the prompts. Without `OPENROUTER_API_KEY` the engine treats L as not built, so production keeps working until the key is set. `scripts/analyze.py "<show>"` runs it from the terminal. Every prompt writes only from the evidence it's given, never invents facts about a person, never mentions sensitive traits and never calls a match a prediction about one listener. Every call goes through `llm_client.py`: OpenRouter in production, a Claude subscription locally ([The LLM](#the-llm)).
 
 ## Web app tasks
 
@@ -240,7 +240,7 @@ JSON, no auth, CORS for the web app. Errors are `{ "error": "<code>", "message":
 | GET | `/health` | | `{ ok, qloo_calls_today, qloo_calls_left }` |
 | GET | `/shows` | `q` (2 to 100 chars, on submit, not per keystroke) | `{ shows: [Show] }`, up to 5. Empty: not in Qloo. |
 | GET | `/featured` | | `{ featured: [{ show: Show, analysis_id }] }`, empty until `scripts/warm.py` has run |
-| POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one. |
+| POST | `/analyses` | `{ show_id, filters }` | 202 `{ id, status: "running" }`. Same show and filters reuse the earlier one, unless it has no bios, or no ideas while the LLM is set up. |
 | GET | `/analyses/{id}` | | The analysis below. Poll once a second while running. |
 | GET | `/analyses/{id}/guests/{ref}` | `title`, `pitch`, `reason`: the idea as the chat rewrote it, all three or none | `{ ref, audience_map, adds, episode: { title, summary, segments: [{ title, points }], questions } or null }`. The episode is written once per analysis, guest and idea, then stored. |
 | POST | `/chat` | `{ analysis_id, messages: [{ role, content }] }`, the last 20 | `{ reply, action, analysis_id?, guest_ref?, idea? }` |
