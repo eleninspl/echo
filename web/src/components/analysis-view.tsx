@@ -18,8 +18,10 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { Analysis, Idea, Step } from "@/lib/echo";
+import type { Analysis, Idea, LeaveOutWhy, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
+import { filterPhrases } from "@/lib/format";
+import { LEFT_OUT_LIMIT, useLeftOut, WHY_NAMES, type LeftOutGuest } from "@/lib/left-out";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
@@ -28,7 +30,7 @@ import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
 import { useStart } from "@/lib/use-start";
 
 import { Backdrop } from "./backdrop";
-import { AskSection, Chat } from "./chat";
+import { AskSection, carryChat, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
@@ -38,7 +40,7 @@ import { PageNav } from "./page-nav";
 import { PickBar } from "./pick-bar";
 import { Problem } from "./problem";
 import { Scope } from "./scope";
-import { CommonGround, FanAges } from "./spectrum";
+import { FanAges } from "./spectrum";
 import { TasteMap } from "./taste-map";
 import { TopPicks } from "./top-picks";
 
@@ -56,6 +58,9 @@ type OpenAnalysis = {
   rerun: Rerun;
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
+  leftOut: LeftOutGuest[];
+  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
+  onBringBack: (id: string) => void;
 };
 
 export type Rewrite = { id: string; ref: string; idea: Idea };
@@ -73,10 +78,16 @@ export function useOpenAnalysis(): OpenAnalysis {
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { id, guestRef, inviting } = readPath(usePathname());
-  const { analysis, error, retry, update } = useAnalysis(id);
+  const { analysis: loadedAnalysis, error, retry, update } = useAnalysis(id);
   const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
-  const openId = analysis?.id ?? null;
-  const showId = analysis?.show.id ?? null;
+  const openId = loadedAnalysis?.id ?? null;
+  const showId = loadedAnalysis?.show.id ?? null;
+  const [leftOut, setLeftOut] = useLeftOut(showId ?? "");
+  const excluded = useMemo(() => leftOut.map(({ id }) => id), [leftOut]);
+  const analysis = useMemo(() => {
+    if (!loadedAnalysis || !excluded.length) return loadedAnalysis;
+    return { ...loadedAnalysis, guests: loadedAnalysis.guests.filter((guest) => !excluded.includes(guest.id)) };
+  }, [loadedAnalysis, excluded]);
   const saved = useMemo(() => (picks.id === showId ? picks.value : showId ? readPicks(showId) : []), [picks, showId]);
   const guests = useMemo(() => analysis?.guests ?? [], [analysis]);
   // Picks are saved by entity ID and shown by this run's refs, in the order they were picked.
@@ -112,11 +123,15 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   const showRerun = useCallback(
     (next: Analysis) => {
       toTop.current = true;
+      if (openId) {
+        const phrases = filterPhrases(next.filters);
+        carryChat(openId, next.id, `The page shows a new run${phrases.length ? `: ${phrases.join(", ")}` : ""}.`);
+      }
       router.push(analysisPath(next.id), { scroll: false });
     },
-    [router],
+    [router, openId],
   );
-  const rerun = useRerun(showId ?? "", openId, showRerun);
+  const rerun = useRerun(showId ?? "", openId, showRerun, excluded);
 
   useEffect(() => {
     if (!toTop.current || !openId) return;
@@ -182,6 +197,28 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     [guests, saved, keep, openId],
   );
   const onUnpick = useCallback((id: string) => keep(saved.filter((pick) => pick.id !== id)), [saved, keep]);
+  const onLeaveOut = useCallback(
+    (ref: string, why: LeaveOutWhy) => {
+      const index = guests.findIndex((other) => other.ref === ref);
+      const guest = guests[index];
+      if (!guest || !openId) return;
+      setLeftOut((current) =>
+        [...current.filter(({ id }) => id !== guest.id), { id: guest.id, name: guest.name, why }].slice(
+          -LEFT_OUT_LIMIT,
+        ),
+      );
+      if (saved.some(({ id }) => id === guest.id)) keep(saved.filter(({ id }) => id !== guest.id));
+      if (guestRef !== ref) return;
+      const next = guests[index + 1] ?? guests[index - 1];
+      if (next) router.replace(guestPath(openId, next.ref), { scroll: false });
+      else onClose();
+    },
+    [guests, openId, setLeftOut, saved, keep, guestRef, router, onClose],
+  );
+  const onBringBack = useCallback(
+    (id: string) => setLeftOut((current) => current.filter((guest) => guest.id !== id)),
+    [setLeftOut],
+  );
   const onForget = useCallback(
     () => keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
     [guests, saved, keep],
@@ -235,17 +272,42 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         rerun,
         rewritten,
         onAskSlot: setAskSlot,
+        leftOut,
+        onLeaveOut,
+        onBringBack,
       }}
     >
       {children}
-      <Chat analysis={analysis} onRerun={showRun} onRewrite={rewrite} beside={openGuest !== null} slot={askSlot} />
+      <Chat
+        analysis={analysis}
+        exclude={excluded}
+        onRerun={showRun}
+        onRewrite={rewrite}
+        onLeaveOut={onLeaveOut}
+        beside={openGuest !== null}
+        slot={askSlot}
+      />
     </OpenAnalysisContext>
   );
 }
 
 export function Console() {
-  const { analysis, openGuest, onOpen, onClose, picked, onPick, missing, onForget, rerun, rewritten, onAskSlot } =
-    useOpenAnalysis();
+  const {
+    analysis,
+    openGuest,
+    onOpen,
+    onClose,
+    picked,
+    onPick,
+    missing,
+    onForget,
+    rerun,
+    rewritten,
+    onAskSlot,
+    leftOut,
+    onLeaveOut,
+    onBringBack,
+  } = useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const figures = computeStats(analysis);
@@ -282,7 +344,10 @@ export function Console() {
         show={analysis.show}
         lock="show-head"
         stops={[
-          { id: "top-picks", label: guests.some(({ label }) => label === "sweet_spot") ? "Start with these" : "Closest" },
+          {
+            id: "top-picks",
+            label: guests.some(({ label }) => label === "sweet_spot") ? "Start with these" : "Closest",
+          },
           { id: "scope", label: "Compare" },
           { id: "guests", label: "Ranked" },
           { id: "tastes", label: "Listeners" },
@@ -310,6 +375,7 @@ export function Console() {
           picked={picked}
           onPick={onPick}
           onOpen={onOpen}
+          onLeaveOut={onLeaveOut}
         />
         <Scope
           key={`scope-${analysis.id}`}
@@ -324,7 +390,8 @@ export function Console() {
             <p className="max-w-[62ch] text-ink-soft">
               Each dot is a guest. Higher up, your listeners like them more. Further right, more of their fans are new
               to you. A bigger dot means their fans are likelier to enjoy your show. The box at the top right holds high
-              fit and high reach; the ringed dots in it are the sweet spots, whose fans also love your show back.
+              fit and high reach: its ringed dots are the sweet spots, whose fans also love your show back, and the
+              others are one-way, whose fans are less likely to.
             </p>
             <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
           </div>
@@ -343,14 +410,13 @@ export function Console() {
         />
         <section
           aria-label="Your listeners"
-          className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-3"
+          className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-2"
         >
-          <div className="@3xl:col-span-3">
+          <div className="@3xl:col-span-2">
             <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} rerun={rerun} />
           </div>
-          <FanAges stats={figures} />
-          <CommonGround guests={guests} />
-          <LeftOut analysis={analysis} />
+          {figures.withAges > 0 && <FanAges stats={figures} />}
+          <LeftOut analysis={analysis} leftOut={leftOut} onBringBack={onBringBack} />
         </section>
         <AskSection onSlot={onAskSlot} />
       </div>
@@ -363,6 +429,7 @@ export function Console() {
         onPick={onPick}
         onOpen={onOpen}
         onClose={onClose}
+        onLeaveOut={onLeaveOut}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>
@@ -425,15 +492,39 @@ function pin(anchor: Element): (() => void) | undefined {
   return stop;
 }
 
-function LeftOut({ analysis }: { analysis: Analysis }) {
+function LeftOut({
+  analysis,
+  leftOut,
+  onBringBack,
+}: {
+  analysis: Analysis;
+  leftOut: LeftOutGuest[];
+  onBringBack: (id: string) => void;
+}) {
+  const count = analysis.left_out.length + leftOut.length;
   return (
     <section aria-labelledby="left-out" className="flex flex-col gap-4">
       <SectionHead id="left-out" title="Left out" small>
-        <span>{analysis.left_out.length}</span>
+        <span>{count}</span>
       </SectionHead>
       <div className="flex flex-col gap-3">
-        {analysis.left_out.length ? (
+        {count ? (
           <ul className="flex flex-col gap-1.5">
+            {leftOut.map(({ id, name, why }) => (
+              <li key={id} className="flex items-center justify-between gap-3 border-b border-steel pb-1.5 text-sm">
+                <span className="min-w-0 truncate">{name}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <Chip color="var(--accent)">{WHY_NAMES[why]}</Chip>
+                  <button
+                    type="button"
+                    onClick={() => onBringBack(id)}
+                    className="text-xs text-ink-soft underline underline-offset-4 hover:text-ink"
+                  >
+                    Bring back<span className="sr-only"> {name}</span>
+                  </button>
+                </span>
+              </li>
+            ))}
             {analysis.left_out.map(({ name, why }) => (
               <li
                 key={`${name}-${why}`}
@@ -450,7 +541,8 @@ function LeftOut({ analysis }: { analysis: Analysis }) {
           <p className="text-sm text-ink-dim">Nobody: no hosts or past guests came back.</p>
         )}
         <p className="text-xs text-ink-dim">
-          Echo leaves out the show&apos;s hosts and people already in its episode titles.
+          Echo leaves out the show&apos;s hosts, people already in its episode titles, and anyone you leave out. Yours
+          stay out of every run of this show until you bring them back.
         </p>
       </div>
     </section>

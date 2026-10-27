@@ -308,3 +308,23 @@ def test_search_finds_the_failing_shows_by_title(mock):
 
 def test_httpx_does_not_log_every_request():
     assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+
+
+def test_the_mock_chat_leaves_a_guest_out_and_reruns_keep_them_out(mock):
+    guests = mock.get("/analyses/an_example").json()["guests"]
+    second = guests[1]
+    body = ask(mock, f"We've had {second['name']} on already")
+    assert (body["action"], body["guest_ref"], body["why"]) == ("leave_out", second["ref"], "had_on")
+    messages = [{"role": "user", "content": "Less famous guests"}]
+    reply = mock.post("/chat", json={"analysis_id": "an_example", "messages": messages, "exclude": [second["id"]]})
+    rerun = mock.get(f"/analyses/{reply.json()['analysis_id']}").json()
+    assert rerun["filters"]["exclude"] == [second["id"]]
+    assert second["id"] not in [guest["id"] for guest in rerun["guests"]]
+    started = mock.post("/analyses", json={"show_id": SHOW_ID, "filters": {"exclude": [second["id"]] * 2}}).json()
+    assert mock.get(f"/analyses/{started['id']}").json()["filters"]["exclude"] == [second["id"]]
+
+
+def test_a_mock_episode_takes_the_ideas_title(mock):
+    guest = mock.get("/analyses/an_example").json()["guests"][0]
+    details = mock.get("/analyses/an_example/guests/g1", params={"length": "45 min"}).json()
+    assert details["episode"]["title"] == guest["idea"]["title"]

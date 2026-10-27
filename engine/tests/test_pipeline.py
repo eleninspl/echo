@@ -125,6 +125,26 @@ def test_people_wikidata_says_have_died_are_left_out(engine, monkeypatch):
     assert len(analysis["guests"]) == 20
 
 
+def test_the_top_guests_get_their_work_and_page_from_wikidata(engine, monkeypatch):
+    async def work_of(people: list[dict]) -> dict[str, wikidata.Work]:
+        first = people[0]
+        page = f"https://en.wikipedia.org/wiki/{first['name'].replace(' ', '_')}"
+        return {first["entity_id"]: wikidata.Work(page, ["Example Co"], [], [])}
+
+    monkeypatch.setattr(wikidata, "work_of", work_of)
+    first = run(engine)["guests"][0]
+    assert "A founder of Example Co." in first["bio"]
+    assert list(first["links"])[0] == "wikipedia"
+
+
+def test_guests_the_host_left_out_never_come_back(engine):
+    first = run(engine)["guests"][0]
+    again = run(engine, exclude=[first["id"]])
+    assert first["id"] not in [guest["id"] for guest in again["guests"]]
+    assert len(again["guests"]) == 20
+    assert again["filters"]["exclude"] == [first["id"]]
+
+
 def test_evidence_differs_per_guest(engine):
     explained = [guest["evidence"] for guest in run(engine)["guests"][:10]]
     assert len({tuple(e["shared_tastes"]) for e in explained}) > 1
@@ -395,7 +415,7 @@ def test_a_run_with_the_llm_puts_ideas_on_the_top_guests(engine, monkeypatch):
 
 
 def test_a_failed_llm_call_on_a_route_is_a_502_llm_error(engine, monkeypatch):
-    async def broken(analysis, messages):
+    async def broken(analysis, messages, exclude=()):
         raise LlmError("the model sent nonsense")
 
     monkeypatch.setattr(llm, "chat", broken)

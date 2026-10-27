@@ -442,6 +442,7 @@ def create_app(
         title: str | None = Query(None, min_length=1, max_length=200),
         pitch: str | None = Query(None, min_length=1, max_length=1000),
         reason: str | None = Query(None, min_length=1, max_length=1000),
+        length: str | None = Query(None, max_length=30),
     ) -> GuestDetails:
         given = [part for part in (title, pitch, reason) if part is not None]
         if given and len(given) != 3:
@@ -451,28 +452,39 @@ def create_app(
         guest = engine.guest(analysis, ref, idea)
         engine.mock_fails(analysis.show.id, "guest_details")
         maps = await engine.guest_maps(analysis, guest)
+        length = " ".join((length or "").split()) or None
         if engine.mock:
             episode = GuestDetails.model_validate({**engine.example["guest_details"], "ref": ref}).episode
-        elif (episode := await engine.writings.get(analysis, guest, "episode", Episode)) is None:
+            if episode and guest.idea:
+                episode.title = guest.idea.title
+        elif (episode := await engine.writings.get(analysis, guest, "episode", Episode, length)) is None:
             try:
-                episode = await pipeline.llm_step(llm.write_episode(analysis, guest, maps), None, "the episode idea")
+                episode = await pipeline.llm_step(
+                    llm.write_episode(analysis, guest, maps, length), None, "the episode idea"
+                )
             except pipeline.AnalysisFailed as error:
                 raise EchoError(502, error.code, error.message) from None
             if episode is not None:
-                await engine.writings.put(analysis, guest, "episode", episode)
+                await engine.writings.put(analysis, guest, "episode", episode, length)
         return GuestDetails(ref=ref, audience_map=maps.audience_map, adds=maps.adds, episode=episode)
 
     @app.post("/chat")
     async def chat(body: ChatRequest, tasks: BackgroundTasks) -> ChatReply:
         analysis = await engine.done(body.analysis_id)
         engine.mock_fails(analysis.show.id, "chat")
+        exclude = analysis.filters.exclude if body.exclude is None else body.exclude
         if engine.mock:
-            decision = mocked.decide(analysis.guests, analysis.filters, body.messages)
+            shown = [guest for guest in analysis.guests if guest.id not in exclude]
+            decision = mocked.decide(shown, analysis.filters, body.messages)
         else:
-            decision = await llm.chat(analysis, body.messages)
+            decision = await llm.chat(analysis, body.messages, exclude)
         if decision.action == "rerun":
-            rerun = await engine.start(analysis.show.id, decision.filters or analysis.filters, tasks)
+            filters = (decision.filters or analysis.filters).model_copy(update={"exclude": sorted(set(exclude))})
+            rerun = await engine.start(analysis.show.id, filters, tasks)
             return ChatReply(reply=decision.reply, action="rerun", analysis_id=rerun.id)
+        if decision.action == "leave_out" and decision.guest_ref:
+            engine.guest(analysis, decision.guest_ref)
+            return ChatReply(reply=decision.reply, action="leave_out", guest_ref=decision.guest_ref, why=decision.why)
         if decision.action == "rewrite" and decision.guest_ref and decision.idea:
             # Not saved: an analysis is shared by everyone who runs the same show and filters, featured shows by
             # every visitor. The web app keeps the visitor's own rewrites.
@@ -494,12 +506,13 @@ def create_app(
         guest = engine.guest(analysis, body.guest_ref, body.idea)
         if engine.mock:
             return Briefing(markdown=fill(engine.example["briefing"], analysis, guest))
-        if (saved := await engine.writings.get(analysis, guest, "briefing", Briefing)) is not None:
+        length = " ".join((body.length or "").split()) or None
+        if (saved := await engine.writings.get(analysis, guest, "briefing", Briefing, length)) is not None:
             return saved
         maps = await engine.guest_maps(analysis, guest)
-        episode = await engine.writings.get(analysis, guest, "episode", Episode)
+        episode = await engine.writings.get(analysis, guest, "episode", Episode, length)
         written = Briefing(markdown=await llm.write_briefing(analysis, guest, maps, episode))
-        await engine.writings.put(analysis, guest, "briefing", written)
+        await engine.writings.put(analysis, guest, "briefing", written, length)
         return written
 
     return app

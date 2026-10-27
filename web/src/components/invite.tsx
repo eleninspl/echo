@@ -446,6 +446,7 @@ function GuestCard({
   onRemove,
 }: CardProps) {
   const emailWrong = email.trim() !== "" && !isEmail(email);
+  const episodeLength = cleanDetails(sharedDetails)?.length;
   return (
     <li
       className="rise flex flex-col gap-5 rounded-2xl bg-well p-5 shadow-[inset_0_0_0_1px_var(--steel)] sm:p-6"
@@ -551,6 +552,7 @@ function GuestCard({
             guestRef={guest.ref}
             guestName={guest.name}
             idea={rewrittenIdea(guest)}
+            length={episodeLength}
           />
         </div>
       )}

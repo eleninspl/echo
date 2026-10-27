@@ -11,6 +11,10 @@ async def nobody_died(people: list[dict]) -> set[str]:
     return set()
 
 
+async def no_work(people: list[dict]) -> dict[str, wikidata.Work]:
+    return {}
+
+
 async def no_feed(itunes_id: str) -> list[str]:
     return []
 
@@ -27,6 +31,7 @@ def no_real_llm():
 def no_real_wikidata():
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(wikidata, "died", nobody_died)
+        patch.setattr(wikidata, "work_of", no_work)
         yield
 
 

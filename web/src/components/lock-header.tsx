@@ -186,21 +186,25 @@ type Active = { key: string; phrase: string; without: Filters };
 // Each filter that differs from the defaults, with the request that clears it.
 function activeFilters(filters: Filters): Active[] {
   const base = requestFilters(filters);
-  const phrase = (part: Partial<Filters>) => filterPhrases({ ...EMPTY, ...part })[0];
+  const phrase = (part: Partial<Filters>) => filterPhrases({ ...EMPTY, ...part });
   const active: Active[] = [];
   if (base.fame !== "any")
-    active.push({ key: "fame", phrase: phrase({ fame: base.fame }), without: { ...base, fame: "any" } });
-  if (base.age) active.push({ key: "age", phrase: phrase({ age: base.age }), without: { ...base, age: null } });
+    active.push({ key: "fame", phrase: phrase({ fame: base.fame })[0], without: { ...base, fame: "any" } });
+  if (base.age) active.push({ key: "age", phrase: phrase({ age: base.age })[0], without: { ...base, age: null } });
   if (base.country)
-    active.push({ key: "country", phrase: phrase({ country: base.country }), without: { ...base, country: null } });
+    active.push({ key: "country", phrase: phrase({ country: base.country })[0], without: { ...base, country: null } });
   if (filters.episode_about)
     active.push({
       key: "about",
-      phrase: phrase({ episode_about: filters.episode_about }),
+      phrase: phrase({ episode_about: filters.episode_about })[0],
       without: { ...base, episode_about: null },
     });
   if (base.theme)
-    active.push({ key: "theme", phrase: phrase({ theme: base.theme }), without: { ...base, theme: null } });
+    active.push({
+      key: "theme",
+      phrase: phrase({ theme: base.theme, episode_about: filters.episode_about }).at(-1) ?? base.theme,
+      without: { ...base, theme: null },
+    });
   return active;
 }
 

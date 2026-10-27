@@ -67,3 +67,10 @@ def test_a_theme_alone_keeps_the_guests(guests):
     themed = mock.guests_for(guests, Filters(theme="road trips"))
     assert [g.name for g in themed] == [g.name for g in guests]
     assert [g.scores for g in themed] == [g.scores for g in guests]
+
+
+def test_the_mock_chat_leaves_out_a_guest_by_name(guests):
+    named = decide(guests, f"Drop {guests[3].name}, they're not for us")
+    assert (named.action, named.guest_ref, named.why) == ("leave_out", guests[3].ref, "not_for_us")
+    assert decide(guests, f"We had {guests[0].name} on last year").why == "had_on"
+    assert decide(guests, "Leave out the comedian").action == "none"

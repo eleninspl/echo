@@ -33,6 +33,7 @@ CHAT_PROBES = [
     ("younger", "Show me guests for younger listeners", "rerun"),
     ("less_famous", "I'd like less famous guests", "rerun"),
     ("about_film", "I want an episode about the movie Dune", "rerun"),
+    ("leave_out", "We've had {third} on the show already", "leave_out"),
 ]
 
 

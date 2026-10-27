@@ -25,23 +25,30 @@ def writings_cache(store: Path | None) -> Cache:
 
 
 class Writings:
-    """Keyed by analysis, guest and the guest's idea: a rewritten idea gets a new episode and briefing."""
+    """Keyed by analysis, guest, the guest's idea and the episode length: a rewritten idea gets a new episode and
+    briefing, and so does a new length."""
 
     def __init__(self, cache: Cache | None) -> None:
         self.cache = cache
 
     @staticmethod
-    def key(analysis: Analysis, guest: Guest, kind: Kind) -> str:
+    def key(analysis: Analysis, guest: Guest, kind: Kind, length: str | None = None) -> str:
         idea = guest.idea.model_dump_json() if guest.idea else ""
+        if length:
+            idea = f"{idea}\n{length.lower()}"
         return f"{analysis.id}.{guest.ref}.{kind}.{hashlib.sha256(idea.encode()).hexdigest()[:12]}"
 
-    async def get[T: BaseModel](self, analysis: Analysis, guest: Guest, kind: Kind, model: type[T]) -> T | None:
+    async def get[T: BaseModel](
+        self, analysis: Analysis, guest: Guest, kind: Kind, model: type[T], length: str | None = None
+    ) -> T | None:
         if self.cache is None:
             return None
-        saved = await self.cache.get(self.key(analysis, guest, kind))
+        saved = await self.cache.get(self.key(analysis, guest, kind, length))
         return None if saved is None else model.model_validate(saved)
 
-    async def put(self, analysis: Analysis, guest: Guest, kind: Kind, value: BaseModel) -> None:
+    async def put(
+        self, analysis: Analysis, guest: Guest, kind: Kind, value: BaseModel, length: str | None = None
+    ) -> None:
         if self.cache is not None:
-            key = self.key(analysis, guest, kind)
+            key = self.key(analysis, guest, kind, length)
             await self.cache.set(key, kind, {"analysis": analysis.id, "ref": guest.ref}, value.model_dump())

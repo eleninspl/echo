@@ -105,6 +105,7 @@ def test_ideas_are_written_in_one_call_for_the_top_ten_by_ref(fake, analysis):
         "love_back",
         "reach",
         "shared_tastes_strongest_first",
+        "podcasts_both_audiences_love",
         "new_podcasts_their_fans_bring",
         "age_groups_where_their_fans_stand_out",
     }
@@ -147,7 +148,7 @@ def test_the_episode_wanted_is_passed_on(fake, analysis):
     analysis.filters.episode_about = EpisodeAbout(query="Example Film", type="movie", used="Example Film (2019)")
     llm_fake = fake(ideas={"ideas": []})
     asyncio.run(llm.write_ideas(analysis))
-    assert facts_of(llm_fake.calls[0])["the_host_wants_an_episode_about"] == "Example Film (2019)"
+    assert facts_of(llm_fake.calls[0])["the_host_wants_an_episode_about"] == "the film Example Film (2019)"
 
 
 def test_without_an_openrouter_key_the_llm_parts_stay_unbuilt(monkeypatch):
@@ -194,7 +195,7 @@ def test_the_episode_uses_both_audience_maps(fake, analysis):
 
 
 def decision(**fields) -> dict:
-    return {"reply": "Done.", "action": "none", "filters": None, "guest_ref": None, "idea": None, **fields}
+    return {"reply": "Done.", "action": "none", "filters": None, "guest_ref": None, "idea": None, "why": None, **fields}
 
 
 def test_chat_can_ask_for_a_rerun_with_new_filters(fake, analysis):
@@ -429,3 +430,53 @@ def test_every_schema_is_strict(fake, analysis):
     with pytest.raises(LlmError):
         asyncio.run(llm.write_drafts(analysis, analysis.guests[:1], DraftRequest(analysis_id="a", guest_refs=["g1"])))
     assert [strict(call["schema"]) for call in llm_fake.calls] == [4, 2, 2]
+
+
+EPISODE = {
+    "title": "A title of its own",
+    "summary": "Two sentences.",
+    "segments": [{"title": "Their work", "points": ["One"], "minutes": 20}],
+    "questions": ["What first?"],
+}
+
+
+def test_the_episode_keeps_the_ideas_title_and_times_segments_only_to_a_length(fake, analysis):
+    guest = analysis.guests[0]
+    llm_fake = fake(episode=EPISODE)
+    episode = asyncio.run(llm.write_episode(analysis, guest, maps(), "45 min"))
+    assert episode.title == guest.idea.title
+    assert episode.segments[0].minutes == 20
+    assert facts_of(llm_fake.calls[0])["episode_length"] == "45 min"
+    segment = llm_fake.calls[0]["schema"]["properties"]["segments"]["items"]
+    assert "minutes" in segment["required"]
+    untimed = asyncio.run(llm.write_episode(analysis, guest, maps()))
+    assert untimed.segments[0].minutes is None
+    guest.idea = None
+    assert asyncio.run(llm.write_episode(analysis, guest, maps())).title == "A title of its own"
+
+
+def test_the_briefing_says_where_to_read_up_only_without_known_facts(fake, analysis):
+    links = {"imdb": "https://www.imdb.com/name/nm1/", "wikipedia": "https://en.wikipedia.org/wiki/Guest_A"}
+    guest = analysis.guests[0].model_copy(update={"links": links, "bio": None})
+    llm_fake = fake(briefing={"markdown": "# Guest A"})
+    asyncio.run(llm.write_briefing(analysis, guest, maps()))
+    assert facts_of(llm_fake.calls[0])["guest"]["read_up"] == (
+        "Read up before you record: [Wikipedia](https://en.wikipedia.org/wiki/Guest_A)"
+    )
+    assert llm.read_up(guest.model_copy(update={"links": {}})) == "Read up on them before you record."
+    assert llm.read_up(guest.model_copy(update={"bio": "Comedian. Known for Example Show."})) is None
+
+
+def test_chat_can_leave_a_guest_out_and_never_sees_those_left_out(fake, analysis):
+    left = analysis.guests[2]
+    llm_fake = fake(chat_decision=decision(action="leave_out", guest_ref="g2", why="had_on"))
+    result = asyncio.run(llm.chat(analysis, [Message(role="user", content="We had them on")], {left.id}))
+    assert (result.action, result.guest_ref, result.why) == ("leave_out", "g2", "had_on")
+    facts = facts_of(llm_fake.calls[0])
+    assert left.ref not in [guest["ref"] for guest in facts["guests"]]
+    assert "exclude" not in facts["current_filters"]
+    assert left.ref not in llm_fake.calls[0]["schema"]["properties"]["guest_ref"]["anyOf"][0]["enum"]
+    fake(chat_decision=decision(action="leave_out", guest_ref="g2", why=None))
+    assert asyncio.run(llm.chat(analysis, [Message(role="user", content="Drop them")])).why == "not_for_us"
+    fake(chat_decision=decision(action="leave_out", guest_ref=left.ref, why="had_on"))
+    assert asyncio.run(llm.chat(analysis, [Message(role="user", content="?")], {left.id})).action == "none"

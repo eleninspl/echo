@@ -9,15 +9,14 @@ import { Info, LABEL_HUE, out100, rank, SCORE_HUE, SectionHead } from "./hud";
 import { Voiceprint } from "./voiceprint";
 
 // The scope from docs/qloo.md, Scoring: reach across, fit up, love back as dot size, label as colour,
-// and the box of high fit and reach at reach ≥ 0.33 and fit ≥ 0.5. Only its ringed dots are sweet spots: a
-// sweet spot also needs love back, so a far or balanced guest can sit in the box too. Dot size steps on a
+// and the box of high fit and reach at reach ≥ 0.33 and fit ≥ 0.5. Its ringed dots are sweet spots and the rest
+// one-way guests (label `far`), whose fans are less likely to love the show back. Dot size steps on a
 // fixed five-step ramp so the same size means the same love back everywhere. Colour is never the only cue: sweet spots carry a
 // ring, the regions and the top guests are named on the chart, the tooltip names the label, and the list and
 // the dossier say it in words.
 const ZONE = { reach: 0.33, fit: 0.5 };
 // The label regions that fit and reach alone decide (docs/qloo.md, Scoring): safe under 33 reach, long shot
-// under 33 fit, balanced in between below the sweet spot. Far also needs a low love back, so it has no region;
-// its dots gather at the right.
+// under 33 fit, balanced in between below the box.
 const LOW = 0.33;
 const RAMP = [4.5, 6.5, 8.5, 11, 13.5];
 const PAD = { top: 30, right: 24, bottom: 50, left: 58 };
@@ -161,8 +160,8 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
         <Info>
           Up is how much your listeners like a guest beyond their fame; right, how new the guest&apos;s fans are to you.
           Bigger dots: their fans like your show more. The teal box holds high fit and high reach; its ringed dots are
-          the sweet spots, whose fans also love your show back. The shaded regions are the labels fit and reach decide
-          on their own.
+          the sweet spots, whose fans also love your show back, and the rest are one-way, whose fans are less likely to.
+          The shaded regions are the labels fit and reach decide on their own.
         </Info>
       </SectionHead>
       {children}

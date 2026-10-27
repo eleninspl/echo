@@ -25,11 +25,13 @@ export function Briefing({
   guestRef,
   guestName,
   idea,
+  length,
 }: {
   id: string;
   guestRef: string;
   guestName: string;
   idea?: Idea;
+  length?: string;
 }) {
   const [load, setLoad] = useState<Load>({ state: "idle" });
   const [printing, setPrinting] = useState(false);
@@ -46,7 +48,7 @@ export function Briefing({
   async function write() {
     setLoad({ state: "loading" });
     try {
-      const { markdown } = await echo.briefing(id, guestRef, idea);
+      const { markdown } = await echo.briefing(id, guestRef, idea, length);
       setLoad({ state: "done", markdown });
     } catch (error) {
       setLoad({ state: "failed", problem: writingProblem(error, "briefings") });

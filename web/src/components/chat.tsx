@@ -14,7 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { echo, type Analysis, type Idea, type Message } from "@/lib/echo";
+import { echo, type Analysis, type Idea, type LeaveOutWhy, type Message } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { useAnalysis } from "@/lib/use-analysis";
@@ -68,15 +68,16 @@ const SUGGESTIONS: { ask: string; note: string; icon: ReactNode }[] = [
 // A note is shown in the transcript but never sent: Echo's own word on a run it started.
 type Entry = Message & { note?: boolean };
 
-// The conversation per show, so it survives a reload, another page and a rerun. Kept short.
+// The conversation per run, so it survives a reload and another page, and goes along to a rerun started from it.
+// Kept short.
 const KEPT = 60;
-const historyKey = (showId: string) => `echo.chat.${showId}`;
+const historyKey = (analysisId: string) => `echo.chat.run.${analysisId}`;
 // Once the engine says it has no writing model, for the rest of this visit.
 const NO_WRITER = "echo.chat.no-writer";
 
-function readHistory(showId: string): Entry[] {
+function readHistory(analysisId: string): Entry[] {
   try {
-    const saved: unknown = JSON.parse(window.localStorage.getItem(historyKey(showId)) ?? "[]");
+    const saved: unknown = JSON.parse(window.localStorage.getItem(historyKey(analysisId)) ?? "[]");
     if (!Array.isArray(saved)) return [];
     return saved.filter(
       (entry): entry is Entry =>
@@ -87,13 +88,19 @@ function readHistory(showId: string): Entry[] {
   }
 }
 
-function saveHistory(showId: string, entries: Entry[]) {
+function saveHistory(analysisId: string, entries: Entry[]) {
   try {
-    if (entries.length) window.localStorage.setItem(historyKey(showId), JSON.stringify(entries.slice(-KEPT)));
-    else window.localStorage.removeItem(historyKey(showId));
+    if (entries.length) window.localStorage.setItem(historyKey(analysisId), JSON.stringify(entries.slice(-KEPT)));
+    else window.localStorage.removeItem(historyKey(analysisId));
   } catch {
     return;
   }
+}
+
+export function carryChat(fromId: string, toId: string, note: string) {
+  if (fromId === toId) return;
+  const entries = readHistory(fromId);
+  if (entries.length) saveHistory(toId, [...entries, { role: "assistant", content: note, note: true }]);
 }
 
 function readNoWriter(): boolean {
@@ -114,9 +121,11 @@ function saveNoWriter() {
 
 type Props = {
   analysis: Analysis;
+  exclude: string[];
   // Called when a run the chat started is done, to show it in place of the current one.
   onRerun: (analysis: Analysis) => void;
   onRewrite: (guestRef: string, idea: Idea) => void;
+  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
   beside?: boolean;
   slot?: HTMLElement | null;
 };
@@ -129,10 +138,10 @@ const REDUCED = "(prefers-reduced-motion: reduce)";
 // or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. A round
 // button at the bottom right on every page, left of an open guest; the panel opens out of it, and closing it keeps the conversation.
 // Scrolled down to the page's Ask Echo section, the button flies into it and the conversation opens there.
-export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null }: Props) {
-  const showId = analysis.show.id;
-  const [history, setHistory] = useState(() => ({ showId, entries: readHistory(showId) }));
-  if (history.showId !== showId) setHistory({ showId, entries: readHistory(showId) });
+export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside = false, slot = null }: Props) {
+  const runId = analysis.id;
+  const [history, setHistory] = useState(() => ({ runId, entries: readHistory(runId) }));
+  if (history.runId !== runId) setHistory({ runId, entries: readHistory(runId) });
   const entries = history.entries;
   const setEntries = useCallback(
     (change: (current: Entry[]) => Entry[]) =>
@@ -143,7 +152,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<HostError | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
+  const [rerunId, setRerunId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(() => entries.length);
   const log = useRef<HTMLOListElement>(null);
@@ -156,7 +165,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
   const [near, setNear] = useState(false);
   const landed = slot !== null && near;
 
-  useEffect(() => saveHistory(history.showId, history.entries), [history]);
+  useEffect(() => saveHistory(history.runId, history.entries), [history]);
   if (landed && open) setOpen(false);
   if (landed && seen !== entries.length) setSeen(entries.length);
 
@@ -207,16 +216,16 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
 
   const finished = useCallback(
     (next: Analysis) => {
-      setRunId(null);
+      setRerunId(null);
       const phrases = filterPhrases(next.filters);
       const note = `Done. The page shows the new run${phrases.length ? `: ${phrases.map(lowerFirst).join(", ")}` : ""}.`;
-      setEntries((current) => [...current, { role: "assistant", content: note, note: true }]);
+      carryChat(runId, next.id, note);
       onRerun(next);
     },
-    [onRerun, setEntries],
+    [onRerun, runId],
   );
-  const run = useAnalysis(runId, finished);
-  const running = runId !== null && run.analysis?.id === runId ? run.analysis : null;
+  const run = useAnalysis(rerunId, finished);
+  const running = rerunId !== null && run.analysis?.id === rerunId ? run.analysis : null;
 
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
@@ -240,7 +249,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
   function restart() {
     setEntries(() => []);
     setProblem(null);
-    setRunId(null);
+    setRerunId(null);
     setSeen(0);
     input.current?.focus();
   }
@@ -253,13 +262,14 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
     setText("");
     setPending(true);
     setProblem(null);
-    setRunId(null);
+    setRerunId(null);
     try {
       const history = next.filter((entry) => !entry.note).map(({ role, content }) => ({ role, content }));
-      const reply = await echo.chat(analysis.id, history.slice(-HISTORY));
+      const reply = await echo.chat(analysis.id, history.slice(-HISTORY), exclude);
       setEntries((current) => [...current, { role: "assistant", content: reply.reply }]);
       if (reply.action === "rerun" && reply.analysis_id && reply.analysis_id !== analysis.id)
-        setRunId(reply.analysis_id);
+        setRerunId(reply.analysis_id);
+      if (reply.action === "leave_out" && reply.guest_ref) onLeaveOut(reply.guest_ref, reply.why ?? "not_for_us");
       if (reply.action === "rewrite" && reply.guest_ref && reply.idea) {
         onRewrite(reply.guest_ref, reply.idea);
         close();
@@ -285,12 +295,13 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
     if (event.key === "Escape") close();
   }
 
-  const failed = runId !== null && run.analysis?.id === runId && run.analysis.status === "failed" ? run.analysis : null;
+  const failed =
+    rerunId !== null && run.analysis?.id === rerunId && run.analysis.status === "failed" ? run.analysis : null;
   const step = running?.steps.findIndex((s) => !s.done) ?? -1;
   // The engine answers "not built yet" when the server has no writing model: say so, and stop offering asks.
   const offline = noWriter;
   const talking =
-    entries.length > 0 || pending || running !== null || failed !== null || (run.error !== null && runId !== null);
+    entries.length > 0 || pending || running !== null || failed !== null || (run.error !== null && rerunId !== null);
 
   const busy = pending || running?.status === "running";
   const unread = !open && entries.length > seen;
@@ -368,7 +379,7 @@ export function Chat({ analysis, onRerun, onRewrite, beside = false, slot = null
             These guests are still the ones from before.
           </Line>
         )}
-        {run.error && runId && (
+        {run.error && rerunId && (
           <Line who="Echo">
             <span className="font-semibold text-alert">{describe(run.error).title}.</span> {run.error.message}
           </Line>
@@ -610,6 +621,7 @@ const ASKS = [
   { what: "Different guests", how: "Younger listeners, less famous names, guests from one country." },
   { what: "An episode about something", how: "A theme like road trips, or a film, show, artist or brand by name." },
   { what: "A new take on one idea", how: "Echo rewrites a guest's episode idea the way you describe." },
+  { what: "Leave a guest out", how: "Say who you've had on or who isn't right, and they stay out of every run." },
 ];
 
 export function AskSection({ onSlot }: { onSlot: Dispatch<SetStateAction<HTMLElement | null>> }) {

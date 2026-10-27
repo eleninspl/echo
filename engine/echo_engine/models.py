@@ -8,6 +8,7 @@ AnchorType = Literal["movie", "tv_show", "artist", "brand", "videogame"]
 Label = Literal["sweet_spot", "safe", "far", "long_shot", "balanced"]
 Status = Literal["running", "done", "failed"]
 THEME_LENGTH = 120
+EXCLUDE_LENGTH = 50
 
 
 class Show(BaseModel):
@@ -34,6 +35,7 @@ class Filters(BaseModel):
     episode_about: EpisodeAbout | None = None
     # Free text for the LLM only (ideas, the episode, drafts, the briefing). Qloo never sees it.
     theme: str | None = Field(default=None, max_length=THEME_LENGTH)
+    exclude: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(default=[], max_length=EXCLUDE_LENGTH)
 
     @field_validator("theme", mode="before")
     @classmethod
@@ -42,6 +44,11 @@ class Filters(BaseModel):
             value = " ".join(value.split())
             return value or None
         return value
+
+    @field_validator("exclude")
+    @classmethod
+    def sorted_once(cls, value: list[str]) -> list[str]:
+        return sorted(set(value))
 
 
 class Step(BaseModel):
@@ -70,6 +77,7 @@ class Scores(BaseModel):
 
 class Evidence(BaseModel):
     shared_tastes: list[str] = []
+    shared_podcasts: list[str] = []
     new_podcasts: list[str] = []
     ages: list[AgeBucket] = []
 
@@ -170,6 +178,7 @@ class GuestMaps(BaseModel):
 class Segment(BaseModel):
     title: str
     points: list[str]
+    minutes: int | None = None
 
 
 class Episode(BaseModel):
@@ -189,25 +198,34 @@ class Message(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
 
 
+ChatAction = Literal["rerun", "rewrite", "leave_out", "none"]
+LeaveOutWhy = Literal["had_on", "not_for_us"]
+
+
 class ChatRequest(BaseModel):
     analysis_id: str
     messages: list[Message] = Field(min_length=1, max_length=20)
+    exclude: list[Annotated[str, Field(min_length=1, max_length=64)]] | None = Field(
+        default=None, max_length=EXCLUDE_LENGTH
+    )
 
 
 class ChatDecision(BaseModel):
     reply: str
-    action: Literal["rerun", "rewrite", "none"]
+    action: ChatAction
     filters: Filters | None = None
     guest_ref: str | None = None
     idea: Idea | None = None
+    why: LeaveOutWhy | None = None
 
 
 class ChatReply(BaseModel):
     reply: str
-    action: Literal["rerun", "rewrite", "none"]
+    action: ChatAction
     analysis_id: str | None = None
     guest_ref: str | None = None
     idea: Idea | None = None
+    why: LeaveOutWhy | None = None
 
 
 class DraftText(BaseModel):
@@ -331,6 +349,7 @@ class BriefingRequest(BaseModel):
     analysis_id: str
     guest_ref: str
     idea: RewrittenIdea | None = None
+    length: str | None = Field(default=None, max_length=30)
 
 
 class Briefing(BaseModel):

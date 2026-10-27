@@ -24,7 +24,7 @@ import { ShowCover } from "./show-cover";
 export const RESULTS_SLOT = "show-results";
 const WIDE = "(min-width: 1280px)";
 // Themes to click, for a host who hasn't thought of one.
-const THEMES = ["road trips", "first jobs", "a film you both love"];
+const THEMES = ["road trips", "first jobs", "money mistakes"];
 
 type Search =
   | { state: "idle" }
@@ -271,6 +271,7 @@ function ThemeField({ theme, onTheme }: { theme: string; onTheme: (theme: string
           maxLength={THEME_LENGTH}
           autoComplete="off"
           placeholder="Episode theme, optional"
+          aria-describedby="theme-note"
           className="field min-h-10 w-full py-2 pr-9 pl-10 text-sm"
         />
         {theme && (
@@ -301,6 +302,9 @@ function ThemeField({ theme, onTheme }: { theme: string; onTheme: (theme: string
           ))}
         </ul>
       )}
+      <p id="theme-note" className="basis-full text-xs text-ink-dim">
+        Shapes the ideas Echo writes, not which guests come back.
+      </p>
     </div>
   );
 }

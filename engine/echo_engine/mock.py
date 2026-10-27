@@ -37,8 +37,8 @@ ANCHOR_WORDS: dict[str, AnchorType] = {
 ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
 HELP = (
     "Mock mode understands a few asks: younger, older or an age; less famous or rising; a country; "
-    "an episode about a film, show, artist or brand by name; a theme; or a funnier, shorter or new take on the "
-    "first idea."
+    "an episode about a film, show, artist or brand by name; a theme; a funnier, shorter or new take on the "
+    "first idea; or leaving out a guest by name."
 )
 # Fewer guests than this after the filters fail the run, as the real engine does.
 MIN_GUESTS = 5
@@ -47,6 +47,8 @@ MIN_GUESTS = 5
 def decide(guests: list[Guest], current: Filters, messages: list[Message]) -> ChatDecision:
     text = next((m.content for m in reversed(messages) if m.role == "user"), "").strip()
     said = " ".join(text.lower().split())
+    if re.search(r"\b(leave out|drop|remove|skip|not for us|had .{1,60} on|been on)\b", said):
+        return leave_out(guests, said)
     if re.search(r"\b(idea|funn|shorter|rewrite|punchier|lighter|serious)", said):
         return rewrite(guests, said)
     filters, unclear = changed(current, text, said)
@@ -61,6 +63,19 @@ def decide(guests: list[Guest], current: Filters, messages: list[Message]) -> Ch
         f"Mock mode: running again for {', '.join(phrases)}." if phrases else "Mock mode: running again for everyone."
     )
     return ChatDecision(reply=reply, action="rerun", filters=filters)
+
+
+def leave_out(guests: list[Guest], said: str) -> ChatDecision:
+    guest = next((g for g in guests if g.name.lower() in said), None)
+    if guest is None:
+        return ChatDecision(reply="Mock mode: name the guest to leave out, as they appear on the page.", action="none")
+    why = "had_on" if re.search(r"\b(had .{1,60} on|been on|was on|were on)\b", said) else "not_for_us"
+    return ChatDecision(
+        reply=f"Mock mode: {guest.name} is left out of this page and of every run after it.",
+        action="leave_out",
+        guest_ref=guest.ref,
+        why=why,
+    )
 
 
 def rewrite(guests: list[Guest], said: str) -> ChatDecision:
@@ -180,12 +195,12 @@ def describe(filters: Filters) -> list[str]:
 def guests_for(guests: list[Guest], filters: Filters) -> list[Guest]:
     """The example guests as a run with these filters might return them: trimmed, scored again and reordered.
     Fewer than MIN_GUESTS means the filters are too narrow."""
-    pool = [guest.model_copy(deep=True) for guest in guests]
+    pool = [guest.model_copy(deep=True) for guest in guests if guest.id not in filters.exclude]
     if filters.theme:
         for guest in pool:
             if guest.idea:
                 guest.idea.pitch = f"{guest.idea.pitch} The conversation keeps coming back to {filters.theme}."
-    if filters.model_copy(update={"theme": None}) == Filters():
+    if filters.model_copy(update={"theme": None, "exclude": []}) == Filters():
         return pool
     if filters.fame != "any":
         # Leave out the guests whose fans already listen: the household names.

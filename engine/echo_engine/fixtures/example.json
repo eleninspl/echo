@@ -665,7 +665,7 @@
         "bio": null,
         "image_url": null,
         "links": {},
-        "label": "far",
+        "label": "balanced",
         "scores": {
           "fit": 0.38,
           "love_back": 0.23,
@@ -717,7 +717,7 @@
         "bio": null,
         "image_url": null,
         "links": {},
-        "label": "far",
+        "label": "long_shot",
         "scores": {
           "fit": 0.31,
           "love_back": 0.15,
@@ -753,7 +753,7 @@
         "bio": null,
         "image_url": null,
         "links": {},
-        "label": "far",
+        "label": "long_shot",
         "scores": {
           "fit": 0.15,
           "love_back": 0.08,

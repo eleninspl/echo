@@ -120,6 +120,11 @@ export function useDetails(showId: string) {
   return useStored(`echo.invite-details.${showId}`, parseDetails, noDetails);
 }
 
+export function useEpisodeLength(showId: string): string | undefined {
+  const [details] = useDetails(showId);
+  return cleanDetails(details.forAll)?.length;
+}
+
 export function saved(draft: Draft, changed = false): SavedDraft {
   return { subject: draft.subject, body: draft.body, changed };
 }
