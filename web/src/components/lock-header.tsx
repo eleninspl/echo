@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
-import type { AgeBucket, Analysis, Fame, Filters } from "@/lib/echo";
+import { THEME_LENGTH, type AgeBucket, type Analysis, type AnchorType, type Fame, type Filters } from "@/lib/echo";
 import { AGES, filterPhrases, LABELS } from "@/lib/format";
 import type { Pick } from "@/lib/picks";
 import { AGE_ORDER, LABEL_ORDER, type Stats } from "@/lib/stats";
@@ -161,6 +161,19 @@ const FAME_CHOICES: { value: Fame; name: string }[] = [
   { value: "rising", name: "Rising" },
 ];
 
+const ABOUT_CHOICES: { value: AnchorType; name: string; placeholder: string }[] = [
+  { value: "movie", name: "Film", placeholder: "A film's title" },
+  { value: "tv_show", name: "TV show", placeholder: "A TV show's title" },
+  { value: "artist", name: "Artist", placeholder: "An artist's name" },
+  { value: "brand", name: "Brand", placeholder: "A brand's name" },
+];
+
+const ABOUT_LENGTH = 100;
+
+function squash(text: string): string | null {
+  return text.split(/\s+/).filter(Boolean).join(" ") || null;
+}
+
 // Suggestions for the country field; the engine takes any place name it can find.
 const COUNTRIES = [
   "United States",
@@ -208,7 +221,7 @@ const EMPTY: Filters = { fame: "any", age: null, country: null, episode_about: n
 
 const FROM = "filters";
 
-// The run's filters as chips that each clear with a tap, and a small form to change fame, age and country.
+// The run's filters as chips that each clear with a tap, and a small form to change any of them.
 // Either starts a new run of the same show; the page keeps these guests until it's done.
 function FilterControls({
   filters,
@@ -324,13 +337,27 @@ function FilterForm({
   const [fame, setFame] = useState<Fame>(filters.fame);
   const [age, setAge] = useState<AgeBucket | null>(filters.age);
   const [country, setCountry] = useState(filters.country ?? "");
+  const [aboutType, setAboutType] = useState<AnchorType>(filters.episode_about?.type ?? "movie");
+  const [aboutQuery, setAboutQuery] = useState(filters.episode_about?.query ?? "");
+  const [theme, setTheme] = useState(filters.theme ?? "");
   const place = country.trim();
-  const changed = fame !== filters.fame || age !== filters.age || (place || null) !== filters.country;
+  const query = squash(aboutQuery);
+  const about = query ? { query, type: aboutType } : null;
+  const topic = squash(theme);
+  const was = filters.episode_about;
+  const changed =
+    fame !== filters.fame ||
+    age !== filters.age ||
+    (place || null) !== filters.country ||
+    about?.query !== was?.query ||
+    (about !== null && about.type !== was?.type) ||
+    topic !== (filters.theme ?? null);
+  const choice = ABOUT_CHOICES.find(({ value }) => value === aboutType) ?? ABOUT_CHOICES[0];
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!changed || (place && place.length < 2)) return;
-    onRun({ ...requestFilters(filters), fame, age, country: place || null });
+    onRun({ ...requestFilters(filters), fame, age, country: place || null, episode_about: about, theme: topic });
   }
 
   return (
@@ -394,6 +421,45 @@ function FilterForm({
           </datalist>
         </label>
       </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="tag mb-2 text-ink-dim">Episode about</legend>
+        <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-2">
+          <select
+            value={aboutType}
+            onChange={(event) => setAboutType(event.target.value as AnchorType)}
+            aria-label="Kind"
+            className="field h-10 px-3 text-sm"
+          >
+            {ABOUT_CHOICES.map(({ value, name }) => (
+              <option key={value} value={value}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={aboutQuery}
+            onChange={(event) => setAboutQuery(event.target.value)}
+            maxLength={ABOUT_LENGTH}
+            autoComplete="off"
+            placeholder={choice.placeholder}
+            aria-label={`${choice.name}, optional`}
+            className="field h-10 px-3 text-sm"
+          />
+        </div>
+        <span className="text-sm text-ink-dim">Guests whose fans love it too rank higher.</span>
+      </fieldset>
+      <label className="flex flex-col gap-2">
+        <span className="tag text-ink-dim">Theme</span>
+        <input
+          value={theme}
+          onChange={(event) => setTheme(event.target.value)}
+          maxLength={THEME_LENGTH}
+          autoComplete="off"
+          placeholder="e.g. road trips"
+          className="field h-10 px-3 text-sm"
+        />
+        <span className="text-sm text-ink-dim">Shapes the ideas Echo writes, not which guests come back.</span>
+      </label>
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" disabled={!changed} className="btn btn-brand">
           Find new guests
