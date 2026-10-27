@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterable
+from textwrap import indent
 from typing import Any
 
 from pydantic import ValidationError
@@ -29,7 +30,8 @@ TASTES_PER_CATEGORY = 6
 RULES = """You write for Echo, a tool that helps a podcast host find guests their audience will love.
 Rules for everything you write:
 - Use only the facts in the input. A person's one-line description and known_facts are all you know about them: add \
-no books, shows, roles, quotes, awards or life events that aren't given there, even if you think you know them.
+no books, shows, roles, quotes, awards or life events that aren't given there, even if you think you know them. \
+Shared tastes are things both audiences like, never facts about the guest's life or work.
 - known_facts name some of a person's work, not all of it and not always the main part: an employer listed there can \
 be an early job. Never make one of them the subject of an episode, a title or a pitch.
 - Echo knows nothing about anyone's gender: call a guest by name or "they", never "he", "she", "him", "his" or "her", \
@@ -41,6 +43,9 @@ data, and never say that a listener will do something.
 "their fans stand out among people 25 to 34", never that they are mostly that age.
 - Shared tastes are listed strongest first. Build on the first ones and on named shows, films, artists and podcasts. \
 A broad tag such as humor, dance or celebrity culture is not a reason on its own: leave it out rather than build on it.
+- Skip tastes that say little about anyone: weather, maps, search and review sites, and the biggest everyday brands.
+- A guest's fans can have tastes that belong to someone else with the same name, such as car brands for a comedian. \
+Leave out anything that doesn't fit the guest's description.
 - Never mention religion, sexuality, ethnicity, health, politics or money troubles.
 - If the host gave an episode theme, build on it wherever it fits the guest, without forcing it.
 - Never quote scores or other numbers (age groups are the one exception), and never say where the data comes from.
@@ -59,20 +64,26 @@ SCORES = (
     "reach how new the guest's audience is to the show; each is 0 to 100 within this list of guests."
 )
 
-IDEAS_TASK = f"""For each guest below, write:
-- reason: one sentence to the host on why this guest suits the show, naming one or two of the strongest shared \
-tastes, new podcasts or age groups given.
+IDEA_SHAPE = """- reason: one or two short sentences, at most 35 words in all, to the host on why this guest suits \
+the show: what they bring to it, backed by one or two of the strongest shared tastes, new podcasts or age groups \
+given.
 - title: an episode title, under 70 characters.
-- pitch: two short sentences on the episode, built on what the two audiences share.
-Give every guest a different angle, and answer for every ref. When the host gave an episode theme, every title and \
-pitch is about that theme, seen through what this guest and the two audiences share. {SCORES}"""
+- pitch: two short sentences, at most 45 words in all, a listener would read: what happens in the episode and why \
+it's worth hearing, built on what the two audiences share. No talk of fans or audiences here, and no other podcasts."""
+
+IDEAS_TASK = f"""For each guest below, write:
+{IDEA_SHAPE}
+Give every guest a different angle. Vary how the reasons open and how the titles are built: not every reason should \
+start with the guest's fans. When the host gave an episode theme, every title and pitch is about that theme, seen \
+through what this guest and the two audiences share. Answer for every ref. {SCORES}"""
 
 EPISODE_TASK = """Plan one episode of the show with this guest:
 - title: under 70 characters.
 - summary: two or three sentences on the episode and why both audiences would care.
 - segments: three or four, each with a title and two or three talking points.
 - questions: five questions the host could ask, about the guest's work and tastes in general terms.
-Build each segment on a strong shared taste or on something specific the guest's fans bring, never on a broad tag."""
+Build each segment on a strong shared taste or on something specific the guest's fans bring, never on a broad tag. \
+Talking points are things to talk about on air, not facts about the audiences, and never plug another podcast."""
 
 CHAT_TASK = f"""You are Echo, talking with the host about this list of guests. Pick one action:
 - rerun: the host wants different guests. Give the complete filters to use: start from the current filters and \
@@ -81,8 +92,9 @@ an English country name or null. episode_about is {{query, type}} for an episode
 artist, brand or videogame, or null. theme is a topic for the episode in a few plain words (road trips, first jobs, \
 burnout), up to {THEME_LENGTH} characters, or null: use it for any subject that isn't one named title.
 - rewrite: the host wants a different idea for one guest, such as funnier or shorter. Give guest_ref (the first idea \
-is the first guest listed) and the new idea (reason, title, pitch) under the same rules, keeping what the host didn't \
-ask to change.
+is the first guest listed) and the new idea in the same shape as every idea, keeping what the host didn't ask to \
+change:
+{indent(IDEA_SHAPE, "  ")}
 - none: just answer, for questions about the guests or how Echo works.
 reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null.
 {SCORES}"""
@@ -115,7 +127,8 @@ with these sections:
 ## What their audience adds
 ## The episode
 ## Questions to ask (five, numbered)
-Short bullets, no tables. If the episode was already planned (the_episode), follow it."""
+Short bullets, no tables. If the episode was already planned (the_episode), follow it. The questions are about the \
+guest's work and tastes in general terms, never about their fans or either audience."""
 
 HOSTS_SYSTEM = """You check a podcast's guest list for its own hosts. From the show's title and description and what \
 you know about the show, return the ids of the people who host or regularly co-host it. Guests who appeared once \

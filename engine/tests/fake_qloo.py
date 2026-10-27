@@ -57,6 +57,10 @@ def person(i: int, affinity: float) -> dict:
             "spouse": ["Invented Spouse"],
             "official_website": ["https://example.com/p4"],
         }
+    if i == 8:
+        entity["properties"]["short_descriptions"][0]["value"] = "Invented politician"
+    if i == 11:
+        entity["properties"]["short_descriptions"][0]["value"] = "Invented comedian (born 1970)"
     return entity
 
 

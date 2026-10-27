@@ -12,6 +12,12 @@ REGISTRY_KEYS = {
     "goodreads_author_id",
 }
 OCCUPATION_TAG = "urn:tag:occupation:person"
+YEAR = r"(?:1[89]|20)\d{2}"
+YEAR_NOTE = re.compile(rf"\s*\([^()]*\b{YEAR}\b[^()]*\)")
+BORN_NOTE = re.compile(rf",?\s*\b(?:born|b\.)\s[^,;()]*?\b{YEAR}\b", re.IGNORECASE)
+LIFESPAN = re.compile(rf"\b({YEAR})\s*[-–—−]\s*({YEAR})\b")
+MIN_LIFESPAN = 18
+STUB_DESCRIPTIONS = {"researcher", "scientist", "scholar"}
 
 
 def normalize(text: str) -> str:
@@ -29,8 +35,51 @@ def properties(entity: dict) -> dict:
     return entity.get("properties") or {}
 
 
+def english_description(entity: dict) -> str | None:
+    props = properties(entity)
+    for item in props.get("short_descriptions") or []:
+        if item.get("language") == "en" and item.get("value"):
+            return item["value"]
+    return props.get("short_description")
+
+
+def occupations(entity: dict) -> list[str]:
+    names = [tag.get("name") or "" for tag in entity.get("tags") or [] if tag.get("type") == OCCUPATION_TAG]
+    return list(dict.fromkeys(name.strip() for name in names if name.strip()))
+
+
+def from_occupations(entity: dict) -> str | None:
+    named = occupations(entity)[:2]
+    if not named:
+        return None
+    return " and ".join([named[0], *(name.lower() for name in named[1:])])
+
+
+def person_description(entity: dict) -> str | None:
+    text = english_description(entity)
+    if not text or "orcid" in text.lower() or text.strip().lower() in STUB_DESCRIPTIONS:
+        return from_occupations(entity)
+    plain = LIFESPAN.sub("", BORN_NOTE.sub("", YEAR_NOTE.sub("", text)))
+    return re.sub(r"\s+([,.;])", r"\1", re.sub(r"\s{2,}", " ", plain)).strip(" ,;") or None
+
+
+def birth_year(entity: dict) -> int | None:
+    match = re.match(r"(\d{4})", str(properties(entity).get("date_of_birth") or ""))
+    return int(match.group(1)) if match else None
+
+
+def lifespan_in_description(entity: dict) -> bool:
+    match = LIFESPAN.search(english_description(entity) or "")
+    if not match:
+        return False
+    born, died = int(match.group(1)), int(match.group(2))
+    if (known := birth_year(entity)) is not None:
+        return born == known
+    return died - born >= MIN_LIFESPAN
+
+
 def is_dead(entity: dict) -> bool:
-    return bool(properties(entity).get("date_of_death"))
+    return bool(properties(entity).get("date_of_death")) or lifespan_in_description(entity)
 
 
 def is_minor(entity: dict, today: date) -> bool:

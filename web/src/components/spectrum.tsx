@@ -28,7 +28,8 @@ export function FanAges({ stats }: { stats: Stats }) {
       <SectionHead id="ages" title="Guests' fans by age" small>
         <span>{stats.withAges} guests</span>
         <Info>
-          For each age group, how many guests&apos; fans lean to it. A guest&apos;s fans can lean to more than one.
+          For each age group, how many guests have fans who stand out in it. A guest&apos;s fans can stand out in more
+          than one.
         </Info>
       </SectionHead>
       {stats.withAges === 0 ? (

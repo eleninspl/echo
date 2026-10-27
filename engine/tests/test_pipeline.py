@@ -6,13 +6,13 @@ import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
-from echo_engine import apple, llm
+from echo_engine import apple, llm, wikidata
 from echo_engine.app import create_app
 from echo_engine.llm_client import LlmError, Reply
 from echo_engine.models import Filters
 from echo_engine.qloo_client import QlooClient
 from scripts import warm
-from tests.fake_qloo import SHOW_ID, SHOW_TITLE, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler
+from tests.fake_qloo import SHOW_ID, SHOW_TITLE, THIN_SHOW_ID, WEAK_TOP_SHOW_ID, handler, person_id
 
 
 def fake_client(**kwargs) -> QlooClient:
@@ -81,7 +81,8 @@ def test_full_analysis(engine):
     names = {g["name"] for g in guests}
     assert len(guests) == 20
     assert [g["ref"] for g in guests] == [f"g{i}" for i in range(1, 21)]
-    assert not names & {"Person 00", "Sam Host", "Person 02", "Person 03", "Person 07", "Pat Before"}
+    assert not names & {"Person 00", "Sam Host", "Person 02", "Person 03", "Person 07", "Pat Before", "Person 08"}
+    assert next(g["description"] for g in guests if g["name"] == "Person 11") == "Invented comedian"
     assert sum(1 for g in guests if g["name"] == "Person 04") == 1
     with_facts = next(g for g in guests if g["name"] == "Person 04")
     assert with_facts["bio"] == "Invented person 4. Known for Invented Film."
@@ -107,6 +108,21 @@ def test_full_analysis(engine):
     assert all(g["idea"] is None for g in guests)
     assert analysis["qloo_calls"]
     assert not any("test-key" in str(call) for call in analysis["qloo_calls"])
+
+
+def test_people_wikidata_says_have_died_are_left_out(engine, monkeypatch):
+    asked = []
+
+    async def died(people: list[dict]) -> set[str]:
+        asked.extend(person["entity_id"] for person in people)
+        return {person_id(4), person_id(10)}
+
+    monkeypatch.setattr(wikidata, "died", died)
+    analysis = run(engine)
+    names = {guest["name"] for guest in analysis["guests"]}
+    assert person_id(4) in asked and person_id(0) not in asked
+    assert not names & {"Person 04", "Person 10"}
+    assert len(analysis["guests"]) == 20
 
 
 def test_evidence_differs_per_guest(engine):
