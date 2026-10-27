@@ -15,9 +15,17 @@ const loaded = new Map<string, Details>();
 const SETTLE = 600;
 
 // `idea`: the guest's idea when the chat rewrote it, so the episode is written for it.
-type Props = { id: string; guestRef: string; idea?: Idea; length?: string; ideaTitle?: string; showMap: MapRow[] };
+type Props = {
+  id: string;
+  guestRef: string;
+  idea?: Idea;
+  length?: string;
+  ideaTitle?: string;
+  showMap: MapRow[];
+  onShowMap?: () => void;
+};
 
-export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap }: Props) {
+export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, onShowMap }: Props) {
   const key = `${id}/${guestRef}/${idea ? `${idea.title}/${idea.pitch}` : ""}/${length ?? ""}`;
   const [load, setLoad] = useState<Load>(() => {
     const details = loaded.get(key);
@@ -86,6 +94,17 @@ export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap }:
           <FansVenn showMap={showMap} guestMap={details.audience_map} adds={details.adds} />
         ) : (
           <Waiting>Mapping their audience…</Waiting>
+        )}
+        {onShowMap && (
+          <button type="button" onClick={onShowMap} className="btn self-start">
+            <svg aria-hidden viewBox="0 0 16 16" className="size-4">
+              <g fill="none" stroke="currentColor" strokeWidth="1.4">
+                <circle cx="6" cy="8" r="4.5" />
+                <circle cx="10" cy="8" r="4.5" />
+              </g>
+            </svg>
+            See both on the taste map
+          </button>
         )}
       </Part>
     </>

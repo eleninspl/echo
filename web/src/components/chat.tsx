@@ -14,11 +14,21 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { echo, type Analysis, type Idea, type LeaveOutWhy, type Message } from "@/lib/echo";
+import {
+  echo,
+  type Analysis,
+  type Idea,
+  type LeaveOutWhy,
+  type MapFocus,
+  type Message,
+  type TasteAsk,
+} from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
+import { showTastes, type Ask } from "@/lib/pointer";
 import { useAnalysis } from "@/lib/use-analysis";
 
+import { Picture } from "./guest-list";
 import { SectionHead, SHEET_CLEAR } from "./hud";
 import { Logo } from "./logo";
 
@@ -66,7 +76,8 @@ const SUGGESTIONS: { ask: string; note: string; icon: ReactNode }[] = [
 ];
 
 // A note is shown in the transcript but never sent: Echo's own word on a run it started.
-type Entry = Message & { note?: boolean };
+type Named = { id: string; name: string };
+type Entry = Message & { note?: boolean; guests?: Named[]; map?: MapFocus };
 
 // The conversation per run, so it survives a reload and another page, and goes along to a rerun started from it.
 // Kept short.
@@ -126,6 +137,9 @@ type Props = {
   onRerun: (analysis: Analysis) => void;
   onRewrite: (guestRef: string, idea: Idea) => void;
   onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
+  onPoint?: (focus: MapFocus) => void;
+  onOpenGuest?: (guestRef: string) => void;
+  onAsker?: (ask: ((ask: Ask) => void) | null) => void;
   beside?: boolean;
   slot?: HTMLElement | null;
 };
@@ -138,7 +152,18 @@ const REDUCED = "(prefers-reduced-motion: reduce)";
 // or rewrites one idea (L4). The previous analysis stays on screen until the new one is done. A round
 // button at the bottom right on every page, left of an open guest; the panel opens out of it, and closing it keeps the conversation.
 // Scrolled down to the page's Ask Echo section, the button flies into it and the conversation opens there.
-export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside = false, slot = null }: Props) {
+export function Chat({
+  analysis,
+  exclude,
+  onRerun,
+  onRewrite,
+  onLeaveOut,
+  onPoint,
+  onOpenGuest,
+  onAsker,
+  beside = false,
+  slot = null,
+}: Props) {
   const runId = analysis.id;
   const [history, setHistory] = useState(() => ({ runId, entries: readHistory(runId) }));
   if (history.runId !== runId) setHistory({ runId, entries: readHistory(runId) });
@@ -254,7 +279,20 @@ export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside
     input.current?.focus();
   }
 
-  async function send(message: string) {
+  function pointAt(focus: MapFocus) {
+    onPoint?.(focus);
+    if (!landed) close();
+    showTastes();
+  }
+
+  function openGuest(guest: Named) {
+    const ref = analysis.guests.find((one) => one.id === guest.id)?.ref;
+    if (!ref) return;
+    if (!landed) close();
+    onOpenGuest?.(ref);
+  }
+
+  async function send(message: string, taste?: TasteAsk) {
     const content = message.trim();
     if (!content || pending || noWriter) return;
     const next: Entry[] = [...entries, { role: "user", content }];
@@ -265,8 +303,21 @@ export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside
     setRerunId(null);
     try {
       const history = next.filter((entry) => !entry.note).map(({ role, content }) => ({ role, content }));
-      const reply = await echo.chat(analysis.id, history.slice(-HISTORY), exclude);
-      setEntries((current) => [...current, { role: "assistant", content: reply.reply }]);
+      const reply = await echo.chat(analysis.id, history.slice(-HISTORY), exclude, taste);
+      const guests = (reply.guest_refs ?? []).flatMap((ref) => {
+        const guest = analysis.guests.find((one) => one.ref === ref);
+        return guest ? [{ id: guest.id, name: guest.name }] : [];
+      });
+      setEntries((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: reply.reply,
+          ...(guests.length ? { guests } : {}),
+          ...(reply.map ? { map: reply.map } : {}),
+        },
+      ]);
+      if (reply.map) onPoint?.(reply.map);
       if (reply.action === "rerun" && reply.analysis_id && reply.analysis_id !== analysis.id)
         setRerunId(reply.analysis_id);
       if (reply.action === "leave_out" && reply.guest_ref) onLeaveOut(reply.guest_ref, reply.why ?? "not_for_us");
@@ -285,6 +336,18 @@ export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside
     }
     setPending(false);
   }
+
+  useEffect(() => {
+    if (!onAsker) return;
+    onAsker((ask) => {
+      if (!landed) {
+        setSeen(entries.length);
+        setOpen(true);
+      }
+      send(ask.text, ask.taste);
+    });
+    return () => onAsker(null);
+  });
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -362,7 +425,49 @@ export function Chat({ analysis, exclude, onRerun, onRewrite, onLeaveOut, beside
           </li>
         )}
         {entries.map((entry, index) => (
-          <Line key={index} who={entry.role === "user" ? "You" : "Echo"}>
+          <Line
+            key={index}
+            who={entry.role === "user" ? "You" : "Echo"}
+            after={
+              (entry.guests?.length || entry.map) && (
+                <span className="flex flex-wrap gap-1.5 px-1">
+                  {entry.guests?.map((guest) => {
+                    const here = analysis.guests.find((one) => one.id === guest.id);
+                    return (
+                      <button
+                        key={guest.id}
+                        type="button"
+                        disabled={!here}
+                        onClick={() => openGuest(guest)}
+                        title={here ? `Open ${guest.name}` : `${guest.name} isn't in this run`}
+                        className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-deck-hi py-1 pr-3 pl-1 text-xs font-semibold text-ink transition-colors enabled:hover:bg-steel disabled:opacity-50"
+                      >
+                        <span className="relative size-6 shrink-0 overflow-hidden rounded-full bg-well">
+                          {here && <Picture guest={here} sizes="24px" small />}
+                        </span>
+                        {guest.name}
+                      </button>
+                    );
+                  })}
+                  {entry.map && (
+                    <button
+                      type="button"
+                      onClick={() => entry.map && pointAt(entry.map)}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold text-ink transition-colors hover:bg-brand/25"
+                    >
+                      <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
+                        <g fill="none" stroke="currentColor" strokeWidth="1.4">
+                          <circle cx="8" cy="8" r="2" />
+                          <circle cx="8" cy="8" r="5.5" />
+                        </g>
+                      </svg>
+                      See it on the taste map
+                    </button>
+                  )}
+                </span>
+              )
+            }
+          >
             {entry.content}
           </Line>
         ))}
@@ -561,7 +666,7 @@ function lowerFirst(phrase: string): string {
   return phrase.charAt(0).toLowerCase() + phrase.slice(1);
 }
 
-function Line({ who, children }: { who: string; children: ReactNode }) {
+function Line({ who, children, after }: { who: string; children: ReactNode; after?: ReactNode }) {
   const you = who === "You";
   return (
     <li className={`flex max-w-[85%] flex-col gap-1 ${you ? "self-end items-end" : "self-start"}`}>
@@ -571,6 +676,7 @@ function Line({ who, children }: { who: string; children: ReactNode }) {
       >
         {children}
       </p>
+      {after}
     </li>
   );
 }

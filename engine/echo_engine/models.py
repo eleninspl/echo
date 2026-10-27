@@ -61,6 +61,7 @@ class MapItem(BaseModel):
     name: str
     image_url: str | None = None
     affinity: float
+    id: str | None = None
 
 
 class MapRow(BaseModel):
@@ -175,6 +176,51 @@ class GuestMaps(BaseModel):
     adds: list[MapRow]
 
 
+class BridgeCount(BaseModel):
+    both: int
+    yours: int
+    theirs: int
+
+
+class GuestBridge(BaseModel):
+    ref: str
+    both: list[MapRow]
+    yours: list[MapRow]
+    theirs: list[MapRow]
+    totals: dict[str, BridgeCount] = {}
+
+
+class MapLens(BaseModel):
+    age: AgeBucket | None = None
+    country: str | None = None
+    audience_map: list[MapRow]
+
+
+class TasteFan(BaseModel):
+    ref: str
+    affinity: float
+
+
+class TasteFans(BaseModel):
+    category: str
+    name: str
+    guests: list[TasteFan]
+
+
+class TasteAsk(BaseModel):
+    category: str = Field(min_length=1, max_length=20)
+    name: str = Field(min_length=1, max_length=300)
+    age: AgeBucket | None = None
+    country: str | None = Field(default=None, min_length=2, max_length=60)
+
+
+class MapFocus(BaseModel):
+    category: str | None = None
+    tastes: list[str] = []
+    age: AgeBucket | None = None
+    country: str | None = Field(default=None, min_length=2, max_length=60)
+
+
 class Segment(BaseModel):
     title: str
     points: list[str]
@@ -208,6 +254,7 @@ class ChatRequest(BaseModel):
     exclude: list[Annotated[str, Field(min_length=1, max_length=64)]] | None = Field(
         default=None, max_length=EXCLUDE_LENGTH
     )
+    taste: TasteAsk | None = None
 
 
 class ChatDecision(BaseModel):
@@ -217,6 +264,8 @@ class ChatDecision(BaseModel):
     guest_ref: str | None = None
     idea: Idea | None = None
     why: LeaveOutWhy | None = None
+    map: MapFocus | None = None
+    guest_refs: list[str] = []
 
 
 class ChatReply(BaseModel):
@@ -226,6 +275,8 @@ class ChatReply(BaseModel):
     guest_ref: str | None = None
     idea: Idea | None = None
     why: LeaveOutWhy | None = None
+    map: MapFocus | None = None
+    guest_refs: list[str] = []
 
 
 class DraftText(BaseModel):

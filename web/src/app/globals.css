@@ -306,6 +306,17 @@ a {
     animation-delay: calc(var(--order, 0) * 30ms);
   }
 
+  @keyframes taste-pop {
+    from {
+      opacity: 0;
+      scale: 0.3;
+    }
+  }
+
+  .taste-pop {
+    animation: taste-pop 700ms var(--ease-out) backwards;
+  }
+
   @keyframes spin {
     to {
       transform: rotate(360deg);

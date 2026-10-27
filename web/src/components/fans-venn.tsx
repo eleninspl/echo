@@ -6,7 +6,7 @@ import type { MapItem, MapRow } from "@/lib/echo";
 import { category } from "@/lib/format";
 
 import { categoryHue } from "./hud";
-import { TasteImage } from "./taste-map";
+import { TasteImage } from "./taste-side";
 
 type Side = "yours" | "both" | "theirs";
 type Spot = { key: string; item: MapItem; category: string; side: Side; x: number; y: number; r: number };

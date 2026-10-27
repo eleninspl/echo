@@ -18,12 +18,13 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { Analysis, Idea, LeaveOutWhy, Step } from "@/lib/echo";
+import type { Analysis, Idea, LeaveOutWhy, MapFocus, Step } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
 import { LEFT_OUT_LIMIT, useLeftOut, WHY_NAMES, type LeftOutGuest } from "@/lib/left-out";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
+import type { Ask, Pointer } from "@/lib/pointer";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
@@ -61,6 +62,11 @@ type OpenAnalysis = {
   leftOut: LeftOutGuest[];
   onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
   onBringBack: (id: string) => void;
+  pointer: Pointer | null;
+  onClearPointer: () => void;
+  bridged: string | null;
+  onBridge: (guestId: string | null) => void;
+  onAsk: (ask: Ask) => void;
 };
 
 export type Rewrite = { id: string; ref: string; idea: Idea };
@@ -95,6 +101,20 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
   const missing = analysis?.status === "done" ? saved.filter(({ id }) => !guests.some((guest) => guest.id === id)) : [];
   const [rewritten, setRewritten] = useState<Rewrite | null>(null);
   const [askSlot, setAskSlot] = useState<HTMLElement | null>(null);
+  const [pointer, setPointer] = useState<Pointer | null>(null);
+  const [bridged, setBridged] = useState<string | null>(null);
+  const pointed = useRef(0);
+  const asker = useRef<((ask: Ask) => void) | null>(null);
+  const onPoint = useCallback((focus: MapFocus) => {
+    pointed.current += 1;
+    setBridged(null);
+    setPointer({ ...focus, key: pointed.current });
+  }, []);
+  const onClearPointer = useCallback(() => setPointer(null), []);
+  const onAsker = useCallback((ask: ((ask: Ask) => void) | null) => {
+    asker.current = ask;
+  }, []);
+  const onAsk = useCallback((ask: Ask) => asker.current?.(ask), []);
   const openedHere = useRef(false);
   const openGuest = openId === id ? guestRef : null;
 
@@ -275,6 +295,11 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         leftOut,
         onLeaveOut,
         onBringBack,
+        pointer,
+        onClearPointer,
+        bridged,
+        onBridge: setBridged,
+        onAsk,
       }}
     >
       {children}
@@ -284,6 +309,9 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         onRerun={showRun}
         onRewrite={rewrite}
         onLeaveOut={onLeaveOut}
+        onPoint={onPoint}
+        onOpenGuest={onOpen}
+        onAsker={onAsker}
         beside={openGuest !== null}
         slot={askSlot}
       />
@@ -307,6 +335,11 @@ export function Console() {
     leftOut,
     onLeaveOut,
     onBringBack,
+    pointer,
+    onClearPointer,
+    bridged,
+    onBridge,
+    onAsk,
   } = useOpenAnalysis();
   const { guests } = analysis;
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -413,7 +446,17 @@ export function Console() {
           className="grid grid-cols-1 gap-x-12 gap-y-14 border-t border-steel pt-14 @3xl:grid-cols-2"
         >
           <div className="@3xl:col-span-2">
-            <TasteMap key={`tastes-${analysis.id}`} analysis={analysis} rerun={rerun} />
+            <TasteMap
+              key={`tastes-${analysis.id}`}
+              analysis={analysis}
+              rerun={rerun}
+              pointer={pointer}
+              onClearPointer={onClearPointer}
+              bridged={bridged}
+              onBridge={onBridge}
+              onAsk={onAsk}
+              onOpen={onOpen}
+            />
           </div>
           {figures.withAges > 0 && <FanAges stats={figures} />}
           <LeftOut analysis={analysis} leftOut={leftOut} onBringBack={onBringBack} />
@@ -430,6 +473,7 @@ export function Console() {
         onOpen={onOpen}
         onClose={onClose}
         onLeaveOut={onLeaveOut}
+        onBridge={onBridge}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>

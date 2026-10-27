@@ -18,14 +18,17 @@ from .models import (
     Guest,
     GuestMaps,
     Idea,
+    MapFocus,
     MapRow,
     Message,
     Person,
     Show,
+    TasteFans,
 )
 
 IDEA_GUESTS = 10
 TASTES_PER_CATEGORY = 6
+TASTE_FANS_NAMED = 5
 
 RULES = """You write for Echo, a tool that helps a podcast host find guests their audience will love.
 Rules for everything you write:
@@ -117,9 +120,21 @@ burnout), up to {THEME_LENGTH} characters, or null: use it for any subject that 
 is the first guest listed with one) and the new idea in the same shape as every idea, keeping what the host didn't \
 ask to change:
 {indent(IDEA_SHAPE, "  ")}
-- none: just answer, for questions about the guests or how Echo works.
+- none: just answer, for questions about the guests, what the listeners like, or how Echo works.
 reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null, \
 and never say you can't leave a guest out.
+map: point the taste map on the page at what the reply is about, or null. category is the one asked about or null. \
+tastes are names from what_your_listeners_love that the reply mentions, written exactly as there, or empty. age and \
+country show the map for listeners of one age group or one country when the host asks about them ("what do younger \
+listeners watch?"), else null. When you set age or country you don't know that group's tastes: say only that the map \
+now shows them and leave tastes empty. A sentence naming what they lean to is added after your reply, so don't write \
+one or mention it. A question about what the listeners like \
+is action none with a map: rerun is only for different guests.
+guest_refs: the refs of the guests the reply names, in the order named, or empty.
+When the host asks about one taste (the_host_asks_about_this_taste), answer in up to three sentences: whose fans \
+tend to like it too, from guests_whose_fans_like_it_most, strongest first, and an episode built on it with one of \
+them. If none are given, say Echo can't tell whose fans like it and still suggest an episode. Point the map at that \
+taste and set guest_refs.
 {SCORES}"""
 
 DRAFTS_TASK = """Write an invitation email from the host to each guest below, one per ref.
@@ -322,10 +337,58 @@ async def write_episode(analysis: Analysis, guest: Guest, maps: GuestMaps, lengt
     return episode
 
 
-async def chat(analysis: Analysis, messages: list[Message], exclude: Collection[str] = ()) -> ChatDecision:
+def map_names(analysis: Analysis) -> dict[str, str]:
+    return {item.name: row.category for row in analysis.audience_map for item in row.items}
+
+
+def taste_facts(guests: list[Guest], taste: TasteFans) -> dict[str, Any]:
+    names = {guest.ref: guest.name for guest in guests}
+    return {
+        "name": taste.name,
+        "category": taste.category,
+        "guests_whose_fans_like_it_most": [
+            {"ref": fan.ref, "name": names[fan.ref]} for fan in taste.guests[:TASTE_FANS_NAMED] if fan.ref in names
+        ],
+    }
+
+
+def pointed(analysis: Analysis, focus: MapFocus | None, taste: TasteFans | None) -> MapFocus | None:
+    names = map_names(analysis)
+    if focus is None:
+        return MapFocus(category=taste.category, tastes=[taste.name]) if taste else None
+    tastes = [name for name in dict.fromkeys(focus.tastes) if name in names]
+    if taste and taste.name not in tastes:
+        tastes.insert(0, taste.name)
+    category = focus.category if focus.category in set(names.values()) else None
+    if not (category or tastes or focus.age or focus.country):
+        return None
+    return MapFocus(category=category, tastes=tastes, age=focus.age, country=focus.country)
+
+
+def lens_leaders(rows: list[MapRow], category: str | None, most: int = 3) -> list[str]:
+    if category:
+        return [item.name for row in rows if row.category == category for item in row.items[:most]]
+    return [row.items[0].name for row in rows if row.items][:most]
+
+
+def lens_line(focus: MapFocus, names: list[str]) -> str:
+    who = "Listeners"
+    if focus.age:
+        who += f" {focus.age.replace('_', ' ')}"
+    if focus.country:
+        who += f" in {focus.country}"
+    listed = names[0] if len(names) < 2 else f"{', '.join(names[:-1])} and {names[-1]}"
+    return f"{who} lean most to {listed}."
+
+
+async def chat(
+    analysis: Analysis, messages: list[Message], exclude: Collection[str] = (), taste: TasteFans | None = None
+) -> ChatDecision:
     guests = [guest for guest in analysis.guests if guest.id not in exclude]
     refs = [guest.ref for guest in guests]
     with_ideas = {guest.ref for guest in guests if guest.idea is not None}
+    names = list(map_names(analysis))
+    categories = list(dict.fromkeys(map_names(analysis).values()))
     facts = {
         **show_facts(analysis),
         "current_filters": analysis.filters.model_dump(exclude={"episode_about": {"used"}, "exclude": True}),
@@ -333,6 +396,8 @@ async def chat(analysis: Analysis, messages: list[Message], exclude: Collection[
         "guests": [{**guest_facts(guest), "idea_title": guest.idea.title if guest.idea else None} for guest in guests],
         "conversation": [message.model_dump() for message in messages],
     }
+    if taste is not None:
+        facts["the_host_asks_about_this_taste"] = taste_facts(guests, taste)
     schema = obj(
         reply=TEXT,
         action=one_of(["rerun", "rewrite", "leave_out", "none"]),
@@ -340,10 +405,21 @@ async def chat(analysis: Analysis, messages: list[Message], exclude: Collection[
         guest_ref=nullable(one_of(refs)),
         idea=nullable(IDEA),
         why=nullable(one_of(LEAVE_OUT_WHY)),
+        map=nullable(
+            obj(
+                category=nullable(one_of(categories) if categories else TEXT),
+                tastes=array(one_of(names) if names else TEXT),
+                age=nullable(one_of(AGES)),
+                country=nullable(TEXT),
+            )
+        ),
+        guest_refs=array(one_of(refs) if refs else TEXT),
     )
     data = await ask(RULES, CHAT_TASK, facts, schema, "chat_decision")
     if isinstance(theme := (data.get("filters") or {}).get("theme"), str):
         data["filters"]["theme"] = theme[:THEME_LENGTH]
+    if isinstance(focus := data.get("map"), dict) and isinstance(country := focus.get("country"), str):
+        focus["country"] = country.strip()[:60] if len(country.strip()) >= 2 else None
     decision = checked(ChatDecision, data)
     if decision.action == "rerun" and decision.filters is None:
         decision.action = "none"
@@ -353,6 +429,8 @@ async def chat(analysis: Analysis, messages: list[Message], exclude: Collection[
         if decision.guest_ref not in refs:
             decision.action = "none"
         decision.why = decision.why or "not_for_us"
+    decision.map = pointed(analysis, decision.map, taste)
+    decision.guest_refs = [ref for ref in dict.fromkeys(decision.guest_refs) if ref in refs]
     return decision
 
 

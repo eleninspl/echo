@@ -120,6 +120,8 @@ def insights(params: dict[str, str]) -> httpx.Response:
         return httpx.Response(200, json={"results": {"tags": tags_for(signal, params["filter.tag.types"])}})
     if lens:
         ids = lens.split(",")
+        if signal.startswith("urn:entity:book"):
+            return httpx.Response(200, json={"results": {"entities": [{"entity_id": e, "name": e} for e in ids]}})
         if kind == "urn:entity:podcast" and signal.startswith("aaaaaaaa"):
             query = {} if signal.endswith("9") else {"affinity": score(signal, "love")}
             return httpx.Response(
@@ -145,8 +147,16 @@ def insights(params: dict[str, str]) -> httpx.Response:
         if i % 2 == 0:
             podcasts.insert(3, {"entity_id": SHOW_ID, "name": SHOW_TITLE, "query": {"affinity": score(signal, "love")}})
         return httpx.Response(200, json={"results": {"entities": podcasts[:50]}})
+    offset = int(signal[-2:]) % 7 if signal.startswith("aaaaaaaa") else 0
+    if params.get("signal.demographics.age") or params.get("signal.location.query"):
+        offset += 3
     items = [
-        {"entity_id": f"{kind}-{signal[:4]}-{i}", "name": f"{kind} {i}", "query": {"affinity": 0.9}} for i in range(20)
+        {
+            "entity_id": f"{kind}-{signal[:4]}-{i}",
+            "name": f"{kind} {i}",
+            "query": {"affinity": round(0.95 - i * 0.01, 3)},
+        }
+        for i in range(offset, offset + 20)
     ]
     return httpx.Response(200, json={"results": {"entities": items}})
 
