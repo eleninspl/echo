@@ -121,6 +121,22 @@ def test_same_request_is_reused(engine):
     assert first == second
 
 
+def test_an_analysis_without_ideas_is_run_again_once_the_llm_is_ready(engine, monkeypatch):
+    first = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
+    monkeypatch.setattr(llm, "ready", lambda: True)
+    second = engine.post("/analyses", json={"show_id": SHOW_ID}).json()["id"]
+    assert first != second
+
+
+def test_an_analysis_made_before_bios_is_run_again(engine):
+    first = run(engine)
+    saved = asyncio.run(state(engine).analyses.get(first["id"]))
+    for guest in saved.guests:
+        guest.bio = None
+    asyncio.run(state(engine).analyses.put(saved))
+    assert run(engine)["id"] != first["id"]
+
+
 def test_filters_change_the_lists_and_use_a_fit_lens(engine):
     analysis = run(engine, fame="less_famous", age="25_to_29", country="Greece")
     assert analysis["status"] == "done", analysis["error"]

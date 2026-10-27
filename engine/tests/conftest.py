@@ -11,4 +11,5 @@ def unset() -> llm.LlmClient:
 def no_real_llm():
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(llm, "client", unset)
+        patch.setattr(llm, "ready", lambda: False)
         yield

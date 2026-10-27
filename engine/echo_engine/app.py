@@ -160,14 +160,15 @@ class Engine:
         self, show_id: str, filters: Filters, tasks: BackgroundTasks | None = None, reuse: bool = True
     ) -> Analysis:
         """Runs in `tasks` when given, else before returning. With `reuse`, the same show and filters return the
-        earlier running or finished analysis."""
+        earlier running or finished analysis, unless it was made before bios, or without ideas the engine can write
+        now."""
         reuse = reuse and not self.mock
-        if reuse and (existing := await self.analyses.find(request_key(show_id, filters))):
+        if reuse and (existing := await self.earlier(show_id, filters)):
             return existing
         await self.check_cap()
         show = await self.show(show_id)
         self.mock_fails(show.id, "start")
-        if reuse and (existing := await self.analyses.find(request_key(show.id, filters))):
+        if reuse and (existing := await self.earlier(show.id, filters)):
             return existing
         analysis = Analysis(
             id=f"an_{uuid4().hex[:12]}",
@@ -183,6 +184,10 @@ class Engine:
         else:
             tasks.add_task(runner, analysis)
         return analysis
+
+    async def earlier(self, show_id: str, filters: Filters) -> Analysis | None:
+        existing = await self.analyses.find(request_key(show_id, filters))
+        return existing if existing is not None and up_to_date(existing) else None
 
     async def run(self, analysis: Analysis) -> None:
         try:
@@ -235,6 +240,14 @@ class Engine:
             return GuestMaps.model_validate(self.example["guest_details"])
         async with self.client() as client:
             return await pipeline.guest_maps(client, analysis, guest)
+
+
+def up_to_date(analysis: Analysis) -> bool:
+    if analysis.status != "done":
+        return True
+    has_bios = any(guest.bio for guest in analysis.guests)
+    has_ideas = any(guest.idea for guest in analysis.guests)
+    return has_bios and (has_ideas or not llm.ready())
 
 
 def fail(analysis: Analysis, code: str, message: str) -> None:
