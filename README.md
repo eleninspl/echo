@@ -86,6 +86,26 @@ cd ../web && cp .env.example .env.local && npm install && npm run dev   # http:/
 
 Drop `ECHO_MOCK=1` to run against Qloo and the LLM. Locally the engine keeps everything in `.cache/`; it uses Postgres and Redis only when their variables are set. Without an LLM key the writing steps say they aren't set up. The LLM backends are in [docs/plan.md](docs/plan.md#the-llm), deploying in [docs/plan.md](docs/plan.md#deploying-the-engine).
 
+## Echo in OpenClaw
+
+`openclaw/` is a ready workspace for an Echo agent in [OpenClaw](https://docs.openclaw.ai): its instructions (`AGENTS.md`, `SOUL.md`, `IDENTITY.md`) and the `echo` skill, a Node script with no dependencies that calls the engine's API. In whatever chat OpenClaw is connected to, the agent finds the show, ranks its guests, and writes episode plans, invitation drafts and briefings. It sends nothing unless you tell it to send a draft to an address you give it.
+
+```bash
+cp -R openclaw ~/.openclaw/workspace-echo
+openclaw agents add echo --workspace ~/.openclaw/workspace-echo --non-interactive
+openclaw agents bind --agent echo --bind telegram   # or slack, discord, whatsapp
+openclaw chat --session agent:echo:main             # or try it in the terminal
+```
+
+Then message it: "I host <your show>. Who should I book next?" It uses the public engine. To use another one, set the skill's environment:
+
+```bash
+openclaw config set skills.entries.echo.env.ECHO_ENGINE_URL http://localhost:8000
+openclaw config set skills.entries.echo.env.ECHO_WEB_URL http://localhost:3000
+```
+
+The skill needs Node 18 or later (OpenClaw 2026.10.6 and later need Node 24.22.1 or 26.12.1); `npm run test:skill` runs its tests.
+
 ## Layout
 
 ```
@@ -93,6 +113,7 @@ brand/    logo
 docs/     plan.md (v1 and the API), qloo.md (Qloo calls and scoring), echo.md (pitch and rules)
 engine/   Python engine (FastAPI)
 web/      Next.js web app
+openclaw/ an Echo agent for OpenClaw, with the echo skill
 scripts/  repo helpers and TypeScript probes of the Qloo API
 src/      TypeScript Qloo client used by the probes
 ```
