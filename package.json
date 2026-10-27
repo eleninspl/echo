@@ -5,7 +5,8 @@
   "scripts": {
     "probe": "node --env-file=.env --import tsx scripts/probe.ts",
     "typecheck": "tsc --noEmit",
-    "map-api": "node --env-file=.env --import tsx scripts/map-api.ts"
+    "map-api": "node --env-file=.env --import tsx scripts/map-api.ts",
+    "test:skill": "node --test openclaw/skills/echo/echo.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

@@ -20,7 +20,9 @@ Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both
 
 3 or 4 featured shows, precomputed, open instantly from the landing page.
 
-**Not in v1:** shows Qloo doesn't have, pasting Apple, Spotify or RSS links, the Telegram/OpenClaw bot, logins, sessions, SSE, sending or approving, checking a named guest, grow toward interests, cities or another show, topic tags, the plain-AI comparison (make it offline for the pitch if there's time), an after-episode summary.
+**OpenClaw** (To agree 1): `openclaw/` is the workspace of an Echo agent for a host's own OpenClaw: `AGENTS.md`, `SOUL.md`, `IDENTITY.md` and the `echo` skill (`openclaw/skills/echo/`), a Node script with no dependencies that calls the API below (`find`, `analyze`, `results`, `guest`, `ask`, `invite`, `revise`, `brief`) and prints plain text for the agent. It keeps the ideas the chat rewrites and the last draft per guest in a temp folder, and sends them back like the web app does. It drafts in whatever chat OpenClaw is connected to, and sends a draft only when the host says to, through a tool the host has set up. Leonidas.
+
+**Not in v1:** shows Qloo doesn't have, pasting Apple, Spotify or RSS links, a hosted OpenClaw bot, logins, sessions, SSE, sending or approving in the web app, checking a named guest, grow toward interests, cities or another show, topic tags, the plain-AI comparison (make it offline for the pitch if there's time), an after-episode summary.
 
 ## Engine tasks
 
@@ -161,7 +163,7 @@ W1 to W5 took about 2.25 days and are built on mock mode; W6 to W13 are about 3.
 
 ## To agree
 
-1. **The bot.** The pitch says Echo works through OpenClaw; v1's agent is the chat. Change the pitch line, or add the bot after the freeze if both halves finish early.
+1. **The bot.** Leonidas's pick on 26 Oct, Eleni to confirm: no hosted bot. Echo ships as an OpenClaw agent and skill (`openclaw/`, under v1) that a host adds to their own OpenClaw, and the demo video shows it, so the pitch line stays. The judges' live demo is the web app. Like the web app, the agent gets ideas, drafts and briefings from the public engine only once the OpenRouter key is in.
 2. **The LLM in production.** Leonidas built L1 to L6 (25 Oct). Until the demo each of us runs them locally on our own Claude subscription. Before it: fund OpenRouter, `vercel env add OPENROUTER_API_KEY production` on `echo-qloo`, redeploy. The featured shows already have ideas, written by Claude locally through `warm.py` (26 Oct). Compare models on OpenRouter if there's time (The LLM, below).
 3. **Featured shows.** Done 26 Oct (#39): comedy, music, sports and a business interview show, 3 or 4 sweet spots each, warmed to production. Titles are in `ECHO_FEATURED`, never the repo. Music is the weakest: its guests are mostly radio interviewers, not musicians.
 4. **Politicians among the guests.** Candidate lists include politicians and political commentators (on 4 of the 13 shortlisted shows). Echo doesn't drop them. A guest suggestion that's a politician is a risk in front of the judges; dropping them would be a screen on the description and occupation tags, in clean-up.

@@ -8,7 +8,7 @@
 >
 > Stop echoing in the same room. Find the guest, and the story, that carries your voice somewhere new.
 
-v1 has no OpenClaw bot: the chat in the web app is the agent. Whether the pitch line changes or the bot comes back after the freeze is open in [plan.md](plan.md).
+Echo's agent runs in two places: Ask Echo, the chat in the web app, and an Echo agent a host adds to their own OpenClaw (`openclaw/`), which works in whatever chat OpenClaw is connected to. There's no hosted bot: judges try the web app, and the demo video shows OpenClaw. Leonidas's pick on 26 Oct, Eleni to confirm ([plan.md](plan.md#to-agree), point 1).
 
 ## The problem
 
