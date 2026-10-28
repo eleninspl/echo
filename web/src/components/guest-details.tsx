@@ -120,7 +120,7 @@ function Waiting({ children }: { children: ReactNode }) {
   );
 }
 
-function EpisodePlan({ episode, ideaTitle }: { episode: Episode; ideaTitle?: string }) {
+export function EpisodePlan({ episode, ideaTitle }: { episode: Episode; ideaTitle?: string }) {
   const timed = episode.segments.some((segment) => segment.minutes);
   return (
     <div className="flex flex-col gap-6">

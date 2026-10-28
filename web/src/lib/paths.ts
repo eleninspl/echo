@@ -14,3 +14,6 @@ export function readPath(pathname: string): { id: string; guestRef: string | nul
     inviting: section === "invite",
   };
 }
+
+export const yourGuestsPath = (showId?: string, guestId?: string) =>
+  showId && guestId ? `/guests?${new URLSearchParams({ show: showId, guest: guestId }).toString()}` : "/guests";

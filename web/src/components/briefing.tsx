@@ -26,14 +26,18 @@ export function Briefing({
   guestName,
   idea,
   length,
+  saved,
+  onWritten,
 }: {
   id: string;
   guestRef: string;
   guestName: string;
   idea?: Idea;
   length?: string;
+  saved?: string;
+  onWritten?: (markdown: string) => void;
 }) {
-  const [load, setLoad] = useState<Load>({ state: "idle" });
+  const [load, setLoad] = useState<Load>(saved ? { state: "done", markdown: saved } : { state: "idle" });
   const [printing, setPrinting] = useState(false);
 
   // Printing copies the briefing to the end of body, where the print styles show it alone (globals.css).
@@ -50,6 +54,7 @@ export function Briefing({
     try {
       const { markdown } = await echo.briefing(id, guestRef, idea, length);
       setLoad({ state: "done", markdown });
+      onWritten?.(markdown);
     } catch (error) {
       setLoad({ state: "failed", problem: writingProblem(error, "briefings") });
     }
