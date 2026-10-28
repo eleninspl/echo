@@ -219,9 +219,13 @@ class Engine:
         await self.analyses.put(analysis)
 
     async def run_mock(self, analysis: Analysis) -> None:
-        """The example's analysis, or the failure or delay a failing example show stands for."""
+        """The example's analysis, filled in step by step like a real run, or the failure or delay a failing example
+        show stands for."""
         failure = self.failures.get(analysis.show.id, {})
         delay = failure["seconds"] / len(analysis.steps) if "seconds" in failure else self.step_delay
+        example = Analysis.model_validate(self.example["analysis"])
+        guests = mocked.guests_for(example.guests, analysis.filters)
+        enough = len(guests) >= mocked.MIN_GUESTS
         for step in analysis.steps:
             if step.key == failure.get("at"):
                 fail(analysis, failure["error"], failure["message"])
@@ -229,9 +233,14 @@ class Engine:
                 return
             await asyncio.sleep(delay)
             step.done = True
-        example = Analysis.model_validate(self.example["analysis"])
-        guests = mocked.guests_for(example.guests, analysis.filters)
-        if len(guests) < mocked.MIN_GUESTS:
+            if step.key == "map":
+                analysis.audience_map = example.audience_map
+            elif step.key == "clean":
+                analysis.left_out = example.left_out
+            elif step.key in ("score", "evidence") and enough:
+                unwritten = {"idea": None} if step.key == "evidence" else {"idea": None, "evidence": None}
+                analysis.guests = [guest.model_copy(update=unwritten) for guest in guests]
+        if not enough:
             fail(analysis, "filters_too_narrow", "No guests match those filters. Try a broader one.")
             await self.analyses.put(analysis)
             return

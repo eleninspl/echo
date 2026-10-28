@@ -1,28 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
-import { THEME_LENGTH, type AgeBucket, type Analysis, type AnchorType, type Fame, type Filters } from "@/lib/echo";
-import { AGES, filterPhrases, LABELS } from "@/lib/format";
+import type { Analysis, Filters } from "@/lib/echo";
+import { filterPhrases, LABELS } from "@/lib/format";
 import type { Pick } from "@/lib/picks";
-import { AGE_ORDER, LABEL_ORDER, type Stats } from "@/lib/stats";
-import type { Rerun } from "@/lib/use-analysis";
+import { LABEL_ORDER, type Stats } from "@/lib/stats";
 
-import { Chip, LABEL_HUE, RerunStatus } from "./hud";
+import { Chip, LABEL_HUE } from "./hud";
 
 // The show Echo has locked onto, with the filters it ran under. Used alone while a run goes, and as the
-// left of the header once it's done.
-// `filters` takes the place of the plain filter chips, for the finished run's controls.
-export function ShowLock({
-  analysis,
-  filters: controls,
-  children,
-}: {
-  analysis: Analysis;
-  filters?: ReactNode;
-  children?: ReactNode;
-}) {
+// left of the header once it's done. Filters change only through Ask Echo.
+export function ShowLock({ analysis, children }: { analysis: Analysis; children?: ReactNode }) {
   const { show, filters } = analysis;
   const phrases = filterPhrases(filters);
   const unused = filters.episode_about && filters.episode_about.used === null && analysis.status === "done";
@@ -42,16 +32,15 @@ export function ShowLock({
           {show.title}
         </h1>
         {show.description && <p className="line-clamp-2 max-w-[60ch] text-ink-soft">{show.description}</p>}
-        {controls ??
-          (phrases.length > 0 && (
-            <ul aria-label="Filters" className="flex flex-wrap gap-1.5">
-              {phrases.map((phrase) => (
-                <li key={phrase}>
-                  <Chip color="var(--accent)">{phrase}</Chip>
-                </li>
-              ))}
-            </ul>
-          ))}
+        {phrases.length > 0 && (
+          <ul aria-label="Filters" className="flex flex-wrap gap-1.5">
+            {phrases.map((phrase) => (
+              <li key={phrase}>
+                <Chip color="var(--accent)">{phrase}</Chip>
+              </li>
+            ))}
+          </ul>
+        )}
         {unused && (
           <p className="text-sm text-ink-soft">
             Echo couldn&apos;t use &ldquo;{filters.episode_about?.query}&rdquo;, so these guests don&apos;t account for
@@ -73,18 +62,15 @@ function Cover({ children }: { children: ReactNode }) {
   );
 }
 
-// The finished run at a glance: the show, its filters to change, how many guests are a sweet spot, and what
-// that means.
+// The finished run at a glance: the show, its filters, how many guests are a sweet spot, and what that means.
 export function LockHeader({
   analysis,
   stats,
-  rerun,
   missing,
   onForget,
 }: {
   analysis: Analysis;
   stats: Stats;
-  rerun: Rerun;
   missing: Pick[];
   onForget: () => void;
 }) {
@@ -93,10 +79,9 @@ export function LockHeader({
       aria-label="This analysis"
       className="grid gap-x-16 gap-y-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(18rem,26rem)] @4xl:items-center"
     >
-      <ShowLock
-        analysis={analysis}
-        filters={<FilterControls filters={analysis.filters} rerun={rerun} missing={missing} onForget={onForget} />}
-      />
+      <ShowLock analysis={analysis}>
+        <MissingPicks missing={missing} onForget={onForget} />
+      </ShowLock>
       <div className="flex flex-col gap-3">
         <p className="flex items-end gap-3">
           <span
@@ -155,324 +140,21 @@ export function requestFilters(filters: Filters): Filters {
   return { ...filters, episode_about: about && { query: about.query, type: about.type } };
 }
 
-const FAME_CHOICES: { value: Fame; name: string }[] = [
-  { value: "any", name: "Any" },
-  { value: "less_famous", name: "Less famous" },
-  { value: "rising", name: "Rising" },
-];
-
-const ABOUT_CHOICES: { value: AnchorType; name: string; placeholder: string }[] = [
-  { value: "movie", name: "Film", placeholder: "A film's title" },
-  { value: "tv_show", name: "TV show", placeholder: "A TV show's title" },
-  { value: "artist", name: "Artist", placeholder: "An artist's name" },
-  { value: "brand", name: "Brand", placeholder: "A brand's name" },
-];
-
-const ABOUT_LENGTH = 100;
-
-function squash(text: string): string | null {
-  return text.split(/\s+/).filter(Boolean).join(" ") || null;
-}
-
-// Suggestions for the country field; the engine takes any place name it can find.
-const COUNTRIES = [
-  "United States",
-  "United Kingdom",
-  "Canada",
-  "Australia",
-  "Ireland",
-  "Germany",
-  "France",
-  "Spain",
-  "Italy",
-  "Netherlands",
-  "Sweden",
-  "Greece",
-  "Brazil",
-  "Mexico",
-  "India",
-  "Japan",
-];
-
-type Active = { key: string; phrase: string; without: Filters };
-
-// Each filter that differs from the defaults, with the request that clears it.
-function activeFilters(filters: Filters): Active[] {
-  const base = requestFilters(filters);
-  const phrase = (part: Partial<Filters>) => filterPhrases({ ...EMPTY, ...part });
-  const active: Active[] = [];
-  if (base.fame !== "any")
-    active.push({ key: "fame", phrase: phrase({ fame: base.fame })[0], without: { ...base, fame: "any" } });
-  if (base.age) active.push({ key: "age", phrase: phrase({ age: base.age })[0], without: { ...base, age: null } });
-  if (base.country)
-    active.push({ key: "country", phrase: phrase({ country: base.country })[0], without: { ...base, country: null } });
-  if (filters.episode_about)
-    active.push({
-      key: "about",
-      phrase: phrase({ episode_about: filters.episode_about })[0],
-      without: { ...base, episode_about: null },
-    });
-  if (base.theme)
-    active.push({
-      key: "theme",
-      phrase: phrase({ theme: base.theme, episode_about: filters.episode_about }).at(-1) ?? base.theme,
-      without: { ...base, theme: null },
-    });
-  return active;
-}
-
-const EMPTY: Filters = { fame: "any", age: null, country: null, episode_about: null, theme: null };
-
-const FROM = "filters";
-
-// The run's filters as chips that each clear with a tap, and a small form to change any of them.
-// Either starts a new run of the same show; the page keeps these guests until it's done.
-function FilterControls({
-  filters,
-  rerun,
-  missing,
-  onForget,
-}: {
-  filters: Filters;
-  rerun: Rerun;
-  missing: Pick[];
-  onForget: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const active = activeFilters(filters);
-  const busy = rerun.busy;
-
-  // The form floats over the page (in its flow on a phone); a click outside it closes it.
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: PointerEvent) => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [open]);
-
+function MissingPicks({ missing, onForget }: { missing: Pick[]; onForget: () => void }) {
+  if (!missing.length) return null;
   return (
-    <div className="flex flex-col gap-3">
-      <div ref={box} className="relative">
-        <ul aria-label="Filters" className="flex flex-wrap items-center gap-1.5">
-          {active.map(({ key, phrase, without }) => (
-            <li key={key}>
-              <span className="inline-flex min-h-8 items-center gap-1 rounded-full bg-deck py-0.5 pr-0.5 pl-3 text-xs font-medium text-ink ring-1 ring-steel">
-                {phrase}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => rerun.start(without, FROM)}
-                  aria-label={`Clear: ${phrase}`}
-                  title="Clear"
-                  className="flex size-7 items-center justify-center rounded-full text-ink-dim transition-colors hover:bg-deck-hi hover:text-ink disabled:pointer-events-none disabled:opacity-40"
-                >
-                  <svg aria-hidden viewBox="0 0 12 12" className="size-2.5">
-                    <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </span>
-            </li>
-          ))}
-          <li>
-            <button
-              type="button"
-              aria-expanded={open}
-              disabled={busy}
-              onClick={() => setOpen(!open)}
-              className={`btn btn-sm min-h-8 ${open ? "btn-solid" : ""}`}
-            >
-              <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
-                <path
-                  d="M2 4.5h7M13 4.5h1M2 11.5h1M7 11.5h7"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <circle cx="11" cy="4.5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                <circle cx="5" cy="11.5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
-              {active.length ? "Change" : "Narrow the guests"}
-            </button>
-          </li>
-        </ul>
-        {open && (
-          <FilterForm
-            filters={filters}
-            onRun={(next) => {
-              setOpen(false);
-              rerun.start(next, FROM);
-            }}
-            onCancel={() => setOpen(false)}
-          />
-        )}
-      </div>
-      <RerunStatus rerun={rerun} from={FROM} className="max-w-md" />
-      {missing.length > 0 && (
-        <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
-          <span>
-            {missing.length === 1 ? "Your pick" : "Your picks"} {listNames(missing.map(({ name }) => name))}{" "}
-            {missing.length === 1 ? "isn't" : "aren't"} in this run
-            {missing.every((pick) => pick.analysis && pick.ref)
-              ? `. You can still invite ${missing.length === 1 ? "them" : "all of them"}.`
-              : "."}
-          </span>
-          <button type="button" onClick={onForget} className="text-ink underline underline-offset-4 hover:text-brand">
-            Unpick
-          </button>
-        </p>
-      )}
-    </div>
-  );
-}
-
-function FilterForm({
-  filters,
-  onRun,
-  onCancel,
-}: {
-  filters: Filters;
-  onRun: (filters: Filters) => void;
-  onCancel: () => void;
-}) {
-  const id = useId();
-  const [fame, setFame] = useState<Fame>(filters.fame);
-  const [age, setAge] = useState<AgeBucket | null>(filters.age);
-  const [country, setCountry] = useState(filters.country ?? "");
-  const [aboutType, setAboutType] = useState<AnchorType>(filters.episode_about?.type ?? "movie");
-  const [aboutQuery, setAboutQuery] = useState(filters.episode_about?.query ?? "");
-  const [theme, setTheme] = useState(filters.theme ?? "");
-  const place = country.trim();
-  const query = squash(aboutQuery);
-  const about = query ? { query, type: aboutType } : null;
-  const topic = squash(theme);
-  const was = filters.episode_about;
-  const changed =
-    fame !== filters.fame ||
-    age !== filters.age ||
-    (place || null) !== filters.country ||
-    about?.query !== was?.query ||
-    (about !== null && about.type !== was?.type) ||
-    topic !== (filters.theme ?? null);
-  const choice = ABOUT_CHOICES.find(({ value }) => value === aboutType) ?? ABOUT_CHOICES[0];
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!changed || (place && place.length < 2)) return;
-    onRun({ ...requestFilters(filters), fame, age, country: place || null, episode_about: about, theme: topic });
-  }
-
-  return (
-    <form
-      data-filters
-      onSubmit={submit}
-      onKeyDown={(event) => event.key === "Escape" && onCancel()}
-      className="rise mt-2 flex w-full flex-col sm:absolute sm:top-full sm:left-0 sm:z-30 sm:w-[34rem] gap-4 rounded-2xl bg-deck p-4 shadow-pop ring-1 ring-steel sm:p-5"
-    >
-      <fieldset className="flex flex-col gap-2">
-        <legend className="tag mb-2 text-ink-dim">Fame</legend>
-        <div className="flex flex-wrap gap-1">
-          {FAME_CHOICES.map((choice) => (
-            <label
-              key={choice.value}
-              className={`btn btn-sm cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-brand ${fame === choice.value ? "btn-solid" : ""}`}
-            >
-              <input
-                type="radio"
-                name={`${id}-fame`}
-                value={choice.value}
-                checked={fame === choice.value}
-                onChange={() => setFame(choice.value)}
-                className="sr-only"
-              />
-              {choice.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2">
-          <span className="tag text-ink-dim">Listeners&apos; age</span>
-          <select
-            value={age ?? ""}
-            onChange={(event) => setAge((event.target.value || null) as AgeBucket | null)}
-            className="field h-10 px-3 text-sm"
-          >
-            <option value="">Any age</option>
-            {AGE_ORDER.map((bucket) => (
-              <option key={bucket} value={bucket}>
-                {AGES[bucket]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-2">
-          <span className="tag text-ink-dim">Country</span>
-          <input
-            value={country}
-            onChange={(event) => setCountry(event.target.value)}
-            list={`${id}-countries`}
-            maxLength={60}
-            placeholder="Any country"
-            className="field h-10 px-3 text-sm"
-          />
-          <datalist id={`${id}-countries`}>
-            {COUNTRIES.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-        </label>
-      </div>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="tag mb-2 text-ink-dim">Episode about</legend>
-        <div className="grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-2">
-          <select
-            value={aboutType}
-            onChange={(event) => setAboutType(event.target.value as AnchorType)}
-            aria-label="Kind"
-            className="field h-10 px-3 text-sm"
-          >
-            {ABOUT_CHOICES.map(({ value, name }) => (
-              <option key={value} value={value}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <input
-            value={aboutQuery}
-            onChange={(event) => setAboutQuery(event.target.value)}
-            maxLength={ABOUT_LENGTH}
-            autoComplete="off"
-            placeholder={choice.placeholder}
-            aria-label={`${choice.name}, optional`}
-            className="field h-10 px-3 text-sm"
-          />
-        </div>
-        <span className="text-sm text-ink-dim">Guests whose fans love it too rank higher.</span>
-      </fieldset>
-      <label className="flex flex-col gap-2">
-        <span className="tag text-ink-dim">Theme</span>
-        <input
-          value={theme}
-          onChange={(event) => setTheme(event.target.value)}
-          maxLength={THEME_LENGTH}
-          autoComplete="off"
-          placeholder="e.g. road trips"
-          className="field h-10 px-3 text-sm"
-        />
-        <span className="text-sm text-ink-dim">Shapes the ideas Echo writes, not which guests come back.</span>
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" disabled={!changed} className="btn btn-brand">
-          Find new guests
-        </button>
-        <button type="button" onClick={onCancel} className="btn">
-          Cancel
-        </button>
-      </div>
-    </form>
+    <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
+      <span>
+        {missing.length === 1 ? "Your pick" : "Your picks"} {listNames(missing.map(({ name }) => name))}{" "}
+        {missing.length === 1 ? "isn't" : "aren't"} in this run
+        {missing.every((pick) => pick.analysis && pick.ref)
+          ? `. You can still invite ${missing.length === 1 ? "them" : "all of them"}.`
+          : "."}
+      </span>
+      <button type="button" onClick={onForget} className="text-ink underline underline-offset-4 hover:text-brand">
+        Unpick
+      </button>
+    </p>
   );
 }
 

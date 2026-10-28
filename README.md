@@ -12,9 +12,9 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 
 **[echo-web-mu-taupe.vercel.app](https://echo-web-mu-taupe.vercel.app)**
 
-1. Type a podcast's name and pick it, or open one of the featured shows. Add an episode theme if you like ("road trips").
-2. In under a minute Echo ranks 20 guests by fit, love back and reach, and puts the sweet spots first, each with the tastes both audiences share and an episode idea.
-3. Open a guest for the full episode, what their fans add to yours and a briefing. Ask Echo for "less famous guests", "younger listeners" or "make this idea funnier". Leave out anyone you've already had on.
+1. Type a podcast's name and pick it, or open one of the featured shows.
+2. In under a minute Echo ranks 20 guests by fit, love back and reach, and puts the sweet spots first, each with the tastes both audiences share and an episode idea. While it runs you see what your listeners love, then the first guests, and can start picking.
+3. Open a guest for the full episode and how their fans compare with yours. Ask Echo for "less famous guests", "younger listeners", "an episode about road trips" or "make this idea funnier". Leave out anyone you've already had on.
 4. Pick guests and write the invitations, with your dates, fee and a note for each. Echo sends nothing: open each draft in your own email.
 
 ## How a request becomes a result
