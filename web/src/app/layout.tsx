@@ -3,6 +3,7 @@ import { Chakra_Petch, Martian_Mono, Saira } from "next/font/google";
 import Link from "next/link";
 
 import { EngineNote } from "@/components/engine-note";
+import { GuestsLink } from "@/components/guests-link";
 import { FRAME, hue } from "@/components/hud";
 import { Logo } from "@/components/logo";
 import { THEME_SCRIPT, ThemeToggle } from "@/components/theme-toggle";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div id="bar-context" className="flex min-w-0 flex-1" />
             <div className="flex items-center gap-3 group-has-[[data-on]]/bar:max-sm:[&>:first-child]:hidden">
               <EngineNote />
+              <GuestsLink />
               <ThemeToggle />
             </div>
           </div>

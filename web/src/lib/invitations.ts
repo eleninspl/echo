@@ -5,7 +5,8 @@ import { describe, type HostError } from "./errors";
 import { isRecord, stringsOf, useStored } from "./stored";
 
 // What the invite page keeps in this browser, never on the engine: the drafts per show and guest (they carry
-// the host's name, notes and details), the notes, the practical details, and the guests' emails. Echo never looks an email up or sends one anywhere.
+// the host's name, notes and details), the notes, the practical details, the guests' emails, where each
+// invitation stands and the briefings. Echo never looks an email up or sends one anywhere.
 
 // `changed`: the host edited it or asked Echo to rewrite it, so writing everyone again asks before replacing it.
 export type SavedDraft = DraftText & { changed: boolean };
@@ -60,7 +61,7 @@ export function useEmails() {
 export type Details = { forAll: InviteDetails; perGuest: Record<string, InviteDetails> };
 
 // The engine's limits, in characters.
-export const DETAIL_LIMITS = { dates: 80, fee: 40, place: 80, length: 30, release: 40, reply_by: 40 } as const;
+export const DETAIL_LIMITS = { dates: 80, fee: 40, place: 80, length: 30 } as const;
 type TextDetail = keyof typeof DETAIL_LIMITS;
 const TEXT_DETAILS = Object.keys(DETAIL_LIMITS) as TextDetail[];
 
@@ -123,6 +124,46 @@ export function useDetails(showId: string) {
 export function useEpisodeLength(showId: string): string | undefined {
   const [details] = useDetails(showId);
   return cleanDetails(details.forAll)?.length;
+}
+
+export type InviteStatus = "sent" | "booked";
+export type Statuses = Record<string, InviteStatus>;
+
+function parseStatuses(value: unknown): Statuses {
+  return Object.fromEntries(
+    Object.entries(stringsOf(value)).filter((entry): entry is [string, InviteStatus] =>
+      ["sent", "booked"].includes(entry[1]),
+    ),
+  );
+}
+
+const noStatuses = (statuses: Statuses) => Object.keys(statuses).length === 0;
+
+export function useStatuses(showId: string) {
+  return useStored(`echo.invite-status.${showId}`, parseStatuses, noStatuses);
+}
+
+export type SavedBriefing = { markdown: string; for: string };
+export type Briefings = Record<string, SavedBriefing>;
+
+export const briefingFor = (analysisId: string, guestRef: string, ideaTitle?: string, length?: string) =>
+  [analysisId, guestRef, ideaTitle ?? "", length ?? ""].join("/");
+
+function parseBriefings(value: unknown): Briefings {
+  if (!isRecord(value)) return {};
+  const briefings: Briefings = {};
+  for (const [id, briefing] of Object.entries(value)) {
+    if (isRecord(briefing) && typeof briefing.markdown === "string" && typeof briefing.for === "string") {
+      briefings[id] = { markdown: briefing.markdown, for: briefing.for };
+    }
+  }
+  return briefings;
+}
+
+const noBriefings = (briefings: Briefings) => Object.keys(briefings).length === 0;
+
+export function useBriefings(showId: string) {
+  return useStored(`echo.briefings.${showId}`, parseBriefings, noBriefings);
 }
 
 export function saved(draft: Draft, changed = false): SavedDraft {

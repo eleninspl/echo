@@ -1,28 +1,40 @@
+"use client";
+
 import type { Label } from "./echo";
+import { readStored, storedKeys, useStored, useStoredKeys, useStoredSnapshot, writeStored } from "./stored";
 
 // Picks are kept per show by the guest's entity ID, so they carry across reruns of the same show: a guest's
 // ref is only their place in one run. The name and picture come along to say who isn't in a later run, and the
 // run and ref they were picked in, so they can still be invited from it.
 export type Pick = { id: string; name: string; analysis?: string; ref?: string; image_url?: string; label?: Label };
 
-const key = (showId: string) => `echo.picks.${showId}`;
+const PREFIX = "echo.picks.";
+const key = (showId: string) => `${PREFIX}${showId}`;
+
+function parsePicks(value: unknown): Pick[] {
+  return Array.isArray(value) ? value.filter(isPick) : [];
+}
+
+const noPicks = (picks: Pick[]) => picks.length === 0;
 
 export function readPicks(showId: string): Pick[] {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(key(showId)) ?? "[]");
-    return Array.isArray(saved) ? saved.filter(isPick) : [];
-  } catch {
-    return [];
-  }
+  return readStored(key(showId), parsePicks);
 }
 
 export function savePicks(showId: string, picks: Pick[]) {
-  try {
-    if (picks.length) window.localStorage.setItem(key(showId), JSON.stringify(picks));
-    else window.localStorage.removeItem(key(showId));
-  } catch {
-    return;
-  }
+  writeStored(key(showId), picks.length ? picks : null);
+}
+
+export function usePicks(showId: string) {
+  return useStored(key(showId), parsePicks, noPicks);
+}
+
+export function usePickedShows(): string[] {
+  return useStoredKeys(PREFIX);
+}
+
+export function usePickCount(): number {
+  return useStoredSnapshot(() => storedKeys(PREFIX).reduce((sum, show) => sum + readPicks(show).length, 0), 0);
 }
 
 const LABELS: readonly Label[] = ["sweet_spot", "safe", "far", "long_shot", "balanced"];

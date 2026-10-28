@@ -71,6 +71,40 @@ export function useStored<T>(
   return [value, update];
 }
 
+export function writeStored(key: string, value: unknown) {
+  writeRaw(key, value === null ? null : JSON.stringify(value));
+}
+
+function keysWith(prefix: string): string[] {
+  const keys = new Set([...memory.keys()].filter((key) => key.startsWith(prefix)));
+  try {
+    for (let index = 0; index < window.localStorage.length; index++) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(prefix) && !memoryOnly.has(key)) keys.add(key);
+    }
+  } catch {
+    return [...keys].sort();
+  }
+  return [...keys].filter((key) => readRaw(key) !== null).sort();
+}
+
+export function storedKeys(prefix: string): string[] {
+  return keysWith(prefix).map((key) => key.slice(prefix.length));
+}
+
+export function useStoredKeys(prefix: string): string[] {
+  const joined = useStoredSnapshot(() => storedKeys(prefix).join("\n"), "");
+  return useMemo(() => (joined ? joined.split("\n") : []), [joined]);
+}
+
+export function useStoredSnapshot<T extends string | number>(read: () => T, server: T): T {
+  return useSyncExternalStore(subscribe, read, () => server);
+}
+
+export function readStored<T>(key: string, parse: (value: unknown) => T): T {
+  return parsed(readRaw(key), parse);
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

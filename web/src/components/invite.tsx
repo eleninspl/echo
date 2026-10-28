@@ -1,36 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 
 import { echo, type Analysis, type Draft, type Guest, type InviteDetails } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
 import { saveHostName, useHostName } from "@/lib/host-name";
 import {
-  DETAIL_LIMITS,
   NOTE_LIMIT,
   SHARED_NOTE_LIMIT,
   cleanDetails,
   isEmail,
   mailto,
-  mergedDetails,
   saved,
   useDetails,
   useDrafts,
   useEmails,
   useNotes,
+  useStatuses,
   writingProblem,
+  type InviteStatus,
   type SavedDraft,
 } from "@/lib/invitations";
-import { analysisPath } from "@/lib/paths";
+import { analysisPath, yourGuestsPath } from "@/lib/paths";
 import type { Pick as SavedPick } from "@/lib/picks";
 import { readRewrites, rewrittenIdea, withRewrites } from "@/lib/rewrites";
 
-import { Briefing } from "./briefing";
 import { CopyButton } from "./copy-button";
 import { GuestLinks } from "./dossier";
 import { Picture } from "./guest-list";
 import { LABEL_HUE, hue } from "./hud";
+import { DetailsPicker, GuestDetailsLine } from "./invite-details";
 import { Problem } from "./problem";
 
 // The engine writes at most 5 drafts a request; more picks go in parallel requests.
@@ -88,6 +88,7 @@ export function Invite({
   const [drafts, setDrafts] = useDrafts(analysis.show.id);
   const [notes, setNotes] = useNotes(analysis.show.id);
   const [emails, setEmails] = useEmails();
+  const [statuses, setStatuses] = useStatuses(analysis.show.id);
   const [writing, setWriting] = useState<string[]>([]);
   const [problem, setProblem] = useState<HostError | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -225,70 +226,75 @@ export function Invite({
             Invite {one ? guests[0].name : `${guests.length} guests`}
           </h1>
           <p className="max-w-[60ch] text-ink-soft">
-            An email to each, from what your audiences share. Echo sends nothing: open each one in your own email.
+            An email to each, from what your audiences share. Echo sends nothing: open each one in your own email, then
+            follow them up in{" "}
+            <Link href={yourGuestsPath()} className="text-ink underline underline-offset-4 hover:text-brand">
+              Your guests
+            </Link>
+            .
           </p>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="grid gap-5 border-t border-steel pt-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_auto] md:items-end md:gap-x-6"
-        >
-          <fieldset className="flex flex-col gap-4 md:col-span-3">
-            <legend className="mb-4 flex items-baseline gap-2">
+        <form onSubmit={submit} className="zone flex flex-col gap-6 p-5 sm:p-6">
+          <fieldset className="flex flex-col">
+            <legend className="mb-3 flex items-baseline gap-2">
               <span className="font-display text-base font-semibold">{one ? "The details" : "For everyone"}</span>
               <span className="text-sm text-ink-dim">all optional</span>
             </legend>
-            <SharedDetails
+            <DetailsPicker
               details={details.forAll}
+              label={one ? "The details" : "The details for everyone"}
               onChange={(change) => setDetails((current) => ({ ...current, forAll: { ...current.forAll, ...change } }))}
             />
           </fieldset>
-          {savedName && !renaming ? (
-            <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft md:pb-3">
-              Signed as <span className="font-semibold text-ink">{savedName}</span>
-              <button
-                type="button"
-                onClick={() => setRenaming(true)}
-                className="text-accent underline underline-offset-4 hover:text-ink"
-              >
-                Change
-              </button>
-            </p>
-          ) : (
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] md:items-end md:gap-x-5">
             <label className="flex flex-col gap-1.5">
-              <span className="tag text-ink-dim">Your name, to sign with</span>
+              <span className="tag text-ink-dim">Anything else</span>
               <input
-                value={typed ?? savedName}
-                onChange={(event) => setTyped(event.target.value)}
-                maxLength={80}
-                autoComplete="name"
-                autoFocus={renaming}
+                value={notes.forAll}
+                onChange={(event) =>
+                  setNotes((current) => ({
+                    ...current,
+                    forAll: event.target.value,
+                  }))
+                }
+                maxLength={SHARED_NOTE_LIMIT}
+                placeholder="A recent episode, a reply-by date, or how to write: shorter, warmer…"
                 className={input}
               />
             </label>
-          )}
-          <label className="flex flex-col gap-1.5">
-            <span className="tag text-ink-dim">Anything else</span>
-            <input
-              value={notes.forAll}
-              onChange={(event) =>
-                setNotes((current) => ({
-                  ...current,
-                  forAll: event.target.value,
-                }))
-              }
-              maxLength={SHARED_NOTE_LIMIT}
-              placeholder="A recent episode, why now, or how to write: shorter, warmer…"
-              className={input}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={writing.length > 0 || notSetUp}
-            className={`btn min-h-12 px-6 text-base ${missing.length ? "btn-brand" : ""}`}
-          >
-            {label}
-          </button>
+            {savedName && !renaming ? (
+              <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft md:pb-3">
+                Signed as <span className="font-semibold text-ink">{savedName}</span>
+                <button
+                  type="button"
+                  onClick={() => setRenaming(true)}
+                  className="text-accent underline underline-offset-4 hover:text-ink"
+                >
+                  Change
+                </button>
+              </p>
+            ) : (
+              <label className="flex flex-col gap-1.5">
+                <span className="tag text-ink-dim">Your name, to sign with</span>
+                <input
+                  value={typed ?? savedName}
+                  onChange={(event) => setTyped(event.target.value)}
+                  maxLength={80}
+                  autoComplete="name"
+                  autoFocus={renaming}
+                  className={input}
+                />
+              </label>
+            )}
+            <button
+              type="submit"
+              disabled={writing.length > 0 || notSetUp}
+              className={`btn min-h-12 px-6 text-base ${missing.length ? "btn-brand" : ""}`}
+            >
+              {label}
+            </button>
+          </div>
         </form>
 
         {confirm?.from === "all" && (
@@ -304,7 +310,7 @@ export function Invite({
       </section>
 
       <section aria-label="Guests to invite" className="flex flex-col gap-5">
-        <ol className={`grid grid-cols-1 items-start gap-5 ${one ? "max-w-3xl" : "xl:grid-cols-2"}`}>
+        <ol className={`grid auto-rows-fr grid-cols-1 gap-5 ${one ? "max-w-3xl" : "xl:grid-cols-2"}`}>
           {invitees.map(({ analysisId, guest }, index) => (
             <GuestCard
               key={guest.id}
@@ -344,6 +350,16 @@ export function Invite({
               confirming={confirm?.from === guest.id}
               onConfirm={(replace) => (replace ? write([guest.id]) : setConfirm(null))}
               onRemove={() => onUnpick(guest.id)}
+              status={statuses[guest.id]}
+              onStatus={(status) =>
+                setStatuses((current) => {
+                  const next = { ...current };
+                  if (status) next[guest.id] = status;
+                  else delete next[guest.id];
+                  return next;
+                })
+              }
+              prepare={yourGuestsPath(analysis.show.id, guest.id)}
             />
           ))}
         </ol>
@@ -422,6 +438,9 @@ type CardProps = {
   confirming: boolean;
   onConfirm: (replace: boolean) => void;
   onRemove: () => void;
+  status: InviteStatus | undefined;
+  onStatus: (status: InviteStatus | undefined) => void;
+  prepare: string;
 };
 
 function GuestCard({
@@ -444,12 +463,15 @@ function GuestCard({
   confirming,
   onConfirm,
   onRemove,
+  status,
+  onStatus,
+  prepare,
 }: CardProps) {
   const emailWrong = email.trim() !== "" && !isEmail(email);
-  const episodeLength = cleanDetails(sharedDetails)?.length;
+  const bio = guest.bio ?? guest.description;
   return (
     <li
-      className="rise flex flex-col gap-5 rounded-2xl bg-well p-5 shadow-[inset_0_0_0_1px_var(--steel)] sm:p-6"
+      className="rise flex min-w-0 flex-col gap-5 rounded-2xl bg-well p-5 shadow-[inset_0_0_0_1px_var(--steel)] sm:p-6"
       style={{ "--order": order * 2 } as CSSProperties}
     >
       <div className="flex items-start gap-4">
@@ -464,8 +486,10 @@ function GuestCard({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2 className="font-display text-xl leading-tight font-semibold">{guest.name}</h2>
           {/* Who they are, to help with the note just for them. */}
-          {(guest.bio ?? guest.description) && (
-            <p className="max-w-prose text-sm text-pretty text-ink-soft">{guest.bio ?? guest.description}</p>
+          {bio && (
+            <p title={bio} className="line-clamp-3 max-w-prose text-sm text-pretty text-ink-soft">
+              {bio}
+            </p>
           )}
           {Object.keys(guest.links).length > 0 && (
             <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-dim">
@@ -514,10 +538,10 @@ function GuestCard({
         </label>
       </div>
 
-      <GuestDetailsFields name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
+      <GuestDetailsLine name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
 
       {writing ? (
-        <div aria-live="polite" className="flex flex-col gap-3 border-t border-steel pt-5">
+        <div aria-live="polite" className="flex flex-1 flex-col gap-3 border-t border-steel pt-5">
           <span className="sr-only">Writing the invitation to {guest.name}</span>
           <span className="h-4 w-1/2 animate-pulse rounded-full bg-deck-hi" />
           {[100, 92, 96, 60].map((width) => (
@@ -538,24 +562,45 @@ function GuestCard({
           onConfirm={onConfirm}
         />
       ) : (
-        <p className="rounded-xl border border-dashed border-steel-hi px-4 py-6 text-center text-sm text-ink-dim">
+        <p className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-steel-hi px-4 py-6 text-center text-sm text-ink-dim">
           Not written yet
         </p>
       )}
 
-      {draft && !writing && (
-        <div className="flex flex-col gap-3 border-t border-steel pt-5">
-          <span className="tag text-ink-dim">Then prepare</span>
-          <Briefing
-            key={guest.idea?.title}
-            id={analysisId}
-            guestRef={guest.ref}
-            guestName={guest.name}
-            idea={rewrittenIdea(guest)}
-            length={episodeLength}
-          />
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-steel pt-4">
+        {status === "booked" ? (
+          <span className="tag flex items-center gap-1.5 text-sweet">
+            <Check />
+            Booked
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-pressed={status === "sent"}
+            onClick={() => onStatus(status === "sent" ? undefined : "sent")}
+            className={`btn btn-sm ${status === "sent" ? "btn-solid" : ""}`}
+            style={hue("var(--brand)")}
+          >
+            {status === "sent" && <Check />}
+            {status === "sent" ? "Sent" : "Mark as sent"}
+            <span className="sr-only"> the invitation to {guest.name}</span>
+          </button>
+        )}
+        <Link
+          href={prepare}
+          className="group inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
+        >
+          Briefing and episode
+          <span className="sr-only"> for {guest.name}</span>
+          <svg
+            aria-hidden
+            viewBox="0 0 12 12"
+            className="size-3 transition-transform duration-200 ease-(--ease-out) group-hover:translate-x-0.5"
+          >
+            <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </Link>
+      </div>
     </li>
   );
 }
@@ -609,7 +654,7 @@ function DraftBody({
 
   const edit = (change: Partial<SavedDraft>) => onChange({ ...draft, ...change, changed: true });
   return (
-    <div className="flex flex-col gap-4 border-t border-steel pt-5">
+    <div className="flex flex-1 flex-col gap-4 border-t border-steel pt-5">
       <div className="flex items-center justify-between gap-3">
         <span className="tag text-ink-dim">Invitation</span>
         {draft.changed && <span className="tag text-ink-soft">Edited</span>}
@@ -622,13 +667,13 @@ function DraftBody({
           className={`${input} font-semibold`}
         />
       </label>
-      <label className="flex flex-col gap-1.5">
+      <label className="flex flex-1 flex-col gap-1.5">
         <span className="sr-only">Invitation to {guest.name}</span>
         <textarea
           value={draft.body}
           onChange={(event) => edit({ body: event.target.value })}
           rows={10}
-          className={`${input} min-h-48 resize-y text-sm leading-relaxed text-ink-soft [field-sizing:content]`}
+          className={`${input} min-h-48 flex-1 resize-y text-sm leading-relaxed text-ink-soft [field-sizing:content]`}
         />
       </label>
       <div className="flex flex-wrap items-center gap-2">
@@ -685,282 +730,10 @@ function DraftBody({
   );
 }
 
-const small = "field h-10 w-full min-w-0 px-3 text-sm";
-
-const DATE_CHIPS = ["This month", "Next month", "Flexible"];
-
-const FORMATS = [
-  { value: "in_person", name: "In person" },
-  { value: "remote", name: "Remote" },
-] as const;
-
-function fridayInTwoWeeks(): string {
-  const day = new Date();
-  day.setDate(day.getDate() + 14 + ((12 - day.getDay()) % 7));
-  return day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-}
-
-const TEXT_FIELDS = [
-  { key: "length", label: "Length", placeholder: () => "e.g. 60 min" },
-  { key: "release", label: "Release", placeholder: () => "e.g. March" },
-  { key: "reply_by", label: "Reply by", placeholder: () => `e.g. ${fridayInTwoWeeks()}` },
-] as const;
-
-// The details every invitation states: a compact grid, every field optional.
-function SharedDetails({
-  details,
-  onChange,
-}: {
-  details: InviteDetails;
-  onChange: (change: Partial<InviteDetails>) => void;
-}) {
-  const id = useId();
-  // Six columns: dates, fee and format take a row each on a phone; length, release and reply-by are always three
-  // across.
+export function Check() {
   return (
-    <div className="grid grid-cols-6 items-start gap-x-3 gap-y-4 sm:gap-x-5">
-      <DatesInput
-        value={details.dates ?? ""}
-        onChange={(dates) => onChange({ dates })}
-        className="col-span-6 sm:col-span-3 lg:col-span-2"
-      />
-      <FeeInput
-        fee={details.fee ?? ""}
-        unpaid={details.unpaid ?? false}
-        onChange={(fee, unpaid) => onChange({ fee, unpaid })}
-        className="col-span-6 sm:col-span-3 lg:col-span-2"
-      />
-      <div className="col-span-6 flex flex-col gap-1.5 lg:col-span-2">
-        <span id={`${id}-format`} className="tag text-ink-dim">
-          Format
-        </span>
-        <div role="group" aria-labelledby={`${id}-format`} className="flex items-center gap-1.5">
-          {FORMATS.map((format) => {
-            const on = details.format === format.value;
-            return (
-              <button
-                key={format.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onChange({ format: on ? undefined : format.value })}
-                className={`btn btn-sm min-h-10 shrink-0 ${on ? "btn-solid" : ""}`}
-              >
-                {format.name}
-              </button>
-            );
-          })}
-          {details.format === "in_person" && (
-            <input
-              aria-label="Where"
-              value={details.place ?? ""}
-              onChange={(event) => onChange({ place: event.target.value })}
-              maxLength={DETAIL_LIMITS.place}
-              placeholder="Where"
-              className={`${small} flex-1`}
-            />
-          )}
-        </div>
-      </div>
-      {TEXT_FIELDS.map((field) => (
-        <label key={field.key} className="col-span-2 flex flex-col gap-1.5">
-          <span className="tag text-ink-dim">{field.label}</span>
-          <input
-            value={details[field.key] ?? ""}
-            onChange={(event) => onChange({ [field.key]: event.target.value })}
-            maxLength={DETAIL_LIMITS[field.key]}
-            placeholder={field.placeholder()}
-            className={small}
-          />
-        </label>
-      ))}
-    </div>
-  );
-}
-
-// Recording dates in words, with a few quick picks. `placeholder` is an example, or for one guest what applies
-// when it's left blank.
-function DatesInput({
-  value,
-  onChange,
-  placeholder = "e.g. weekdays in March",
-  className = "",
-}: {
-  value: string;
-  onChange: (dates: string) => void;
-  placeholder?: string;
-  className?: string;
-}) {
-  const id = useId();
-  return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={id} className="tag text-ink-dim">
-        Recording dates
-      </label>
-      <input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        maxLength={DETAIL_LIMITS.dates}
-        placeholder={placeholder}
-        className={small}
-      />
-      <div className="flex flex-wrap gap-1">
-        {DATE_CHIPS.map((chip) => {
-          const on = value.trim() === chip;
-          return (
-            <button
-              key={chip}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChange(on ? "" : chip)}
-              className={`rounded-full px-2.5 py-0.5 text-xs ring-1 transition-colors ${on ? "bg-deck-hi text-ink ring-ink/40" : "text-ink-soft ring-ink/12 hover:bg-deck-hi hover:text-ink"}`}
-            >
-              {chip}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// The fee as an amount in words, or unpaid.
-function FeeInput({
-  fee,
-  unpaid,
-  onChange,
-  placeholder = "e.g. $300",
-  className = "",
-}: {
-  fee: string;
-  unpaid: boolean;
-  onChange: (fee: string, unpaid: boolean) => void;
-  placeholder?: string;
-  className?: string;
-}) {
-  const id = useId();
-  return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={id} className="tag text-ink-dim">
-        Fee
-      </label>
-      <div className="flex gap-1.5">
-        <input
-          id={id}
-          value={unpaid ? "" : fee}
-          onChange={(event) => onChange(event.target.value, false)}
-          disabled={unpaid}
-          maxLength={DETAIL_LIMITS.fee}
-          placeholder={unpaid ? "No fee" : placeholder}
-          className={`${small} flex-1 disabled:opacity-60`}
-        />
-        <button
-          type="button"
-          aria-pressed={unpaid}
-          onClick={() => onChange(fee, !unpaid)}
-          className={`btn btn-sm min-h-10 shrink-0 ${unpaid ? "btn-solid" : ""}`}
-        >
-          Unpaid
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// The details as short phrases, a guest's own ones marked.
-function detailWords(details: InviteDetails, own: InviteDetails | undefined) {
-  const where =
-    details.format === "remote"
-      ? "Remote"
-      : details.place
-        ? `In person, ${details.place}`
-        : details.format === "in_person"
-          ? "In person"
-          : "";
-  const words = [
-    { key: "dates", text: details.dates, own: Boolean(own?.dates) },
-    { key: "fee", text: details.unpaid ? "Unpaid" : details.fee, own: Boolean(own?.fee || own?.unpaid) },
-    { key: "format", text: where, own: false },
-    { key: "length", text: details.length, own: false },
-    { key: "release", text: details.release && `Out ${details.release}`, own: false },
-    { key: "reply_by", text: details.reply_by && `Reply by ${details.reply_by}`, own: false },
-  ];
-  return words.filter((word): word is typeof word & { text: string } => Boolean(word.text));
-}
-
-// On a guest's card: the details their invitation states, and their own dates and fee in place of everyone's.
-function GuestDetailsFields({
-  name,
-  shared,
-  own,
-  onOwn,
-}: {
-  name: string;
-  shared: InviteDetails;
-  own: InviteDetails;
-  onOwn: (own: InviteDetails) => void;
-}) {
-  const [opened, setOpened] = useState(false);
-  const forAll = cleanDetails(shared);
-  const theirs = cleanDetails(own);
-  const open = opened || theirs !== undefined;
-  const words = detailWords(mergedDetails(forAll, theirs), theirs);
-  const change = (next: InviteDetails) => {
-    setOpened(true);
-    onOwn(next);
-  };
-  return (
-    <div className="flex flex-col gap-3">
-      {(words.length > 0 || !open) && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {words.length > 0 && (
-            <ul aria-label={`Details for ${name}`} className="flex min-w-0 flex-wrap gap-1.5">
-              {words.map((word) => (
-                <li
-                  key={word.key}
-                  className={`max-w-full truncate rounded-full px-2.5 py-0.5 text-xs ring-1 ${word.own ? "text-ink ring-brand/60" : "text-ink-soft ring-steel-hi"}`}
-                >
-                  {word.text}
-                </li>
-              ))}
-            </ul>
-          )}
-          {!open && (
-            <button
-              type="button"
-              onClick={() => setOpened(true)}
-              className="px-1 text-xs text-ink-soft underline underline-offset-4 hover:text-ink"
-            >
-              {forAll?.dates || forAll?.fee || forAll?.unpaid ? "Change for them" : "Dates or fee for them"}
-            </button>
-          )}
-        </div>
-      )}
-      {open && (
-        <div className="grid items-start gap-4 sm:grid-cols-2">
-          <DatesInput
-            value={own.dates ?? ""}
-            onChange={(dates) => change({ ...own, dates })}
-            placeholder={forAll?.dates ?? "Same as everyone"}
-          />
-          <FeeInput
-            fee={own.fee ?? ""}
-            unpaid={own.unpaid ?? false}
-            onChange={(fee, unpaid) => change({ ...own, fee, unpaid })}
-            placeholder={forAll?.unpaid ? "Unpaid" : (forAll?.fee ?? "Same as everyone")}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              onOwn({});
-              setOpened(false);
-            }}
-            className="justify-self-start px-1 text-xs text-ink-soft underline underline-offset-4 hover:text-ink sm:col-span-2"
-          >
-            Same as everyone
-          </button>
-        </div>
-      )}
-    </div>
+    <svg aria-hidden viewBox="0 0 12 12" className="size-3">
+      <path d="M2.5 6.25l2.25 2.25L9.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }
