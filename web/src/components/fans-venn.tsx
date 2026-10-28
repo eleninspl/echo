@@ -240,3 +240,64 @@ export function FansVenn({ showMap, guestMap, adds }: { showMap: MapRow[]; guest
     </div>
   );
 }
+
+const MINI = { width: 240, height: 132, radius: 50, apart: 56, middle: 56 };
+const MINI_NAMES: Record<Side, string> = { yours: "Only yours", both: "Both", theirs: "New to you" };
+
+export function FansOverlap({ showMap, guestMap, adds }: { showMap: MapRow[]; guestMap: MapRow[]; adds: MapRow[] }) {
+  const sides = useMemo(() => sidesOf(showMap, guestMap, adds), [showMap, guestMap, adds]);
+  if (!guestMap.some((row) => row.items.length > 0))
+    return <p className="text-sm text-ink-dim">There&apos;s no map for their fans yet.</p>;
+  const left = MINI.width / 2 - MINI.apart / 2;
+  const right = MINI.width / 2 + MINI.apart / 2;
+  const places: Record<Side, number> = {
+    yours: left - MINI.radius / 2,
+    both: MINI.width / 2,
+    theirs: right + MINI.radius / 2,
+  };
+  const sideKeys = Object.keys(places) as Side[];
+  return (
+    <svg
+      role="img"
+      aria-label={sideKeys.map((side) => `${SIDE_NAMES[side]}: ${count(sides[side], null)}`).join(". ")}
+      viewBox={`0 0 ${MINI.width} ${MINI.height}`}
+      className="w-60 shrink-0 overflow-visible"
+    >
+      <circle
+        cx={left}
+        cy={MINI.middle}
+        r={MINI.radius}
+        fill={SIDE_HUES.yours}
+        fillOpacity="0.08"
+        stroke={SIDE_HUES.yours}
+        strokeOpacity="0.6"
+      />
+      <circle
+        cx={right}
+        cy={MINI.middle}
+        r={MINI.radius}
+        fill={SIDE_HUES.theirs}
+        fillOpacity="0.08"
+        stroke={SIDE_HUES.theirs}
+        strokeOpacity="0.6"
+      />
+      {sideKeys.map((side) => (
+        <g key={side}>
+          <text
+            x={places[side]}
+            y={MINI.middle + 8}
+            textAnchor="middle"
+            className="readout"
+            fontSize="22"
+            fill="var(--ink)"
+          >
+            {count(sides[side], null)}
+          </text>
+          <text x={places[side]} y={MINI.height - 4} textAnchor="middle" fontSize="12" fill={SIDE_HUES[side]}>
+            {MINI_NAMES[side]}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}

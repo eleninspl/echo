@@ -9,7 +9,6 @@ import { showTastes } from "@/lib/pointer";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
-import { Briefing } from "./briefing";
 import { AgeLamps, GuestLinks, LeaveOutButton, PickButton, Scores, TasteChips } from "./dossier";
 import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
@@ -267,7 +266,7 @@ function GuestBody({
         </Part>
       )}
 
-      {/* Keyed by the idea: a rewrite brings its own episode and briefing. */}
+      {/* Keyed by the idea: a rewrite brings its own episode. */}
       <GuestDetails
         key={`episode-${guest.idea?.title}`}
         id={analysis.id}
@@ -278,17 +277,6 @@ function GuestBody({
         showMap={analysis.audience_map}
         onShowMap={onShowMap}
       />
-
-      <Part id="sheet-brief" title="Before you record">
-        <Briefing
-          key={`brief-${guest.idea?.title}`}
-          id={analysis.id}
-          guestRef={guest.ref}
-          guestName={guest.name}
-          idea={rewrittenIdea(guest)}
-          length={length}
-        />
-      </Part>
     </div>
   );
 }

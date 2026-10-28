@@ -261,8 +261,11 @@ def test_a_failing_example_show_fails_its_run_at_its_step(mock, failure):
     analysis = mock.get(f"/analyses/{started.json()['id']}").json()
     assert analysis["status"] == "failed"
     assert analysis["error"] == {"error": failure["error"], "message": failure["message"]}
-    assert [step["key"] for step in analysis["steps"] if step["done"]] == STEP_KEYS[: STEP_KEYS.index(failure["at"])]
-    assert analysis["guests"] == []
+    done = [step["key"] for step in analysis["steps"] if step["done"]]
+    assert done == STEP_KEYS[: STEP_KEYS.index(failure["at"])]
+    assert bool(analysis["audience_map"]) == ("map" in done)
+    assert bool(analysis["guests"]) == ("score" in done)
+    assert not any(guest["idea"] for guest in analysis["guests"])
 
 
 def test_the_daily_cap_on_start_is_a_429(mock):

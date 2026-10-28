@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { echo, type Episode, type GuestDetails as Details, type Idea, type MapRow } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 
-import { FansVenn } from "./fans-venn";
+import { FansOverlap } from "./fans-venn";
 import { Lamp, Part } from "./hud";
 
 type Load = { state: "loading" } | { state: "done"; details: Details } | { state: "failed"; problem: HostError };
@@ -80,6 +80,26 @@ export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, o
   const details = load.state === "done" ? load.details : null;
   return (
     <>
+      <Part id={`meet-${guestRef}`} title="Their fans next to yours">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+          {details ? (
+            <FansOverlap showMap={showMap} guestMap={details.audience_map} adds={details.adds} />
+          ) : (
+            <Waiting short>Mapping their audience…</Waiting>
+          )}
+          {onShowMap && (
+            <button type="button" onClick={onShowMap} className="btn">
+              <svg aria-hidden viewBox="0 0 16 16" className="size-4">
+                <g fill="none" stroke="currentColor" strokeWidth="1.4">
+                  <circle cx="6" cy="8" r="4.5" />
+                  <circle cx="10" cy="8" r="4.5" />
+                </g>
+              </svg>
+              See both on the taste map
+            </button>
+          )}
+        </div>
+      </Part>
       <Part id={`episode-${guestRef}`} title="The episode">
         {!details ? (
           <Waiting>Writing the episode…</Waiting>
@@ -89,31 +109,13 @@ export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, o
           <p className="text-ink-dim">Echo hasn&apos;t written this episode yet.</p>
         )}
       </Part>
-      <Part id={`meet-${guestRef}`} title="Their fans next to yours">
-        {details ? (
-          <FansVenn showMap={showMap} guestMap={details.audience_map} adds={details.adds} />
-        ) : (
-          <Waiting>Mapping their audience…</Waiting>
-        )}
-        {onShowMap && (
-          <button type="button" onClick={onShowMap} className="btn self-start">
-            <svg aria-hidden viewBox="0 0 16 16" className="size-4">
-              <g fill="none" stroke="currentColor" strokeWidth="1.4">
-                <circle cx="6" cy="8" r="4.5" />
-                <circle cx="10" cy="8" r="4.5" />
-              </g>
-            </svg>
-            See both on the taste map
-          </button>
-        )}
-      </Part>
     </>
   );
 }
 
-function Waiting({ children }: { children: ReactNode }) {
+function Waiting({ short = false, children }: { short?: boolean; children: ReactNode }) {
   return (
-    <div aria-busy className="flex min-h-24 items-center gap-3 text-ink-soft">
+    <div aria-busy className={`flex items-center gap-3 text-ink-soft ${short ? "min-h-10" : "min-h-24"}`}>
       <Lamp color="var(--accent)" className="pulse size-2" />
       {children}
     </div>
