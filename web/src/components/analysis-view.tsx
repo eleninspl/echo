@@ -28,6 +28,7 @@ import type { Ask, Pointer } from "@/lib/pointer";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
+import { usePacedRun } from "@/lib/use-paced";
 import { useStart } from "@/lib/use-start";
 
 import { Backdrop } from "./backdrop";
@@ -61,7 +62,6 @@ type OpenAnalysis = {
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
   leftOut: LeftOutGuest[];
-  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
   pointer: Pointer | null;
   onClearPointer: () => void;
   bridged: string | null;
@@ -84,7 +84,9 @@ export function useOpenAnalysis(): OpenAnalysis {
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { id, guestRef, inviting } = readPath(usePathname());
-  const { analysis: loadedAnalysis, error, retry, update } = useAnalysis(id);
+  const { analysis: polled, error, retry, update } = useAnalysis(id);
+  // The run screen shows each step long enough to read, so the page opens once it has caught up with the engine.
+  const loadedAnalysis = usePacedRun(polled);
   const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
   const openId = loadedAnalysis?.id ?? null;
   const showId = loadedAnalysis?.show.id ?? null;
@@ -264,7 +266,7 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
               <NextStep problem={describe(error)} onRetry={retry} />
             </Problem>
           ) : analysis.status === "running" ? (
-            <Rundown steps={analysis.steps} />
+            <Rundown analysis={analysis} />
           ) : (
             <Failed analysis={analysis} />
           )}
@@ -289,7 +291,6 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         rewritten,
         onAskSlot: setAskSlot,
         leftOut,
-        onLeaveOut,
         pointer,
         onClearPointer,
         bridged,
@@ -327,7 +328,6 @@ export function Console() {
     rerun,
     rewritten,
     onAskSlot,
-    onLeaveOut,
     pointer,
     onClearPointer,
     bridged,
@@ -400,7 +400,6 @@ export function Console() {
           picked={picked}
           onPick={onPick}
           onOpen={onOpen}
-          onLeaveOut={onLeaveOut}
         />
         <Scope
           key={`scope-${analysis.id}`}
@@ -418,7 +417,7 @@ export function Console() {
               fit and high reach: its ringed dots are the sweet spots, whose fans also love your show back, and the
               others are one-way, whose fans are less likely to.
             </p>
-            <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
+            <LabelSpectrum stats={figures} className="@4xl:w-[34rem] @4xl:shrink-0" />
           </div>
         </Scope>
         <GuestList
@@ -463,8 +462,6 @@ export function Console() {
         onPick={onPick}
         onOpen={onOpen}
         onClose={onClose}
-        onLeaveOut={onLeaveOut}
-        onBridge={onBridge}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>

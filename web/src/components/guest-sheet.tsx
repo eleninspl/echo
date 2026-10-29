@@ -2,20 +2,17 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import type { Analysis, Guest, LeaveOutWhy } from "@/lib/echo";
+import type { Analysis, Guest } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
 import { useEpisodeLength } from "@/lib/invitations";
-import { showTastes } from "@/lib/pointer";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
-import { AgeLamps, GuestLinks, LeaveOutButton, PickButton, Scores, TasteChips } from "./dossier";
-import { GuestDetails } from "./guest-details";
+import { AgeLamps, GuestLinks, PickButton, Scores, TasteChips } from "./dossier";
+import { GuestEpisode, GuestFans, useGuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
 
-const BESIDE = "(min-width: 64rem)";
-const AFTER_CLOSE = 750;
 
 type Props = {
   analysis: Analysis;
@@ -25,8 +22,6 @@ type Props = {
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
   onClose: () => void;
-  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
-  onBridge: (guestId: string) => void;
 };
 
 export function GuestSheet({
@@ -37,8 +32,6 @@ export function GuestSheet({
   onPick,
   onOpen,
   onClose,
-  onLeaveOut,
-  onBridge,
 }: Props) {
   const { guests } = analysis;
   const [last, setLast] = useState(guestRef);
@@ -109,9 +102,6 @@ export function GuestSheet({
         </div>
         {guest && (
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <LeaveOutButton guestName={guest.name} onLeaveOut={(why) => onLeaveOut(guest.ref, why)} place="right-0" />
-            </div>
             <PickButton guestName={guest.name} picked={picked.includes(guest.ref)} onPick={() => onPick(guest.ref)} />
           </div>
         )}
@@ -124,16 +114,6 @@ export function GuestSheet({
             guest={guest}
             rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
-            onLeaveOut={(why) => onLeaveOut(guest.ref, why)}
-            onShowMap={() => {
-              onBridge(guest.id);
-              if (matchMedia(BESIDE).matches) {
-                showTastes();
-                return;
-              }
-              onClose();
-              window.setTimeout(showTastes, AFTER_CLOSE);
-            }}
           />
         ) : (
           <p className="px-5 pt-8 font-display text-2xl font-semibold sm:px-8">This guest isn&apos;t in this run.</p>
@@ -148,135 +128,139 @@ function GuestBody({
   guest,
   rewritten,
   heading,
-  onLeaveOut,
-  onShowMap,
 }: {
   analysis: Analysis;
   guest: Guest;
   rewritten: boolean;
   heading: RefObject<HTMLHeadingElement | null>;
-  onLeaveOut: (why: LeaveOutWhy) => void;
-  onShowMap: () => void;
 }) {
   const { scores, idea, evidence } = guest;
   const color = LABEL_HUE[guest.label];
   const sweet = guest.label === "sweet_spot";
   const length = useEpisodeLength(analysis.show.id);
+  // A rewrite brings its own episode.
+  const details = useGuestDetails(analysis.id, guest.ref, rewrittenIdea(guest), length);
+  const ideasOn = analysis.guests.some((other) => other.idea);
+  // Narrow, the parts run in one column. Wide, the guest sits beside their idea and the evidence, two short columns
+  // that end together, then the episode and the two audiences run the panel's full width, in the same reading order.
   return (
-    <div className="rise flex flex-col gap-10 px-5 pt-7 pb-28 sm:px-8">
-      <header className="flex flex-col gap-6">
-        <div className="flex items-center gap-5">
-          <span
-            className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-well sm:size-28"
-            style={{ boxShadow: sweet ? `0 0 0 2px var(--void), 0 0 0 4px ${color}` : "inset 0 0 0 1px var(--steel)" }}
-          >
-            <Picture guest={guest} sizes="112px" />
-          </span>
-          <div className="min-w-0">
-            <Chip color={color}>{LABELS[guest.label].name}</Chip>
-            <h2
-              ref={heading}
-              tabIndex={-1}
-              className="mt-1.5 font-display text-3xl leading-[1.05] font-semibold text-balance outline-none sm:text-4xl"
-            >
-              {guest.name}
-            </h2>
-            {(guest.bio || guest.description) && (
-              <p className="mt-1.5 text-pretty text-ink-soft">{guest.bio || guest.description}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <p className="flex items-baseline justify-between gap-3">
-            <span className="tag text-ink-dim">Scores, out of 100</span>
-            <span className="flex items-baseline gap-2">
-              <span className="tag text-ink-dim">Echo score</span>
-              <span className="readout text-3xl">{out100(scores.echo)}</span>
-            </span>
-          </p>
-          <Scores scores={scores} bars={64} height={44} readout="text-[1.75rem]" />
-        </div>
-        <p className="text-sm text-ink-soft">
-          <span className="font-semibold" style={{ color }}>
-            {LABELS[guest.label].name}.
-          </span>{" "}
-          {labelMeans(guest.label, scores.reach === null)}
-        </p>
-        <GuestLinks links={guest.links} />
-        <div className="sm:hidden">
-          <LeaveOutButton guestName={guest.name} onLeaveOut={onLeaveOut} />
-        </div>
-      </header>
-
-      <Part
-        id="sheet-idea"
-        title="Episode idea"
-        className="scroll-mt-4"
-        aside={
-          rewritten && (
-            <Chip color="var(--accent)" plain>
-              Rewritten by Echo
-            </Chip>
-          )
-        }
-      >
-        {idea ? (
-          <div className="flex flex-col gap-3">
-            <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
-            <p className="text-ink-soft">{idea.pitch}</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <p className="tag text-ink-dim">Why them</p>
-              <p className="text-sm">{idea.reason}</p>
+    <div className="@container">
+      <div className="rise grid grid-cols-1 gap-10 px-5 pt-7 pb-28 sm:px-8 @[46rem]:grid-cols-2 @[46rem]:gap-x-10">
+        <div className="flex min-w-0 flex-col gap-10">
+          <header className="flex flex-col gap-6">
+            <div className="flex items-center gap-5">
+              <span
+                className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-well sm:size-28 @[46rem]:size-20"
+                style={{
+                  boxShadow: sweet ? `0 0 0 2px var(--void), 0 0 0 4px ${color}` : "inset 0 0 0 1px var(--steel)",
+                }}
+              >
+                <Picture guest={guest} sizes="112px" />
+              </span>
+              <div className="min-w-0">
+                <Chip color={color}>{LABELS[guest.label].name}</Chip>
+                <h2
+                  ref={heading}
+                  tabIndex={-1}
+                  className="mt-1.5 font-display text-3xl leading-[1.05] font-semibold text-balance outline-none! sm:text-4xl @[46rem]:text-3xl"
+                >
+                  {guest.name}
+                </h2>
+                {(guest.bio || guest.description) && (
+                  <p className="mt-1.5 text-pretty text-ink-soft">{guest.bio || guest.description}</p>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <p className="text-sm text-ink-dim">
-            {!analysis.guests.some((other) => other.idea)
-              ? "Episode ideas are off in this demo."
-              : evidence
-                ? "No episode idea yet."
-                : "Echo writes ideas and evidence for the top 10."}
-          </p>
-        )}
-      </Part>
-
-      {evidence && (
-        <Part id="sheet-meet" title="Where your audiences meet">
-          <dl className="grid gap-6 sm:grid-cols-2">
-            <Fact term="Both audiences love">
-              {evidence.shared_tastes.length ? (
-                <TasteChips names={evidence.shared_tastes} color="var(--fit)" />
+            <div className="flex flex-col gap-3">
+              <p className="flex items-baseline justify-between gap-3">
+                <span className="tag text-ink-dim">Scores, out of 100</span>
+                <span className="flex items-baseline gap-2">
+                  <span className="tag text-ink-dim">Echo score</span>
+                  <span className="readout text-3xl">{out100(scores.echo)}</span>
+                </span>
+              </p>
+              <Scores scores={scores} bars={64} height={44} readout="text-[1.75rem]" />
+            </div>
+            <p className="text-sm text-ink-soft">
+              <span className="font-semibold" style={{ color }}>
+                {LABELS[guest.label].name}.
+              </span>{" "}
+              {labelMeans(guest.label, scores.reach === null)}
+            </p>
+            <GuestLinks links={guest.links} />
+          </header>
+        </div>
+        <div className="flex min-w-0 flex-col gap-10">
+          {/* A run without ideas has no box for one: the episode below stands on its own. */}
+          {(idea || ideasOn) && (
+            <Part
+              id="sheet-idea"
+              title="Episode idea"
+              className="scroll-mt-4"
+              aside={
+                rewritten && (
+                  <Chip color="var(--accent)" plain>
+                    Rewritten by Echo
+                  </Chip>
+                )
+              }
+            >
+              {idea ? (
+                <div className="flex flex-col gap-3">
+                  <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
+                  <p className="text-ink-soft">{idea.pitch}</p>
+                  <div className="mt-1 flex flex-col gap-1">
+                    <p className="tag text-ink-dim">Why them</p>
+                    <p className="text-sm">{idea.reason}</p>
+                  </div>
+                </div>
               ) : (
-                <span className="text-sm text-ink-dim">Nothing in common yet.</span>
+                <p className="text-sm text-ink-dim">
+                  {evidence ? "No episode idea yet." : "Echo writes ideas and evidence for the top 10."}
+                </p>
               )}
-            </Fact>
-            <Fact term="Their fans' podcasts, new to you">
-              {evidence.new_podcasts.length ? (
-                <TasteChips names={evidence.new_podcasts} color="var(--reach)" />
-              ) : (
-                <span className="text-sm text-ink-dim">None new to you.</span>
-              )}
-            </Fact>
-            {evidence.ages.length > 0 && (
-              <Fact term="Their fans' age groups" className="sm:col-span-2">
-                <AgeLamps ages={evidence.ages} />
-              </Fact>
-            )}
-          </dl>
-        </Part>
-      )}
-
-      {/* Keyed by the idea: a rewrite brings its own episode. */}
-      <GuestDetails
-        key={`episode-${guest.idea?.title}`}
-        id={analysis.id}
-        guestRef={guest.ref}
-        idea={rewrittenIdea(guest)}
-        length={length}
-        ideaTitle={guest.idea?.title}
-        showMap={analysis.audience_map}
-        onShowMap={onShowMap}
-      />
+            </Part>
+          )}
+          {evidence && (
+            <Part id="sheet-meet" title="Where your audiences meet">
+              <dl className="grid gap-6 sm:grid-cols-2 @[46rem]:grid-cols-1">
+                <Fact term="Both audiences love">
+                  {evidence.shared_tastes.length ? (
+                    <TasteChips names={evidence.shared_tastes} color="var(--fit)" />
+                  ) : (
+                    <span className="text-sm text-ink-dim">Nothing in common yet.</span>
+                  )}
+                </Fact>
+                <Fact term="Their fans' podcasts, new to you">
+                  {evidence.new_podcasts.length ? (
+                    <TasteChips names={evidence.new_podcasts} color="var(--reach)" />
+                  ) : (
+                    <span className="text-sm text-ink-dim">None new to you.</span>
+                  )}
+                </Fact>
+                {evidence.ages.length > 0 && (
+                  <Fact term="Their fans' age groups" className="sm:col-span-2 @[46rem]:col-span-1">
+                    <AgeLamps ages={evidence.ages} />
+                  </Fact>
+                )}
+              </dl>
+            </Part>
+          )}
+        </div>
+        <GuestEpisode
+          id={guest.ref}
+          details={details}
+          ideaTitle={guest.idea?.title}
+          className="@[46rem]:col-span-2"
+        />
+        <GuestFans
+          id={guest.ref}
+          details={details}
+          showMap={analysis.audience_map}
+          guestName={guest.name}
+          className="@[46rem]:col-span-2"
+        />
+      </div>
     </div>
   );
 }

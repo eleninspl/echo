@@ -103,7 +103,7 @@ export function PageNav({ show, stops, lock }: { show: Show; stops: Stop[]; lock
         title="Back to the top"
         className="flex min-w-0 shrink items-center gap-2.5 rounded-lg text-left lg:max-w-[16rem]"
       >
-        <span className="relative hidden size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-well ring-1 ring-steel sm:flex">
+        <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-well ring-1 ring-steel">
           {show.image_url ? (
             <Image src={show.image_url} alt="" fill unoptimized sizes="32px" className="object-cover" />
           ) : (
@@ -112,7 +112,10 @@ export function PageNav({ show, stops, lock }: { show: Show; stops: Stop[]; lock
             </span>
           )}
         </span>
-        <span className="truncate font-display text-sm font-semibold text-ink sm:text-base">{show.title}</span>
+        {/* On a narrow phone the cover stands for the show, where its name would shrink to a letter. */}
+        <span className="sr-only truncate font-display text-sm font-semibold text-ink min-[420px]:not-sr-only sm:text-base">
+          {show.title}
+        </span>
       </button>
 
       <ol className="hidden items-center gap-1 lg:flex">

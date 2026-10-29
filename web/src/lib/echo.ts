@@ -85,6 +85,9 @@ export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]
 export type Message = { role: "user" | "assistant"; content: string };
 
 export type LeaveOutWhy = "had_on" | "not_for_us";
+// The taste map for one age group or country (the map's own controls; Ask Echo doesn't set them).
+export type Lens = { age: AgeBucket | null; country: string | null };
+export type MapLens = Lens & { audience_map: MapRow[] };
 export type BridgeCount = { both: number; yours: number; theirs: number };
 export type GuestBridge = {
   ref: string;
@@ -200,15 +203,18 @@ export const echo = {
   },
   chat: (analysis_id: string, messages: Message[], exclude: string[], taste?: TasteAsk) =>
     call<ChatReply>("/chat", { analysis_id, messages, exclude, taste }),
+  lens: (id: string, lens: Lens, signal?: AbortSignal) =>
+    call<MapLens>(`/analyses/${encodeURIComponent(id)}/map?${lensQuery(lens)}`, undefined, signal),
   bridge: (id: string, ref: string, signal?: AbortSignal) =>
     call<GuestBridge>(
       `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}/bridge`,
       undefined,
       signal,
     ),
-  tasteFans: (id: string, taste: TasteAsk, signal?: AbortSignal) =>
+  // With the taste map on one age group or country, the fans are counted in that group.
+  tasteFans: (id: string, taste: TasteAsk & Partial<Lens>, signal?: AbortSignal) =>
     call<TasteFans>(
-      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}`,
+      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}&${lensQuery({ age: taste.age ?? null, country: taste.country ?? null })}`,
       undefined,
       signal,
     ),
@@ -225,4 +231,11 @@ export const echo = {
 // An idea as the engine takes it, without the web app's own mark.
 function plain({ reason, title, pitch }: Idea) {
   return { reason, title, pitch };
+}
+
+function lensQuery({ age, country }: Lens): string {
+  const query = new URLSearchParams();
+  if (age) query.set("age", age);
+  if (country) query.set("country", country);
+  return query.toString();
 }

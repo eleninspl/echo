@@ -29,13 +29,13 @@
   --love: #ff7a52;
   --reach: #ff4d94;
 
-  /* The sweet spot is teal, the one cool thing on the page; the other labels are quiet, told apart by tone
-     and always named. */
+  /* The sweet spot is a strong teal; the other labels are quiet, told apart by hue
+     (cool blue, violet, ochre, neutral grey) and always named. */
   --sweet: #4fd1b9;
-  --safe: #a3b2d8;
-  --far: #bba7dc;
-  --long-shot: #c9a68c;
-  --balanced: #8f7d89;
+  --safe: #93ade6;
+  --far: #c1a0ee;
+  --long-shot: #d9a266;
+  --balanced: #8e8c94;
 
   --alert: #f2555a;
 
@@ -76,10 +76,10 @@
   --love: #ff4a1a;
   --reach: #ff0a7e;
 
-  --safe: #7787ab;
-  --far: #9b86b5;
-  --long-shot: #a5826a;
-  --balanced: #988a93;
+  --safe: #6b83b8;
+  --far: #9a72c4;
+  --long-shot: #b07a45;
+  --balanced: #8c8c91;
 
   --alert: #d0262c;
 
@@ -317,41 +317,49 @@ a {
     animation: taste-pop 700ms var(--ease-out) backwards;
   }
 
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  /* Echo rings sounding from the show. */
-  @keyframes ring {
-    from {
-      transform: scale(1);
-      opacity: 0.85;
-    }
-    to {
-      transform: scale(9);
-      opacity: 0;
-    }
-  }
-
-  .ring {
+  /* A guest's dot landing on the run screen's small chart. */
+  .dot-pop {
     transform-box: fill-box;
     transform-origin: center;
-    animation: ring 2.8s var(--ease-out) infinite;
+    animation: taste-pop 600ms var(--ease-out) backwards;
   }
 
-  .orbit {
-    animation: orbit var(--orbit-time, 40s) linear infinite;
-  }
-
-  @keyframes orbit {
-    from {
-      transform: rotate(0turn) translateX(var(--orbit-radius, 4%)) rotate(0turn);
-    }
+  /* A left-out person's badge slashed through and faded, one after another. */
+  @keyframes slash {
     to {
-      transform: rotate(1turn) translateX(var(--orbit-radius, 4%)) rotate(-1turn);
+      stroke-dashoffset: 0;
     }
+  }
+
+  @keyframes gone {
+    to {
+      opacity: 0.4;
+      filter: grayscale(1);
+    }
+  }
+
+  .gone {
+    animation: gone 360ms var(--ease-out) forwards;
+    animation-delay: calc(320ms + var(--order, 0) * 120ms);
+  }
+
+  .gone .slash line {
+    stroke-dasharray: 52;
+    stroke-dashoffset: 52;
+    animation: slash 300ms var(--ease-out) forwards;
+    animation-delay: calc(260ms + var(--order, 0) * 120ms);
+  }
+
+  /* Guests whose ideas are being written: their voiceprints breathe in turn, down the list. */
+  @keyframes listen {
+    50% {
+      opacity: 0.4;
+    }
+  }
+
+  .writing .listen {
+    animation: listen 2.4s ease-in-out infinite;
+    animation-delay: calc(var(--order, 0) * 120ms);
   }
 
   /* Something running breathes softly. */
@@ -612,8 +620,20 @@ a {
   .surface,
   .rail,
   .eq > span,
-  .shimmer {
+  .shimmer,
+  .writing .listen,
+  .dot-pop {
     animation: none;
+  }
+
+  .gone {
+    animation: none;
+    opacity: 0.4;
+  }
+
+  .gone .slash line {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 
   .ask-dock,

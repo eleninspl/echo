@@ -338,7 +338,9 @@ function Matches({
               type="button"
               onClick={() => onRun(show.id)}
               disabled={pending !== null}
-              className="group relative flex w-full items-center gap-4 rounded-2xl px-3 py-2.5 text-left transition-[background-color,box-shadow] duration-300 hover:bg-[color-mix(in_srgb,var(--brand)_9%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--brand)_9%,transparent)] disabled:cursor-wait"
+              className={`group relative flex w-full items-center gap-4 rounded-2xl px-3 py-2.5 text-left transition-[background-color,box-shadow] duration-300 hover:bg-[color-mix(in_srgb,var(--brand)_9%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--brand)_9%,transparent)] disabled:cursor-wait ${
+                opening ? "bg-[color-mix(in_srgb,var(--brand)_9%,transparent)]" : ""
+              }`}
             >
               <span
                 aria-hidden
@@ -383,21 +385,6 @@ function Matches({
                   </span>
                 )}
               </span>
-              <span
-                aria-hidden
-                className={`flex size-9 shrink-0 items-center justify-center rounded-full ring-1 transition-[background-color,color,box-shadow] duration-300 group-hover:bg-brand group-hover:text-[color:var(--on-brand)] group-hover:ring-transparent group-focus-visible:bg-brand group-focus-visible:text-[color:var(--on-brand)] ${
-                  opening
-                    ? "bg-brand text-[color:var(--on-brand)] ring-transparent motion-safe:animate-pulse"
-                    : "text-ink-soft ring-ink/15"
-                }`}
-              >
-                <svg
-                  viewBox="0 0 12 12"
-                  className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5"
-                >
-                  <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
-              </span>
               <span className="sr-only">{opening ? `Opening ${show.title}` : `Run Echo on ${show.title}`}</span>
             </button>
           </li>
@@ -407,7 +394,8 @@ function Matches({
   );
 }
 
-function Equalizer() {
+// Four bars bouncing in the score colours, for Echo at work.
+export function Equalizer() {
   return (
     <span aria-hidden className="eq flex h-4 shrink-0 items-end gap-[3px]">
       {["var(--fit)", "var(--love)", "var(--reach)", "var(--love)"].map((color, index) => (

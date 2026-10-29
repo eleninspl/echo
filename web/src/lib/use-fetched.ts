@@ -5,6 +5,30 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { describe, type HostError } from "./errors";
 
 const kept = new Map<string, unknown>();
+// Loads under way, so a component asking for a key that's being fetched ahead joins that load.
+const pending = new Map<string, Promise<unknown>>();
+
+// Whether a key's value is already here, for a view that can skip its wait when it is.
+export const isKept = (key: string) => kept.has(key);
+
+// Fetches a key into the cache before anything asks for it; a key already here or on its way is left alone.
+export function prefetch<T>(key: string, load: () => Promise<T>): Promise<void> {
+  if (kept.has(key)) return Promise.resolve();
+  let loading = pending.get(key);
+  if (!loading) {
+    loading = load()
+      .then((value) => {
+        kept.set(key, value);
+        return value;
+      })
+      .finally(() => pending.delete(key));
+    pending.set(key, loading);
+  }
+  return loading.then(
+    () => undefined,
+    () => undefined,
+  );
+}
 
 export type Fetched<T> = { value: T | null; loading: boolean; problem: HostError | null; retry: () => void };
 
@@ -17,8 +41,10 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
   useEffect(() => {
     if (key === null || kept.has(key)) return;
     const controller = new AbortController();
-    fetchNow(controller.signal)
+    const ahead = pending.get(key);
+    (ahead ?? fetchNow(controller.signal))
       .then((value) => {
+        if (controller.signal.aborted) return;
         kept.set(key, value);
         setLoaded((count) => count + 1);
       })

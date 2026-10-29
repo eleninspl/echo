@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
-import { echo, type Analysis, type AnchorType, type Guest, type MapItem } from "@/lib/echo";
+import { echo, type AgeBucket, type Analysis, type AnchorType, type Guest, type Lens, type MapItem } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
-import { category as categoryName, LABELS } from "@/lib/format";
+import { AGES, category as categoryName, LABELS, SHORT_AGE } from "@/lib/format";
 import type { Ask } from "@/lib/pointer";
+import { AGE_ORDER } from "@/lib/stats";
 import type { Side, Spot } from "@/lib/taste-layout";
 import type { Rerun } from "@/lib/use-analysis";
 import { useFetched } from "@/lib/use-fetched";
@@ -20,9 +21,38 @@ const ANCHOR: Partial<Record<string, AnchorType>> = { music: "artist", film: "mo
 export const FROM = "tastes";
 const FANS_SHOWN = 5;
 const STRIP = 10;
+const COUNTRIES = [
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "Ireland",
+  "New Zealand",
+  "Germany",
+  "France",
+  "Spain",
+  "Italy",
+  "Netherlands",
+  "Sweden",
+  "Brazil",
+  "Mexico",
+  "India",
+  "Japan",
+  "South Africa",
+  "Nigeria",
+];
+
 export const pull = (affinity: number) => Math.round(affinity * 100);
 
 const place = (rank: number) => (rank === 0 ? "Top" : (["2nd", "3rd"][rank - 1] ?? `${rank + 1}th`));
+
+export function lensWords({ age, country }: Lens): string {
+  if (!age && !country) return "Your listeners";
+  const parts = ["Listeners"];
+  if (age) parts.push(AGES[age].toLowerCase());
+  if (country) parts.push(`in ${country}`);
+  return parts.join(" ");
+}
 
 const SIDE_WORDS: Record<Side, { name: string; color: string; means: (guest: string) => string }> = {
   yours: {
@@ -44,6 +74,225 @@ const SIDE_WORDS: Record<Side, { name: string; color: string; means: (guest: str
 
 export function sideOf(where: Side) {
   return SIDE_WORDS[where];
+}
+
+export function LensBar({
+  lens,
+  onLens,
+  onPeek,
+  problem,
+}: {
+  lens: Lens;
+  onLens: (lens: Lens) => void;
+  // Pointing at or focusing an age, so its map can load before the click.
+  onPeek?: (lens: Lens) => void;
+  problem: HostError | null;
+}) {
+  const stops: (AgeBucket | null)[] = [null, ...AGE_ORDER];
+  const index = stops.indexOf(lens.age);
+
+  function keys(event: KeyboardEvent<HTMLDivElement>) {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = Math.min(Math.max(index + step, 0), stops.length - 1);
+    onLens({ ...lens, age: stops[next] });
+    event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
+  }
+
+  return (
+    <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-end @2xl:gap-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span id="lens-age" className="tag text-ink-dim">
+          Listeners by age
+        </span>
+        <div
+          role="radiogroup"
+          aria-labelledby="lens-age"
+          onKeyDown={keys}
+          className="relative grid grid-cols-7 rounded-full bg-deck p-1 shadow-[inset_0_0_0_1px_var(--steel)]"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-y-1 rounded-full bg-accent transition-[left] duration-300 ease-(--ease-out) motion-reduce:transition-none"
+            style={{ left: `calc(0.25rem + ${index} * (100% - 0.5rem) / 7)`, width: "calc((100% - 0.5rem) / 7)" }}
+          />
+          {stops.map((age, i) => {
+            const on = i === index;
+            return (
+              <button
+                key={age ?? "all"}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={age ? AGES[age] : "All ages"}
+                tabIndex={on ? 0 : -1}
+                onClick={() => onLens({ ...lens, age })}
+                onPointerEnter={() => onPeek?.({ ...lens, age })}
+                onFocus={() => onPeek?.({ ...lens, age })}
+                className={`relative min-h-10 rounded-full px-1 text-xs font-semibold whitespace-nowrap transition-colors sm:text-sm ${on ? "text-on-hue" : "text-ink-soft hover:text-ink"}`}
+              >
+                {age ? SHORT_AGE[age] : "All"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5 @2xl:w-64">
+        <span id="lens-country" className="tag text-ink-dim">
+          Listeners in
+        </span>
+        <CountryPicker
+          country={lens.country}
+          describedBy={problem ? "lens-problem" : undefined}
+          onCountry={(country) => onLens({ ...lens, country })}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Which country's listeners the map shows: a button naming it that opens a list to pick from, with a search that also
+// takes a country not on the list (Qloo reads the place by name).
+function CountryPicker({
+  country,
+  describedBy,
+  onCountry,
+}: {
+  country: string | null;
+  describedBy?: string;
+  onCountry: (country: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const typed = query.trim().replace(/\s+/g, " ");
+  const matches = COUNTRIES.filter((name) => name.toLowerCase().includes(typed.toLowerCase()));
+  const known = COUNTRIES.some((name) => name.toLowerCase() === typed.toLowerCase());
+  const other = typed.length >= 2 && typed.length <= 60 && !known;
+  const options: { value: string | null; name: string }[] = [
+    ...(typed ? [] : [{ value: null, name: "Every country" }]),
+    ...matches.map((name) => ({ value: name, name })),
+    ...(other ? [{ value: typed, name: `Listeners in “${typed}”` }] : []),
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+
+  function choose(value: string | null) {
+    setOpen(false);
+    setQuery("");
+    onCountry(value);
+    trigger.current?.focus();
+  }
+
+  function keys(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActive((index) => (index + step + options.length) % Math.max(options.length, 1));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const option = options[active];
+      if (option) choose(option.value);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+      trigger.current?.focus();
+    }
+  }
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby="lens-country lens-country-value"
+        aria-describedby={describedBy}
+        onClick={() => {
+          setOpen(!open);
+          setActive(0);
+        }}
+        className={`flex min-h-12 w-full items-center gap-2 rounded-full bg-deck py-1 pr-2 pl-4 text-left text-sm transition-shadow ${
+          open
+            ? "shadow-[inset_0_0_0_1px_var(--accent)]"
+            : "shadow-[inset_0_0_0_1px_var(--steel)] hover:shadow-[inset_0_0_0_1px_var(--steel-hi)]"
+        }`}
+      >
+        <span id="lens-country-value" className={`min-w-0 flex-1 truncate ${country ? "text-ink" : "text-ink-soft"}`}>
+          {country ?? "Every country"}
+        </span>
+        <svg
+          aria-hidden
+          viewBox="0 0 12 12"
+          className={`size-3 shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M3 4.5L6 7.5l3-3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="rise absolute top-full right-0 z-30 mt-2 flex w-full min-w-60 flex-col gap-1 rounded-2xl bg-deck p-1.5 shadow-pop ring-1 ring-steel">
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActive(0);
+            }}
+            onKeyDown={keys}
+            placeholder="Search a country"
+            maxLength={60}
+            role="combobox"
+            aria-expanded
+            aria-controls="lens-country-list"
+            aria-activedescendant={options[active] ? `lens-country-${active}` : undefined}
+            className="min-h-10 rounded-xl bg-well px-3 text-sm text-ink placeholder:text-ink-dim focus-visible:outline-none!"
+          />
+          <ul
+            id="lens-country-list"
+            role="listbox"
+            aria-label="Countries"
+            className="max-h-64 overflow-y-auto [scrollbar-width:thin]"
+          >
+            {options.map((option, index) => {
+              const on = option.value === country;
+              return (
+                <li
+                  key={option.value ?? "every"}
+                  id={`lens-country-${index}`}
+                  role="option"
+                  aria-selected={on}
+                  onPointerEnter={() => setActive(index)}
+                  onClick={() => choose(option.value)}
+                  className={`flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-sm ${
+                    index === active ? "bg-deck-hi text-ink" : "text-ink-soft"
+                  }`}
+                >
+                  {option.name}
+                  {on && <span aria-hidden className="size-1.5 rounded-full bg-accent" />}
+                </li>
+              );
+            })}
+            {!options.length && <li className="px-3 py-2.5 text-sm text-ink-dim">No country by that name</li>}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function EchoNote({ names, onClear }: { names: string[]; onClear: () => void }) {
@@ -149,6 +398,81 @@ export function GuestStrip({
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+export function LensSide({
+  lens,
+  fresh,
+  gone,
+  loading,
+  problem,
+  onRetry,
+  onClear,
+}: {
+  lens: Lens;
+  fresh: string[];
+  gone: string[];
+  loading: boolean;
+  problem: HostError | null;
+  onRetry: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      <BackButton onClick={onClear}>All listeners</BackButton>
+      <div>
+        <p className="tag text-ink-dim">The map for</p>
+        <p className="mt-1 font-display text-2xl leading-tight font-semibold text-balance">{lensWords(lens)}</p>
+      </div>
+      {problem ? (
+        <div id="lens-problem" role="alert" className="flex flex-col items-start gap-2">
+          <p className="font-semibold text-alert">{problem.title}</p>
+          <p className="text-sm text-ink-soft">{problem.message}</p>
+          {problem.next === "retry" && (
+            <button type="button" onClick={onRetry} className="btn">
+              Try again
+            </button>
+          )}
+        </div>
+      ) : loading ? (
+        <p aria-busy className="flex items-center gap-3 text-ink-soft">
+          <Lamp color="var(--brand)" className="pulse size-2" />
+          Mapping these listeners…
+        </p>
+      ) : (
+        <>
+          <p className="text-sm text-ink-soft">
+            What this group of your listeners likes more than most people do. Circles that moved in grew stronger here;
+            ones that drifted out matter less to them.
+          </p>
+          <div className="flex flex-col gap-2">
+            <p className="flex items-center gap-2 font-semibold">
+              <span aria-hidden className="size-2.5 rounded-full bg-sweet" />
+              New for this group
+              <span className="readout text-sm text-ink-dim">{fresh.length}</span>
+            </p>
+            {fresh.length ? (
+              <span className="flex flex-wrap gap-1.5">
+                {fresh.slice(0, 8).map((name) => (
+                  <Chip key={name} color="var(--sweet)" plain>
+                    {name}
+                  </Chip>
+                ))}
+              </span>
+            ) : (
+              <p className="text-sm text-ink-dim">The same tastes as all your listeners.</p>
+            )}
+          </div>
+          {gone.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold">Less of a pull for them</p>
+              <p className="text-sm text-ink-dim">{joined(gone.slice(0, 6))}.</p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -260,6 +584,7 @@ export function BridgeSide({
 export function TasteSide({
   analysis,
   spot,
+  lens,
   bridged,
   rerun,
   onBack,
@@ -268,6 +593,7 @@ export function TasteSide({
 }: {
   analysis: Analysis;
   spot: Spot;
+  lens: Lens;
   bridged: Guest | null;
   rerun: Rerun;
   onBack: () => void;
@@ -304,7 +630,7 @@ export function TasteSide({
       ) : (
         <div className="flex flex-col gap-1" style={hue(color)}>
           <p className="flex items-baseline justify-between gap-3">
-            <span className="tag text-ink-dim">How strongly your listeners lean to it</span>
+            <span className="tag text-ink-dim">How strongly {lensWords(lens).toLowerCase()} lean to it</span>
             <span className="readout text-3xl">{pull(spot.item.affinity)}</span>
           </p>
           <Track share={spot.item.affinity} order={0} />
@@ -313,7 +639,9 @@ export function TasteSide({
           </p>
         </div>
       )}
-      {ours && <TasteFans analysis={analysis} name={spot.item.name} category={spot.category} onOpen={onOpen} />}
+      {ours && (
+        <TasteFans analysis={analysis} name={spot.item.name} category={spot.category} lens={lens} onOpen={onOpen} />
+      )}
       {ours && (
         <button
           type="button"
@@ -373,15 +701,17 @@ function TasteFans({
   analysis,
   name,
   category,
+  lens,
   onOpen,
 }: {
   analysis: Analysis;
   name: string;
   category: string;
+  lens: Lens;
   onOpen: (ref: string) => void;
 }) {
-  const taste = { category, name };
-  const fans = useFetched(`${analysis.id}|fans|${category}|${name}`, (signal) =>
+  const taste = { category, name, age: lens.age, country: lens.country };
+  const fans = useFetched(`${analysis.id}|fans|${category}|${name}|${lens.age ?? ""}|${lens.country ?? ""}`, (signal) =>
     echo.tasteFans(analysis.id, taste, signal),
   );
   const guests = new Map(analysis.guests.map((guest) => [guest.ref, guest]));
@@ -461,28 +791,32 @@ function BackButton({ onClick, children }: { onClick: () => void; children: Reac
 
 export function TasteImage({ item, color, large = false }: { item: MapItem; color: string; large?: boolean }) {
   const [broken, setBroken] = useState(false);
-  if (item.image_url && !broken) {
-    return (
-      <Image
-        src={item.image_url}
-        alt=""
-        fill
-        unoptimized
-        loading="eager"
-        sizes={large ? "96px" : "64px"}
-        onError={() => setBroken(true)}
-        className="object-cover"
-      />
-    );
-  }
+  const [loaded, setLoaded] = useState(false);
+  const picture = item.image_url && !broken;
+  // The initial on the category's tint, under the picture until it loads and behind a logo's transparent parts.
   return (
-    <span
-      aria-hidden
-      className={`flex size-full items-center justify-center font-display font-semibold text-ink ${large ? "text-4xl" : "text-xs"}`}
-      style={{ background: `color-mix(in srgb, ${color} 30%, var(--well))` }}
-    >
-      {item.name.charAt(0)}
-    </span>
+    <>
+      <span
+        aria-hidden
+        className={`flex size-full items-center justify-center font-display font-semibold text-ink ${large ? "text-4xl" : "text-xs"}`}
+        style={{ background: `color-mix(in srgb, ${color} 30%, var(--well))` }}
+      >
+        {picture && loaded ? "" : item.name.charAt(0)}
+      </span>
+      {picture && (
+        <Image
+          src={item.image_url as string}
+          alt=""
+          fill
+          unoptimized
+          loading="eager"
+          sizes={large ? "96px" : "64px"}
+          onLoad={() => setLoaded(true)}
+          onError={() => setBroken(true)}
+          className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </>
   );
 }
 

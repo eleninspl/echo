@@ -23,6 +23,9 @@ type Props = {
   onHighlight: (guestRef: string | null) => void;
 };
 
+// How many of a guest's shared tastes a wide row shows.
+const SHARED = 3;
+
 type Sort = "echo" | "fit" | "love_back" | "reach";
 
 const SORTS: { key: Sort; name: string; color: string }[] = [
@@ -67,7 +70,8 @@ export function GuestList({
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
       <SectionHead id="guests" title={`All ${guests.length} guests, ${order}`}>
         <div role="group" aria-label="Sort the guests" className="flex flex-wrap items-center gap-1">
-          <span className="mr-1">Sort</span>
+          {/* On a phone the word goes, so the sort and its hint fit on one line; the group still names it. */}
+          <span className="mr-1 hidden sm:inline">Sort</span>
           {SORTS.map(({ key, name, color }) => {
             const on = key === sort;
             return (
@@ -76,7 +80,7 @@ export function GuestList({
                 type="button"
                 aria-pressed={on}
                 onClick={() => choose(key)}
-                className={`flex min-h-8 items-center gap-1.5 rounded-full px-2.5 transition-colors ${
+                className={`flex min-h-8 items-center gap-1.5 rounded-full px-2 transition-colors sm:px-2.5 ${
                   on ? "bg-deck-hi text-ink ring-1 ring-steel-hi" : "text-ink-dim hover:bg-deck hover:text-ink"
                 }`}
               >
@@ -93,9 +97,10 @@ export function GuestList({
       </SectionHead>
       <div
         aria-hidden
-        className="tag -mb-1.5 hidden grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] gap-x-5 px-2 whitespace-nowrap text-ink-dim @2xl:grid"
+        className="tag -mb-1.5 hidden grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] gap-x-5 px-2 whitespace-nowrap text-ink-dim @2xl:grid @5xl:grid-cols-[1.5rem_2.75rem_minmax(12rem,0.8fr)_minmax(0,1.2fr)_6.5rem_15rem_2.75rem_2.25rem]"
       >
-        <span className="col-start-5 grid grid-cols-3 text-center">
+        <span className="col-start-4 hidden @5xl:block">Both audiences love</span>
+        <span className="col-start-5 grid grid-cols-3 text-center @5xl:col-start-6">
           <span className="text-fit">Fit</span>
           <span className="text-love">Love back</span>
           <span className="text-reach">Reach</span>
@@ -150,7 +155,7 @@ function Row({
   return (
     <li
       id={`guest-${guest.ref}`}
-      className={`rise group relative grid scroll-mt-32 grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_auto_2.25rem] items-center gap-x-3.5 gap-y-2 border-b border-steel px-2 py-3 transition-colors @2xl:grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] @2xl:gap-x-5 ${
+      className={`rise group relative grid scroll-mt-32 grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_auto_2.25rem] items-center gap-x-3.5 gap-y-2 border-b border-steel px-2 py-3 transition-colors @2xl:grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_6.5rem_10.5rem_2.75rem_2.25rem] @2xl:gap-x-5 @5xl:grid-cols-[1.5rem_2.75rem_minmax(12rem,0.8fr)_minmax(0,1.2fr)_6.5rem_15rem_2.75rem_2.25rem] ${
         lit || selected ? "bg-deck/70" : "hover:bg-deck/70"
       }`}
       style={
@@ -196,6 +201,18 @@ function Row({
           </span>
         </Link>
         {guest.description && <span className="mt-0.5 block truncate text-xs text-ink-dim">{guest.description}</span>}
+      </span>
+      {/* Wide: what both audiences love fills the middle, on one line; chips that don't fit wrap out of sight. */}
+      <span aria-hidden className="hidden h-6 min-w-0 flex-wrap gap-1.5 overflow-hidden @5xl:flex">
+        {guest.evidence?.shared_tastes.slice(0, SHARED).map((taste) => (
+          <span
+            key={taste}
+            className="max-w-full truncate rounded-full px-2.5 py-0.5 text-xs leading-5 text-ink-soft"
+            style={{ background: "color-mix(in srgb, var(--fit) 12%, var(--well))" }}
+          >
+            {taste}
+          </span>
+        ))}
       </span>
       {/* Narrow: the label and the voiceprint on a second line under the name. Wide: their own columns. */}
       <span className="col-[3/-1] row-start-2 flex items-center justify-between gap-4 @2xl:contents">

@@ -20,6 +20,9 @@ const ZONE = { reach: 0.33, fit: 0.5 };
 const LOW = 0.33;
 const RAMP = [4.5, 6.5, 8.5, 11, 13.5];
 const PAD = { top: 30, right: 24, bottom: 50, left: 58 };
+// Scores of 0 and 100 sit this far inside the plot's edges, so a dot on an edge stays whole and clear of the box's
+// border and the names above it.
+const INSET = 12;
 // How many of the best guests are named beside their dots, fewer on a narrow chart so names don't crowd; the
 // rest are named on hover or focus.
 const NAMED = 10;
@@ -96,8 +99,8 @@ export function Scope({ title, children, guests, selected, highlighted, onSelect
     top: PAD.top,
     bottom: height - PAD.bottom,
   };
-  const x = (reach: number) => plot.left + reach * (plot.right - plot.left);
-  const y = (fit: number) => plot.bottom - fit * (plot.bottom - plot.top);
+  const x = (reach: number) => plot.left + INSET + reach * (plot.right - plot.left - 2 * INSET);
+  const y = (fit: number) => plot.bottom - INSET - fit * (plot.bottom - plot.top - 2 * INSET);
   const position = (guest: Guest) => {
     if (guest.scores.reach !== null) return { cx: x(guest.scores.reach), cy: y(guest.scores.fit) };
     const slot = unscored.indexOf(guest);
