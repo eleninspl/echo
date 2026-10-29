@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
 import { echo, type AgeBucket, type Analysis, type AnchorType, type Guest, type Lens, type MapItem } from "@/lib/echo";
 import type { HostError } from "@/lib/errors";
@@ -90,12 +90,6 @@ export function LensBar({
 }) {
   const stops: (AgeBucket | null)[] = [null, ...AGE_ORDER];
   const index = stops.indexOf(lens.age);
-  const [typed, setTyped] = useState(lens.country ?? "");
-  const [seen, setSeen] = useState(lens.country);
-  if (lens.country !== seen) {
-    setSeen(lens.country);
-    setTyped(lens.country ?? "");
-  }
 
   function keys(event: KeyboardEvent<HTMLDivElement>) {
     const step =
@@ -109,12 +103,6 @@ export function LensBar({
     const next = Math.min(Math.max(index + step, 0), stops.length - 1);
     onLens({ ...lens, age: stops[next] });
     event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
-  }
-
-  function setCountry(value: string) {
-    const country = value.trim().replace(/\s+/g, " ");
-    if (country.length === 1 || country.length > 60) return;
-    onLens({ ...lens, country: country || null });
   }
 
   return (
@@ -155,61 +143,154 @@ export function LensBar({
           })}
         </div>
       </div>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          setCountry(typed);
-        }}
-        className="flex flex-col gap-1.5 @2xl:w-64"
-      >
-        <label htmlFor="lens-country" className="tag text-ink-dim">
+      <div className="flex flex-col gap-1.5 @2xl:w-64">
+        <span id="lens-country" className="tag text-ink-dim">
           Listeners in
-        </label>
-        <div className="flex min-h-12 items-center gap-1 rounded-full bg-deck py-1 pr-1 pl-4 shadow-[inset_0_0_0_1px_var(--steel)] focus-within:shadow-[inset_0_0_0_1px_var(--accent)]">
+        </span>
+        <CountryPicker
+          country={lens.country}
+          describedBy={problem ? "lens-problem" : undefined}
+          onCountry={(country) => onLens({ ...lens, country })}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Which country's listeners the map shows: a button naming it that opens a list to pick from, with a search that also
+// takes a country not on the list (Qloo reads the place by name).
+function CountryPicker({
+  country,
+  describedBy,
+  onCountry,
+}: {
+  country: string | null;
+  describedBy?: string;
+  onCountry: (country: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const typed = query.trim().replace(/\s+/g, " ");
+  const matches = COUNTRIES.filter((name) => name.toLowerCase().includes(typed.toLowerCase()));
+  const known = COUNTRIES.some((name) => name.toLowerCase() === typed.toLowerCase());
+  const other = typed.length >= 2 && typed.length <= 60 && !known;
+  const options: { value: string | null; name: string }[] = [
+    ...(typed ? [] : [{ value: null, name: "Every country" }]),
+    ...matches.map((name) => ({ value: name, name })),
+    ...(other ? [{ value: typed, name: `Listeners in “${typed}”` }] : []),
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+
+  function choose(value: string | null) {
+    setOpen(false);
+    setQuery("");
+    onCountry(value);
+    trigger.current?.focus();
+  }
+
+  function keys(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActive((index) => (index + step + options.length) % Math.max(options.length, 1));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const option = options[active];
+      if (option) choose(option.value);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+      trigger.current?.focus();
+    }
+  }
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby="lens-country lens-country-value"
+        aria-describedby={describedBy}
+        onClick={() => {
+          setOpen(!open);
+          setActive(0);
+        }}
+        className={`flex min-h-12 w-full items-center gap-2 rounded-full bg-deck py-1 pr-2 pl-4 text-left text-sm transition-shadow ${
+          open
+            ? "shadow-[inset_0_0_0_1px_var(--accent)]"
+            : "shadow-[inset_0_0_0_1px_var(--steel)] hover:shadow-[inset_0_0_0_1px_var(--steel-hi)]"
+        }`}
+      >
+        <span id="lens-country-value" className={`min-w-0 flex-1 truncate ${country ? "text-ink" : "text-ink-soft"}`}>
+          {country ?? "Every country"}
+        </span>
+        <svg
+          aria-hidden
+          viewBox="0 0 12 12"
+          className={`size-3 shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M3 4.5L6 7.5l3-3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="rise absolute top-full right-0 z-30 mt-2 flex w-full min-w-60 flex-col gap-1 rounded-2xl bg-deck p-1.5 shadow-pop ring-1 ring-steel">
           <input
-            id="lens-country"
-            list="lens-countries"
-            value={typed}
+            autoFocus
+            value={query}
             onChange={(event) => {
-              setTyped(event.target.value);
-              if (COUNTRIES.includes(event.target.value)) setCountry(event.target.value);
+              setQuery(event.target.value);
+              setActive(0);
             }}
-            placeholder="Every country"
+            onKeyDown={keys}
+            placeholder="Search a country"
             maxLength={60}
-            aria-invalid={problem?.code === "unknown_country" || undefined}
-            aria-describedby={problem ? "lens-problem" : undefined}
-            className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-dim focus-visible:outline-none!"
+            role="combobox"
+            aria-expanded
+            aria-controls="lens-country-list"
+            aria-activedescendant={options[active] ? `lens-country-${active}` : undefined}
+            className="min-h-10 rounded-xl bg-well px-3 text-sm text-ink placeholder:text-ink-dim focus-visible:outline-none!"
           />
-          <datalist id="lens-countries">
-            {COUNTRIES.map((country) => (
-              <option key={country} value={country} />
-            ))}
-          </datalist>
-          {lens.country ? (
-            <button
-              type="button"
-              onClick={() => {
-                setTyped("");
-                onLens({ ...lens, country: null });
-              }}
-              aria-label={`Every country, not only ${lens.country}`}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-deck-hi hover:text-ink"
-            >
-              <svg aria-hidden viewBox="0 0 12 12" className="size-3">
-                <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={typed.trim().length < 2}
-              className="rounded-full px-3 py-2 text-sm font-semibold text-accent disabled:text-ink-dim"
-            >
-              Show
-            </button>
-          )}
+          <ul
+            id="lens-country-list"
+            role="listbox"
+            aria-label="Countries"
+            className="max-h-64 overflow-y-auto [scrollbar-width:thin]"
+          >
+            {options.map((option, index) => {
+              const on = option.value === country;
+              return (
+                <li
+                  key={option.value ?? "every"}
+                  id={`lens-country-${index}`}
+                  role="option"
+                  aria-selected={on}
+                  onPointerEnter={() => setActive(index)}
+                  onClick={() => choose(option.value)}
+                  className={`flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-sm ${
+                    index === active ? "bg-deck-hi text-ink" : "text-ink-soft"
+                  }`}
+                >
+                  {option.name}
+                  {on && <span aria-hidden className="size-1.5 rounded-full bg-accent" />}
+                </li>
+              );
+            })}
+            {!options.length && <li className="px-3 py-2.5 text-sm text-ink-dim">No country by that name</li>}
+          </ul>
         </div>
-      </form>
+      )}
     </div>
   );
 }

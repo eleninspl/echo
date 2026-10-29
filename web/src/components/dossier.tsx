@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import type { AgeBucket, Guest, Scores as GuestScores, LeaveOutWhy } from "@/lib/echo";
+import type { AgeBucket, Guest, Scores as GuestScores } from "@/lib/echo";
 import { AGES, SHORT_AGE } from "@/lib/format";
 import { AGE_ORDER } from "@/lib/stats";
 
@@ -115,73 +115,6 @@ export function PickButton({ guestName, picked, onPick }: { guestName: string; p
       {picked ? "Picked" : "Pick to invite"}
       <span className="sr-only"> {guestName}</span>
     </button>
-  );
-}
-
-const LEAVE_OUT: { why: LeaveOutWhy; name: string; note: string }[] = [
-  { why: "had_on", name: "We've had them on", note: "A past guest Echo missed" },
-  { why: "not_for_us", name: "Not for us", note: "Not right for the show" },
-];
-
-export function LeaveOutButton({
-  guestName,
-  onLeaveOut,
-  place = "left-0",
-}: {
-  guestName: string;
-  onLeaveOut: (why: LeaveOutWhy) => void;
-  place?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: PointerEvent) => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [open]);
-
-  return (
-    <div ref={box} className="relative" onKeyDown={(event) => event.key === "Escape" && setOpen(false)}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className={`btn ${open ? "btn-solid" : ""}`}
-        style={hue("var(--ink)")}
-      >
-        <svg aria-hidden viewBox="0 0 12 12" className="size-3">
-          <circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M2.8 9.2l6.4-6.4" stroke="currentColor" strokeWidth="1.4" />
-        </svg>
-        <span>Leave out</span>
-        <span className="sr-only"> {guestName}</span>
-      </button>
-      {open && (
-        <div
-          className={`rise absolute top-full z-30 mt-2 flex w-60 flex-col rounded-2xl bg-deck p-1.5 shadow-pop ring-1 ring-steel ${place}`}
-        >
-          {LEAVE_OUT.map(({ why, name, note }) => (
-            <button
-              key={why}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onLeaveOut(why);
-              }}
-              className="flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-deck-hi"
-            >
-              <span className="text-sm font-semibold">{name}</span>
-              <span className="text-xs text-ink-dim">{note}</span>
-            </button>
-          ))}
-          <p className="px-3 pt-1 pb-1.5 text-xs text-ink-dim">They stay out of every run of this show.</p>
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -62,7 +62,6 @@ type OpenAnalysis = {
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
   leftOut: LeftOutGuest[];
-  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
   onBringBack: (id: string) => void;
   pointer: Pointer | null;
   onClearPointer: () => void;
@@ -272,7 +271,7 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
               <NextStep problem={describe(error)} onRetry={retry} />
             </Problem>
           ) : analysis.status === "running" ? (
-            <Rundown analysis={analysis} picked={picked} onPick={onPick} />
+            <Rundown analysis={analysis} />
           ) : (
             <Failed analysis={analysis} />
           )}
@@ -297,7 +296,6 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         rewritten,
         onAskSlot: setAskSlot,
         leftOut,
-        onLeaveOut,
         onBringBack,
         pointer,
         onClearPointer,
@@ -337,7 +335,6 @@ export function Console() {
     rewritten,
     onAskSlot,
     leftOut,
-    onLeaveOut,
     onBringBack,
     pointer,
     onClearPointer,
@@ -474,7 +471,6 @@ export function Console() {
         onPick={onPick}
         onOpen={onOpen}
         onClose={onClose}
-        onLeaveOut={onLeaveOut}
         onBridge={onBridge}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />

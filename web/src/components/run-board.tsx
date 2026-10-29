@@ -23,15 +23,7 @@ type View = "radar" | "tastes" | "left" | "scope" | "guests";
 // How many left-out people the picture shows; the rest are counted.
 const SHOWN_LEFT = 12;
 
-export function Rundown({
-  analysis,
-  picked,
-  onPick,
-}: {
-  analysis: Analysis;
-  picked: string[];
-  onPick: (guestRef: string) => void;
-}) {
+export function Rundown({ analysis }: { analysis: Analysis }) {
   const { steps, audience_map: map, guests } = analysis;
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
@@ -102,8 +94,6 @@ export function Rundown({
             ) : (
               <FirstGuests
                 guests={guests}
-                picked={picked}
-                onPick={onPick}
                 writing={steps.some((step) => step.key === "ideas" && !step.done)}
               />
             )}
@@ -219,37 +209,18 @@ function Tastes({ map }: { map: MapRow[] }) {
   );
 }
 
-function FirstGuests({
-  guests,
-  picked,
-  onPick,
-  writing,
-}: {
-  guests: Guest[];
-  picked: string[];
-  onPick: (guestRef: string) => void;
-  writing: boolean;
-}) {
+function FirstGuests({ guests, writing }: { guests: Guest[]; writing: boolean }) {
   const shown = guests.slice(0, SHOWN_GUESTS);
   return (
     <div className="flex flex-col gap-3">
       <Caption title="Your first guests" />
       <p className="-mt-1 flex items-center gap-2.5 text-sm text-ink-soft">
         {writing && <Equalizer />}
-        <span>
-          {writing ? "Echo is writing an episode idea for each. " : ""}Pick anyone you like now: your picks stay when
-          the page opens.
-        </span>
+        <span>{writing ? "Echo is writing an episode idea for each." : "The full page opens in a moment."}</span>
       </p>
       <ol className={`grid gap-x-8 @2xl:grid-cols-2 ${writing ? "writing" : ""}`}>
         {shown.map((guest, index) => (
-          <GuestRow
-            key={guest.ref}
-            guest={guest}
-            index={index}
-            picked={picked.includes(guest.ref)}
-            onPick={() => onPick(guest.ref)}
-          />
+          <GuestRow key={guest.ref} guest={guest} index={index} />
         ))}
       </ol>
       {guests.length > shown.length && (
@@ -259,24 +230,14 @@ function FirstGuests({
   );
 }
 
-function GuestRow({
-  guest,
-  index,
-  picked,
-  onPick,
-}: {
-  guest: Guest;
-  index: number;
-  picked: boolean;
-  onPick: () => void;
-}) {
+function GuestRow({ guest, index }: { guest: Guest; index: number }) {
   const color = LABEL_HUE[guest.label];
   const sweet = guest.label === "sweet_spot";
   const { fit, love_back, reach } = guest.scores;
   const shared = guest.evidence?.shared_tastes.slice(0, 2) ?? [];
   return (
     <li
-      className="rise grid h-16 grid-cols-[1.5rem_2.5rem_minmax(0,1fr)_2.25rem] items-center gap-x-3 border-b border-steel sm:grid-cols-[1.5rem_2.5rem_minmax(0,1fr)_auto_2.25rem]"
+      className="rise grid h-16 grid-cols-[1.5rem_2.5rem_minmax(0,1fr)] items-center gap-x-3 border-b border-steel sm:grid-cols-[1.5rem_2.5rem_minmax(0,1fr)_auto]"
       style={{ "--order": index } as CSSProperties}
     >
       <span className="readout text-sm text-ink-dim">{rank(index)}</span>
@@ -303,28 +264,6 @@ function GuestRow({
         height={22}
         className="listen hidden w-20 sm:block"
       />
-      <button
-        type="button"
-        onClick={onPick}
-        aria-pressed={picked}
-        title={picked ? "Picked to invite" : "Pick to invite"}
-        className={`flex size-9 items-center justify-center rounded-full transition-colors ${
-          picked
-            ? "bg-ink text-on-hue"
-            : "text-ink-soft shadow-[inset_0_0_0_1px_var(--steel-hi)] hover:bg-deck-hi hover:text-ink"
-        }`}
-      >
-        <span className="sr-only">
-          {picked ? "Picked to invite" : "Pick to invite"} {guest.name}
-        </span>
-        <svg aria-hidden viewBox="0 0 12 12" className="size-3">
-          {picked ? (
-            <path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-          ) : (
-            <path d="M6 2v8M2 6h8" fill="none" stroke="currentColor" strokeWidth="1.6" />
-          )}
-        </svg>
-      </button>
     </li>
   );
 }

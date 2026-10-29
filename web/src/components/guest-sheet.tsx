@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import type { Analysis, Guest, LeaveOutWhy } from "@/lib/echo";
+import type { Analysis, Guest } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
 import { useEpisodeLength } from "@/lib/invitations";
 import { showTastes } from "@/lib/pointer";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
-import { AgeLamps, GuestLinks, LeaveOutButton, PickButton, Scores, TasteChips } from "./dossier";
+import { AgeLamps, GuestLinks, PickButton, Scores, TasteChips } from "./dossier";
 import { GuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
@@ -25,7 +25,6 @@ type Props = {
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
   onClose: () => void;
-  onLeaveOut: (guestRef: string, why: LeaveOutWhy) => void;
   onBridge: (guestId: string) => void;
 };
 
@@ -37,7 +36,6 @@ export function GuestSheet({
   onPick,
   onOpen,
   onClose,
-  onLeaveOut,
   onBridge,
 }: Props) {
   const { guests } = analysis;
@@ -109,9 +107,6 @@ export function GuestSheet({
         </div>
         {guest && (
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <LeaveOutButton guestName={guest.name} onLeaveOut={(why) => onLeaveOut(guest.ref, why)} place="right-0" />
-            </div>
             <PickButton guestName={guest.name} picked={picked.includes(guest.ref)} onPick={() => onPick(guest.ref)} />
           </div>
         )}
@@ -124,7 +119,6 @@ export function GuestSheet({
             guest={guest}
             rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
-            onLeaveOut={(why) => onLeaveOut(guest.ref, why)}
             onShowMap={() => {
               onBridge(guest.id);
               if (matchMedia(BESIDE).matches) {
@@ -148,14 +142,12 @@ function GuestBody({
   guest,
   rewritten,
   heading,
-  onLeaveOut,
   onShowMap,
 }: {
   analysis: Analysis;
   guest: Guest;
   rewritten: boolean;
   heading: RefObject<HTMLHeadingElement | null>;
-  onLeaveOut: (why: LeaveOutWhy) => void;
   onShowMap: () => void;
 }) {
   const { scores, idea, evidence } = guest;
@@ -203,9 +195,6 @@ function GuestBody({
           {labelMeans(guest.label, scores.reach === null)}
         </p>
         <GuestLinks links={guest.links} />
-        <div className="sm:hidden">
-          <LeaveOutButton guestName={guest.name} onLeaveOut={onLeaveOut} />
-        </div>
       </header>
 
       <Part
