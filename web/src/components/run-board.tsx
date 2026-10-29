@@ -20,7 +20,7 @@ const SLOW_MS = 3000;
 // What the picture beside the steps shows: the latest step's result, one at a time.
 type View = "radar" | "tastes" | "left" | "scope" | "guests";
 
-// How many left-out names the picture strikes through; the rest are counted.
+// How many left-out people the picture shows; the rest are counted.
 const SHOWN_LEFT = 12;
 
 export function Rundown({
@@ -343,34 +343,69 @@ function Caption({ title, children }: { title: string; children?: ReactNode }) {
   );
 }
 
-// The show's hosts and past guests, struck through one after another as Echo takes them off the list.
+// The show's hosts and past guests as Echo takes them off the list: a count of each, then a badge per person with
+// their initials, slashed through and faded one after another, hosts first.
 function LeftOut({ people: all }: { people: Analysis["left_out"] }) {
-  const people = distinct(all);
-  const shown = people.slice(0, SHOWN_LEFT);
-  const more = people.length - shown.length;
+  const people = distinct(all).sort((a, b) => Number(b.why === "host") - Number(a.why === "host"));
+  const hosts = people.filter(({ why }) => why === "host").length;
+  const past = people.length - hosts;
+  const more = people.length > SHOWN_LEFT ? people.length - (SHOWN_LEFT - 1) : 0;
+  const shown = more ? people.slice(0, SHOWN_LEFT - 1) : people;
   return (
     <div className="flex flex-col gap-5">
       <Caption title="Left out">Already on the show, so not new to your listeners</Caption>
-      <ul className="flex max-w-[36rem] flex-wrap gap-x-5 gap-y-3">
+      <dl className="flex gap-8">
+        {[
+          { term: hosts === 1 ? "host" : "hosts", count: hosts },
+          { term: past === 1 ? "past guest" : "past guests", count: past },
+        ].map(({ term, count }) => (
+          <div key={term} className="flex items-baseline gap-2">
+            <dd className="readout font-display text-3xl">{count}</dd>
+            <dt className="text-sm text-ink-soft">{term}</dt>
+          </div>
+        ))}
+      </dl>
+      <ul className="grid max-w-[36rem] grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-x-3 gap-y-4">
         {shown.map(({ name, why }, index) => (
           <li
             key={`${name}-${index}`}
-            className="rise flex items-baseline gap-2"
+            className="rise flex flex-col items-center gap-1.5 text-center"
             style={{ "--order": index } as CSSProperties}
           >
-            <span
-              className="strike font-display text-xl leading-tight font-semibold text-ink-soft"
-              style={{ "--order": index } as CSSProperties}
-            >
-              {name}
+            <span className="gone relative size-14" style={{ "--order": index } as CSSProperties}>
+              <span
+                className="flex size-full items-center justify-center rounded-full font-display font-semibold text-ink"
+                style={{
+                  background: why === "host" ? "color-mix(in srgb, var(--accent) 16%, var(--well))" : "var(--well)",
+                  boxShadow: `inset 0 0 0 1px ${why === "host" ? "var(--ink-soft)" : "var(--steel-hi)"}`,
+                }}
+              >
+                {initials(name)}
+              </span>
+              <svg aria-hidden viewBox="0 0 56 56" className="slash absolute inset-0 size-full overflow-visible">
+                <line x1="10" y1="46" x2="46" y2="10" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </span>
-            <span className="tag text-ink-dim">{why === "host" ? "Host" : "Past guest"}</span>
+            <span className="line-clamp-2 text-xs leading-tight text-ink-soft">{name}</span>
+            <span className="-mt-1 text-[0.6875rem] text-ink-dim">{why === "host" ? "Host" : "Past guest"}</span>
           </li>
         ))}
+        {more > 0 && (
+          <li className="rise flex flex-col items-center gap-1.5" style={{ "--order": shown.length } as CSSProperties}>
+            <span className="flex size-14 items-center justify-center rounded-full font-display text-sm font-semibold text-ink-soft shadow-[inset_0_0_0_1px_var(--steel)]">
+              +{more}
+            </span>
+            <span className="text-xs text-ink-dim">more</span>
+          </li>
+        )}
       </ul>
-      {more > 0 && <p className="text-sm text-ink-dim">and {more} more</p>}
     </div>
   );
+}
+
+function initials(name: string): string {
+  const words = name.split(/\s+/).filter((word) => /^\p{L}/u.test(word));
+  return (words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? name).slice(0, 2)).toUpperCase();
 }
 
 // The guests as they're scored, dropping onto a small fit-by-reach chart: a dot per guest in its label's hue, bigger

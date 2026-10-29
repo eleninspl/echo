@@ -324,55 +324,30 @@ a {
     animation: taste-pop 600ms var(--ease-out) backwards;
   }
 
-  /* A left-out name struck through, one after another. */
-  @keyframes strike {
+  /* A left-out person's badge slashed through and faded, one after another. */
+  @keyframes slash {
     to {
-      background-size: 100% 1.5px;
-      color: var(--ink-dim);
+      stroke-dashoffset: 0;
     }
   }
 
-  .strike {
-    background: linear-gradient(currentColor, currentColor) no-repeat 0 58% / 0 1.5px;
-    animation: strike 420ms var(--ease-out) forwards;
-    animation-delay: calc(180ms + var(--order, 0) * 110ms);
-  }
-
-  @keyframes spin {
+  @keyframes gone {
     to {
-      transform: rotate(360deg);
+      opacity: 0.4;
+      filter: grayscale(1);
     }
   }
 
-  /* Echo rings sounding from the show. */
-  @keyframes ring {
-    from {
-      transform: scale(1);
-      opacity: 0.85;
-    }
-    to {
-      transform: scale(9);
-      opacity: 0;
-    }
+  .gone {
+    animation: gone 360ms var(--ease-out) forwards;
+    animation-delay: calc(320ms + var(--order, 0) * 120ms);
   }
 
-  .ring {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: ring 2.8s var(--ease-out) infinite;
-  }
-
-  .orbit {
-    animation: orbit var(--orbit-time, 40s) linear infinite;
-  }
-
-  @keyframes orbit {
-    from {
-      transform: rotate(0turn) translateX(var(--orbit-radius, 4%)) rotate(0turn);
-    }
-    to {
-      transform: rotate(1turn) translateX(var(--orbit-radius, 4%)) rotate(-1turn);
-    }
+  .gone .slash line {
+    stroke-dasharray: 52;
+    stroke-dashoffset: 52;
+    animation: slash 300ms var(--ease-out) forwards;
+    animation-delay: calc(260ms + var(--order, 0) * 120ms);
   }
 
   /* Guests whose ideas are being written: their voiceprints breathe in turn, down the list. */
@@ -651,10 +626,14 @@ a {
     animation: none;
   }
 
-  .strike {
+  .gone {
     animation: none;
-    background-size: 100% 1.5px;
-    color: var(--ink-dim);
+    opacity: 0.4;
+  }
+
+  .gone .slash line {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 
   .ask-dock,

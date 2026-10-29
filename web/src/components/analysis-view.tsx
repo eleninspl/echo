@@ -411,7 +411,6 @@ export function Console() {
           picked={picked}
           onPick={onPick}
           onOpen={onOpen}
-          onLeaveOut={onLeaveOut}
         />
         <Scope
           key={`scope-${analysis.id}`}

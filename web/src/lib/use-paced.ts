@@ -6,9 +6,16 @@ import type { Analysis } from "./echo";
 
 // How long the screen stays at least on what a step just finished, so a result the engine has in a blink can still be
 // seen: longest for the run screen's two pictures that play out (the left-out names struck through, the guests dropping
-// onto the chart in run-board.tsx), short for the rest. Keyed by the step just shown done; START is before any.
-const HOLD_MS: Record<string, number> = { START: 900, map: 1200, find: 600, clean: 1900, score: 2000, evidence: 600 };
-const HOLD_DEFAULT = 600;
+// onto the chart in run-board.tsx), about a second and a half for the rest. Keyed by the step just shown done; START is before any.
+const HOLD_MS: Record<string, number> = {
+  START: 1200,
+  map: 1500,
+  find: 1300,
+  clean: 2800,
+  score: 2400,
+  evidence: 1300,
+};
+const HOLD_DEFAULT = 1300;
 // How long the finished list of steps shows before the page opens.
 const END_MS = 500;
 

@@ -79,10 +79,13 @@ export function sideOf(where: Side) {
 export function LensBar({
   lens,
   onLens,
+  onPeek,
   problem,
 }: {
   lens: Lens;
   onLens: (lens: Lens) => void;
+  // Pointing at or focusing an age, so its map can load before the click.
+  onPeek?: (lens: Lens) => void;
   problem: HostError | null;
 }) {
   const stops: (AgeBucket | null)[] = [null, ...AGE_ORDER];
@@ -142,6 +145,8 @@ export function LensBar({
                 aria-label={age ? AGES[age] : "All ages"}
                 tabIndex={on ? 0 : -1}
                 onClick={() => onLens({ ...lens, age })}
+                onPointerEnter={() => onPeek?.({ ...lens, age })}
+                onFocus={() => onPeek?.({ ...lens, age })}
                 className={`relative min-h-10 rounded-full px-1 text-xs font-semibold whitespace-nowrap transition-colors sm:text-sm ${on ? "text-on-hue" : "text-ink-soft hover:text-ink"}`}
               >
                 {age ? SHORT_AGE[age] : "All"}

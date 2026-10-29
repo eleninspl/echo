@@ -8,7 +8,8 @@ import { category as categoryName } from "@/lib/format";
 import { STAGE_ID, TASTES_ID, type Ask, type Pointer } from "@/lib/pointer";
 import { MAX_SIDE, middleOf, ring, SIDES, tasteKey, venn, type Spot } from "@/lib/taste-layout";
 import type { Rerun } from "@/lib/use-analysis";
-import { useFetched, useSettled } from "@/lib/use-fetched";
+import { AGE_ORDER } from "@/lib/stats";
+import { isKept, prefetch, useFetched, useSettled } from "@/lib/use-fetched";
 
 import { Picture } from "./guest-list";
 import { categoryHue, Info, SectionHead } from "./hud";
@@ -95,10 +96,37 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
   }, [shown]);
 
   const wanted = lensId(lens);
-  const asked = useSettled(wanted, ASK_AFTER);
-  const fetchedLens = useFetched(asked ? `${analysis.id}|map|${asked}` : null, (signal) =>
+  const mapKey = (id: string) => `${analysis.id}|map|${id}`;
+  // A lens asked for settles before it's fetched, so stepping through ages doesn't fetch each; one already here shows
+  // at once.
+  const settledAsk = useSettled(wanted, ASK_AFTER);
+  const asked = wanted && isKept(mapKey(wanted)) ? wanted : settledAsk;
+  const fetchedLens = useFetched(asked ? mapKey(asked) : null, (signal) =>
     echo.lens(analysis.id, lensOf(asked), signal),
   );
+  // Pointing at a lens fetches it ahead of the click.
+  const peek = (next: Lens) => {
+    const id = lensId(next);
+    if (id) void prefetch(mapKey(id), () => echo.lens(analysis.id, next));
+  };
+
+  // Once the map is in view, each age group's map loads in the background, two at a time, so switching ages is
+  // instant (6 Qloo calls each, cached by the engine after the first time).
+  useEffect(() => {
+    if (!shown || bridged) return;
+    let stopped = false;
+    const queue = [...AGE_ORDER];
+    const worker = async () => {
+      for (let age = queue.shift(); age && !stopped; age = queue.shift()) {
+        const next = { age, country: null };
+        await prefetch(`${analysis.id}|map|${lensId(next)}`, () => echo.lens(analysis.id, next));
+      }
+    };
+    void Promise.all([worker(), worker()]);
+    return () => {
+      stopped = true;
+    };
+  }, [shown, bridged, analysis.id]);
   const lensRows = useMemo(
     () => (fetchedLens.value ? filled(fetchedLens.value.audience_map) : null),
     [fetchedLens.value],
@@ -195,7 +223,7 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
           see what their fans love next to yours.
         </Info>
       </SectionHead>
-      {!guest && <LensBar lens={lens} onLens={changeLens} problem={lensProblem} />}
+      {!guest && <LensBar lens={lens} onLens={changeLens} onPeek={peek} problem={lensProblem} />}
       <div className="grid grid-cols-1 gap-x-12 gap-y-8 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:items-center">
         <div ref={frame} id={STAGE_ID} className="flex min-w-0 scroll-mt-20 flex-col gap-4">
           {echoedNames.length > 0 && <EchoNote names={echoedNames} onClear={clearEchoed} />}

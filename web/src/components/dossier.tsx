@@ -126,12 +126,10 @@ const LEAVE_OUT: { why: LeaveOutWhy; name: string; note: string }[] = [
 export function LeaveOutButton({
   guestName,
   onLeaveOut,
-  compact = false,
   place = "left-0",
 }: {
   guestName: string;
   onLeaveOut: (why: LeaveOutWhy) => void;
-  compact?: boolean;
   place?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -152,7 +150,6 @@ export function LeaveOutButton({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        title={compact ? "Leave out" : undefined}
         className={`btn ${open ? "btn-solid" : ""}`}
         style={hue("var(--ink)")}
       >
@@ -160,7 +157,7 @@ export function LeaveOutButton({
           <circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
           <path d="M2.8 9.2l6.4-6.4" stroke="currentColor" strokeWidth="1.4" />
         </svg>
-        <span className={compact ? "sr-only sm:not-sr-only" : ""}>Leave out</span>
+        <span>Leave out</span>
         <span className="sr-only"> {guestName}</span>
       </button>
       {open && (
