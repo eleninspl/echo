@@ -32,7 +32,7 @@ import { CopyButton } from "./copy-button";
 import { GuestLinks } from "./dossier";
 import { Picture } from "./guest-list";
 import { LABEL_HUE, hue } from "./hud";
-import { DetailsPicker, GuestDetailsLine } from "./invite-details";
+import { DetailsRows, GuestDetailsLine } from "./invite-details";
 import { Problem } from "./problem";
 
 // The engine writes at most 5 drafts a request; more picks go in parallel requests.
@@ -237,36 +237,23 @@ export function Invite({
           </p>
         </div>
 
-        <form onSubmit={submit} className="zone flex flex-col gap-6 p-5 sm:p-6">
-          <fieldset className="flex flex-col">
-            <legend className="mb-3 flex items-baseline gap-2">
+        <form
+          onSubmit={submit}
+          className="zone grid gap-x-10 gap-y-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]"
+        >
+          <fieldset className="flex min-w-0 flex-col">
+            <legend className="mb-4 flex items-baseline gap-2">
               <span className="font-display text-base font-semibold">{one ? "The details" : "For everyone"}</span>
-              <span className="text-sm text-ink-dim">all optional</span>
+              <span className="text-sm text-ink-dim">a click to change or clear</span>
             </legend>
-            <DetailsPicker
+            <DetailsRows
               details={details.forAll}
-              label={one ? "The details" : "The details for everyone"}
               onChange={(change) => setDetails((current) => ({ ...current, forAll: { ...current.forAll, ...change } }))}
             />
           </fieldset>
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] md:items-end md:gap-x-5">
-            <label className="flex flex-col gap-1.5">
-              <span className="tag text-ink-dim">Anything else</span>
-              <input
-                value={notes.forAll}
-                onChange={(event) =>
-                  setNotes((current) => ({
-                    ...current,
-                    forAll: event.target.value,
-                  }))
-                }
-                maxLength={SHARED_NOTE_LIMIT}
-                placeholder="A recent episode, a reply-by date, or how to write: shorter, warmer…"
-                className={input}
-              />
-            </label>
+          <div className="flex min-w-0 flex-col gap-4 lg:border-l lg:border-steel lg:pl-10">
             {savedName && !renaming ? (
-              <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft md:pb-3">
+              <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
                 Signed as <span className="font-semibold text-ink">{savedName}</span>
                 <button
                   type="button"
@@ -289,10 +276,26 @@ export function Invite({
                 />
               </label>
             )}
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="tag text-ink-dim">Anything else</span>
+              <textarea
+                value={notes.forAll}
+                onChange={(event) =>
+                  setNotes((current) => ({
+                    ...current,
+                    forAll: event.target.value,
+                  }))
+                }
+                maxLength={SHARED_NOTE_LIMIT}
+                rows={2}
+                placeholder="A recent episode, a reply-by date, or how to write: shorter, warmer…"
+                className={`${input} min-h-20 flex-1 resize-none`}
+              />
+            </label>
             <button
               type="submit"
               disabled={writing.length > 0 || notSetUp}
-              className={`btn min-h-12 px-6 text-base ${missing.length ? "btn-brand" : ""}`}
+              className={`btn min-h-12 w-full px-6 text-base ${missing.length ? "btn-brand" : ""}`}
             >
               {label}
             </button>

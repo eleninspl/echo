@@ -76,7 +76,12 @@ function parseDetail(value: unknown): InviteDetails {
   return details;
 }
 
+// What a show starts with before the host sets anything: the usual podcast booking, one click to change.
+// No fee: Echo never guesses about money.
+export const DEFAULT_DETAILS: InviteDetails = { dates: "Flexible", format: "remote", length: "60 min" };
+
 function parseDetails(value: unknown): Details {
+  if (value === null) return { forAll: { ...DEFAULT_DETAILS }, perGuest: {} };
   const details = isRecord(value) ? value : {};
   const perGuest = isRecord(details.perGuest) ? details.perGuest : {};
   return {
@@ -114,11 +119,11 @@ export function mergedDetails(forAll: InviteDetails | undefined, own: InviteDeta
   return merged;
 }
 
-const noDetails = (details: Details) =>
-  !cleanDetails(details.forAll) && !Object.values(details.perGuest).some((own) => cleanDetails(own));
+// Kept even when the host clears everything, so the defaults don't come back.
+const neverEmpty = () => false;
 
 export function useDetails(showId: string) {
-  return useStored(`echo.invite-details.${showId}`, parseDetails, noDetails);
+  return useStored(`echo.invite-details.${showId}`, parseDetails, neverEmpty);
 }
 
 export function useEpisodeLength(showId: string): string | undefined {
