@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { Analysis, Guest, MapRow, Step } from "@/lib/echo";
 import { category, LABELS } from "@/lib/format";
 
 import { Picture } from "./guest-list";
+import { Equalizer } from "./show-finder";
 import { categoryHue, Chip, LABEL_HUE, Lamp, rank, SectionHead } from "./hud";
 import { TasteImage } from "./taste-side";
 import { Voiceprint } from "./voiceprint";
@@ -13,6 +14,8 @@ import { Voiceprint } from "./voiceprint";
 const SHOWN_GUESTS = 10;
 const SHOWN_TASTES = 8;
 const STRUCK = 3;
+// A step that takes longer than this shows how long it has taken so far, so a slow one visibly moves.
+const SLOW_MS = 3000;
 
 type View = "tastes" | "guests";
 
@@ -33,37 +36,47 @@ export function Rundown({
   const view: View | null = guests.length ? (chosen ?? "guests") : tastes ? "tastes" : null;
   return (
     <section aria-labelledby="running" className="flex flex-col gap-4">
-      <SectionHead id="running" title="Echo is running">
-        <span className="text-accent">
-          {done} / {steps.length}
-        </span>
-      </SectionHead>
+      <SectionHead id="running" title="Echo is running" />
+      {/* On a phone the steps sit below the picture, so the one running is named here too. */}
+      <p aria-hidden className="-mt-2 flex items-center gap-2 text-sm text-ink-soft md:hidden">
+        <Lamp color="var(--accent)" on className="pulse size-2 shrink-0" />
+        {current >= 0 ? `Step ${current + 1} of ${steps.length} · ${steps[current].label}` : "Finishing"}
+      </p>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 md:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
-        <ol className="flex flex-col">
-          {steps.map((step, index) => {
-            const on = index === current;
-            const found = detail(step, analysis);
-            return (
-              <li
-                key={step.key}
-                aria-current={on ? "step" : undefined}
-                className={`flex h-14 items-center gap-4 border-b border-steel last:border-b-0 ${step.done || on ? "text-ink" : "text-ink-dim"}`}
-              >
-                <span className="readout w-6 text-sm text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
-                <Lamp
-                  color={step.done ? "var(--ink-soft)" : "var(--accent)"}
-                  on={step.done || on}
-                  className={`size-2.5 shrink-0 ${on ? "pulse" : ""}`}
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className={`truncate ${on ? "font-semibold" : ""}`}>{step.label}</span>
-                  {found && <span className="fade truncate text-xs text-ink-dim">{found}</span>}
-                </span>
-                <span className="sr-only">{step.done ? "(done)" : on ? "(running)" : "(waiting)"}</span>
-              </li>
-            );
-          })}
-        </ol>
+        <div className="flex flex-col gap-4">
+          <ol className="flex flex-col">
+            {steps.map((step, index) => {
+              const on = index === current;
+              const found = detail(step, analysis);
+              return (
+                <li
+                  key={step.key}
+                  aria-current={on ? "step" : undefined}
+                  className={`flex min-h-14 items-center gap-4 border-b border-steel py-2 last:border-b-0 ${
+                    step.done || on ? "text-ink" : "text-ink-dim"
+                  }`}
+                >
+                  <span className="readout w-6 text-sm text-ink-dim">{String(index + 1).padStart(2, "0")}</span>
+                  <Lamp
+                    color={step.done ? "var(--ink-soft)" : "var(--accent)"}
+                    on={step.done || on}
+                    className={`size-2.5 shrink-0 ${on ? "pulse" : ""}`}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className={`leading-snug text-balance ${on ? "font-semibold" : ""}`}>{step.label}</span>
+                    {found && <span className="fade line-clamp-2 text-xs text-ink-dim">{found}</span>}
+                  </span>
+                  {on && <Elapsed key={step.key} />}
+                  <span className="sr-only">{step.done ? "(done)" : on ? "(running)" : "(waiting)"}</span>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="text-sm text-pretty text-ink-dim">
+            {current >= 0 ? `Step ${current + 1} of ${steps.length}. ` : "Done. "}
+            It usually takes under a minute, and the page opens by itself.
+          </p>
+        </div>
         <div className="@container order-first flex min-h-[22rem] flex-col gap-4 md:order-none md:h-[31rem]">
           {view === null ? (
             <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
@@ -91,9 +104,6 @@ export function Rundown({
           )}
         </div>
       </div>
-      <p className="text-sm text-ink-soft">
-        It usually takes under a minute. The page opens by itself when it&apos;s done.
-      </p>
       <p aria-live="polite" className="sr-only">
         {current >= 0 ? `${steps[current].label}, step ${current + 1} of ${steps.length}.` : "Finishing."}
       </p>
@@ -120,7 +130,7 @@ function detail(step: Step, analysis: Analysis): ReactNode {
           Left out{" "}
           {struck.map(({ name }, index) => (
             <span key={`${name}-${index}`}>
-              <s className="decoration-ink-dim">{name}</s>
+              <s className="text-ink-soft decoration-ink-dim/70">{name}</s>
               {index < struck.length - 1 ? ", " : ""}
             </span>
           ))}
@@ -241,11 +251,14 @@ function FirstGuests({
   const shown = guests.slice(0, SHOWN_GUESTS);
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-ink-soft">
-        {writing ? "Echo is writing their episode ideas. " : ""}Pick anyone you like now: your picks stay when the page
-        opens.
+      <p className="flex items-center gap-2.5 text-sm text-ink-soft">
+        {writing && <Equalizer />}
+        <span>
+          {writing ? "Echo is writing an episode idea for each. " : ""}Pick anyone you like now: your picks stay when
+          the page opens.
+        </span>
       </p>
-      <ol className="grid gap-x-8 @2xl:grid-cols-2">
+      <ol className={`grid gap-x-8 @2xl:grid-cols-2 ${writing ? "writing" : ""}`}>
         {shown.map((guest, index) => (
           <GuestRow
             key={guest.ref}
@@ -299,7 +312,14 @@ function GuestRow({
           {shared.length > 0 && <span className="truncate">Both love {shared.join(", ")}</span>}
         </span>
       </span>
-      <Voiceprint fit={fit} love={love_back} reach={reach} bars={24} height={22} className="hidden w-20 sm:block" />
+      <Voiceprint
+        fit={fit}
+        love={love_back}
+        reach={reach}
+        bars={24}
+        height={22}
+        className="listen hidden w-20 sm:block"
+      />
       <button
         type="button"
         onClick={onPick}
@@ -324,6 +344,18 @@ function GuestRow({
       </button>
     </li>
   );
+}
+
+// How long the step on screen has run, once it's slower than SLOW_MS: the real time, counted from when it showed.
+function Elapsed() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  if (seconds * 1000 < SLOW_MS) return null;
+  return <span className="fade readout shrink-0 text-xs text-ink-dim">{seconds} s</span>;
 }
 
 // Echo rings sounding from the show while it works, and the steps done as an arc around them.

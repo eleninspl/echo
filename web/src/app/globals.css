@@ -354,6 +354,18 @@ a {
     }
   }
 
+  /* Guests whose ideas are being written: their voiceprints breathe in turn, down the list. */
+  @keyframes listen {
+    50% {
+      opacity: 0.4;
+    }
+  }
+
+  .writing .listen {
+    animation: listen 2.4s ease-in-out infinite;
+    animation-delay: calc(var(--order, 0) * 120ms);
+  }
+
   /* Something running breathes softly. */
   @keyframes pulse-soft {
     50% {
@@ -612,7 +624,8 @@ a {
   .surface,
   .rail,
   .eq > span,
-  .shimmer {
+  .shimmer,
+  .writing .listen {
     animation: none;
   }
 

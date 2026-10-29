@@ -28,6 +28,7 @@ import type { Ask, Pointer } from "@/lib/pointer";
 import { readRewrites, saveRewrite, withRewrites } from "@/lib/rewrites";
 import { stats as computeStats } from "@/lib/stats";
 import { useAnalysis, useRerun, type Rerun } from "@/lib/use-analysis";
+import { usePacedRun } from "@/lib/use-paced";
 import { useStart } from "@/lib/use-start";
 
 import { Backdrop } from "./backdrop";
@@ -85,7 +86,9 @@ export function useOpenAnalysis(): OpenAnalysis {
 export function AnalysisShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { id, guestRef, inviting } = readPath(usePathname());
-  const { analysis: loadedAnalysis, error, retry, update } = useAnalysis(id);
+  const { analysis: polled, error, retry, update } = useAnalysis(id);
+  // The run screen shows each step long enough to read, so the page opens once it has caught up with the engine.
+  const loadedAnalysis = usePacedRun(polled);
   const [picks, setPicks] = useState<Choice<Pick[]>>({ id: null, value: [] });
   const openId = loadedAnalysis?.id ?? null;
   const showId = loadedAnalysis?.show.id ?? null;

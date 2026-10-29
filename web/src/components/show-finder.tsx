@@ -394,7 +394,8 @@ function Matches({
   );
 }
 
-function Equalizer() {
+// Four bars bouncing in the score colours, for Echo at work.
+export function Equalizer() {
   return (
     <span aria-hidden className="eq flex h-4 shrink-0 items-end gap-[3px]">
       {["var(--fit)", "var(--love)", "var(--reach)", "var(--love)"].map((color, index) => (

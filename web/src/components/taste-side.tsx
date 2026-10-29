@@ -705,28 +705,32 @@ function BackButton({ onClick, children }: { onClick: () => void; children: Reac
 
 export function TasteImage({ item, color, large = false }: { item: MapItem; color: string; large?: boolean }) {
   const [broken, setBroken] = useState(false);
-  if (item.image_url && !broken) {
-    return (
-      <Image
-        src={item.image_url}
-        alt=""
-        fill
-        unoptimized
-        loading="eager"
-        sizes={large ? "96px" : "64px"}
-        onError={() => setBroken(true)}
-        className="object-cover"
-      />
-    );
-  }
+  const [loaded, setLoaded] = useState(false);
+  const picture = item.image_url && !broken;
+  // The initial on the category's tint, under the picture until it loads and behind a logo's transparent parts.
   return (
-    <span
-      aria-hidden
-      className={`flex size-full items-center justify-center font-display font-semibold text-ink ${large ? "text-4xl" : "text-xs"}`}
-      style={{ background: `color-mix(in srgb, ${color} 30%, var(--well))` }}
-    >
-      {item.name.charAt(0)}
-    </span>
+    <>
+      <span
+        aria-hidden
+        className={`flex size-full items-center justify-center font-display font-semibold text-ink ${large ? "text-4xl" : "text-xs"}`}
+        style={{ background: `color-mix(in srgb, ${color} 30%, var(--well))` }}
+      >
+        {picture && loaded ? "" : item.name.charAt(0)}
+      </span>
+      {picture && (
+        <Image
+          src={item.image_url as string}
+          alt=""
+          fill
+          unoptimized
+          loading="eager"
+          sizes={large ? "96px" : "64px"}
+          onLoad={() => setLoaded(true)}
+          onError={() => setBroken(true)}
+          className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </>
   );
 }
 
