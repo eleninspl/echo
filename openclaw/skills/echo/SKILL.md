@@ -23,7 +23,6 @@ Run every command in a shell as `node {baseDir}/echo.mjs <command> ...`, where `
 2. **Rank guests:** `analyze <show_id>`, adding a filter only when the host asks for one:
    - `--fame less_famous` or `--fame rising`
    - `--age 24_and_younger|25_to_29|30_to_34|35_to_44|45_to_54|55_and_older` (the listeners' age group)
-   - `--country "<English country name>"`
    - `--about "<title or name>" --about-type movie|tv_show|artist|brand|videogame` (an episode about something)
    - `--theme "<theme>"` (the episode's theme in the host's words, up to 120 characters, such as "road trips"; it shapes the ideas, not the ranking)
 3. **Report briefly:** say who the top 3 to 5 are, what they do, why they fit and their episode idea's title. Link the chart in Echo. Then offer more guests, a guest's episode plan, invitations or a briefing.

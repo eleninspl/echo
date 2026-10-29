@@ -217,8 +217,6 @@ class TasteAsk(BaseModel):
 class MapFocus(BaseModel):
     category: str | None = None
     tastes: list[str] = []
-    age: AgeBucket | None = None
-    country: str | None = Field(default=None, min_length=2, max_length=60)
 
 
 class Segment(BaseModel):

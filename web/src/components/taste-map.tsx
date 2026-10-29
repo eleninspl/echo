@@ -3,40 +3,20 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { echo, type AgeBucket, type Analysis, type Lens, type MapRow } from "@/lib/echo";
+import { echo, type Analysis, type MapRow } from "@/lib/echo";
 import { category as categoryName } from "@/lib/format";
 import { STAGE_ID, TASTES_ID, type Ask, type Pointer } from "@/lib/pointer";
-import { MAX_SIDE, middleOf, ring, SIDES, tasteKey, venn, type Spot } from "@/lib/taste-layout";
+import { MAX_SIDE, middleOf, ring, SIDES, venn, type Spot } from "@/lib/taste-layout";
 import type { Rerun } from "@/lib/use-analysis";
-import { useFetched, useSettled } from "@/lib/use-fetched";
+import { useFetched } from "@/lib/use-fetched";
 
 import { Picture } from "./guest-list";
 import { categoryHue, Info, SectionHead } from "./hud";
 import { useReveal } from "./reveal";
-import {
-  BridgeSide,
-  EchoNote,
-  LensBar,
-  LensSide,
-  lensWords,
-  Overview,
-  pull,
-  sideOf,
-  TasteImage,
-  TasteSide,
-} from "./taste-side";
+import { BridgeSide, EchoNote, Overview, pull, sideOf, TasteImage, TasteSide } from "./taste-side";
 
 const SETTLED = 1900;
 const MOVE = 900;
-const ASK_AFTER = 350;
-const ALL: Lens = { age: null, country: null };
-
-const lensId = ({ age, country }: Lens) => (age || country ? `${age ?? ""}|${country ?? ""}` : "");
-
-function lensOf(id: string): Lens {
-  const [age, country] = id.split("|");
-  return { age: (age || null) as AgeBucket | null, country: country || null };
-}
 
 const filled = (rows: MapRow[]) => rows.filter((row) => row.items.length > 0);
 
@@ -60,24 +40,21 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
   const [hovered, setHovered] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
-  const [lens, setLens] = useState<Lens>(ALL);
   const [echoed, setEchoed] = useState<string[]>([]);
   const [seenPointer, setSeenPointer] = useState(pointer?.key ?? null);
   const [seenBridge, setSeenBridge] = useState(bridged);
 
-  if (pointer && pointer.key !== seenPointer) {
-    setSeenPointer(pointer.key);
-    setLens({ age: pointer.age, country: pointer.country });
-    setFocus(pointer.category);
-    setChosen(null);
-    setEchoed(pointer.tastes);
-  }
   if (bridged !== seenBridge) {
     setSeenBridge(bridged);
-    setLens(ALL);
     setChosen(null);
     setFocus(null);
     setEchoed([]);
+  }
+  if (pointer && pointer.key !== seenPointer) {
+    setSeenPointer(pointer.key);
+    setFocus(pointer.category);
+    setChosen(null);
+    setEchoed(pointer.tastes);
   }
 
   useEffect(() => {
@@ -94,21 +71,7 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
     return () => window.clearTimeout(timer);
   }, [shown]);
 
-  const wanted = lensId(lens);
-  const asked = useSettled(wanted, ASK_AFTER);
-  const fetchedLens = useFetched(asked ? `${analysis.id}|map|${asked}` : null, (signal) =>
-    echo.lens(analysis.id, lensOf(asked), signal),
-  );
-  const lensRows = useMemo(
-    () => (fetchedLens.value ? filled(fetchedLens.value.audience_map) : null),
-    [fetchedLens.value],
-  );
-  const target = !wanted ? base : wanted === asked ? lensRows : null;
-  const [lastRows, setLastRows] = useState(base);
-  if (target && target.length && target !== lastRows) setLastRows(target);
-  const rows = target?.length ? target : lastRows;
-  const lensProblem = wanted && wanted === asked ? fetchedLens.problem : null;
-  const lensLoading = Boolean(wanted) && !target && !lensProblem;
+  const rows = base;
 
   const guest = bridged ? (analysis.guests.find((one) => one.id === bridged) ?? null) : null;
   const fetchedBridge = useFetched(guest ? `${analysis.id}|bridge|${guest.ref}` : null, (signal) =>
@@ -144,38 +107,18 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
     return () => window.clearTimeout(timer);
   }, [change]);
 
-  const baseKeys = useMemo(
-    () => new Set(base.flatMap((row) => row.items.map((item) => tasteKey(row.category, item.name)))),
-    [base],
-  );
-
   if (!base.length) return null;
 
   const picked = spots.find((spot) => spot.key === chosen);
   const lit = spots.find((spot) => spot.key === (hovered ?? chosen));
   const total = rows.reduce((sum, row) => sum + row.items.length, 0);
-  const lensOn = Boolean(wanted) && !twin;
   const echoedKeys = spots.filter((spot) => echoed.includes(spot.item.name)).map((spot) => spot.key);
   const echoedNames = spots.filter((spot) => echoedKeys.includes(spot.key)).map((spot) => spot.item.name);
-  const fresh = lensOn && target ? spots.filter((spot) => !baseKeys.has(spot.key)) : [];
-  const shownKeys = new Set(spots.map((spot) => spot.key));
-  const gone =
-    lensOn && target
-      ? base.flatMap((row) =>
-          row.items.filter((item) => !shownKeys.has(tasteKey(row.category, item.name))).map((item) => item.name),
-        )
-      : [];
   const all = [
     ...spots.map((spot) => ({ spot, ghost: false })),
     ...(change?.ghosts ?? []).map((spot) => ({ spot, ghost: true })),
   ];
   const categories = bridge ? [...new Set(SIDES.flatMap((where) => bridge[where].map((row) => row.category)))] : [];
-
-  function changeLens(next: Lens) {
-    setLens(next);
-    setChosen(null);
-    setEchoed([]);
-  }
 
   function clearEchoed() {
     setEchoed([]);
@@ -191,11 +134,10 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
         </span>
         <Info>
           What your listeners like more than most people do, as a group. The closer to your show and the bigger the
-          circle, the stronger the pull, out of 100. Pick an age group or a country to see how it shifts, or a guest to
-          see what their fans love next to yours.
+          circle, the stronger the pull, out of 100. Pick a taste to see whose fans like it too, or a guest to see what
+          their fans love next to yours.
         </Info>
       </SectionHead>
-      {!guest && <LensBar lens={lens} onLens={changeLens} problem={lensProblem} />}
       <div className="grid grid-cols-1 gap-x-12 gap-y-8 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:items-center">
         <div ref={frame} id={STAGE_ID} className="flex min-w-0 scroll-mt-20 flex-col gap-4">
           {echoedNames.length > 0 && <EchoNote names={echoedNames} onClear={clearEchoed} />}
@@ -205,9 +147,9 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
             aria-label={
               twin && guest
                 ? `What your listeners and ${guest.name}'s fans love`
-                : `${lensWords(lens)}: their tastes around your show`
+                : "Your listeners: their tastes around your show"
             }
-            aria-busy={lensLoading || (guest !== null && !bridge) || undefined}
+            aria-busy={(guest !== null && !bridge) || undefined}
             className="relative isolate mx-auto"
             style={{ width: side, height: side }}
           >
@@ -218,7 +160,7 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
                   width={side}
                   height={side}
                   className="pointer-events-none absolute inset-0 overflow-visible transition-opacity duration-500"
-                  style={{ opacity: twin ? 0 : lensLoading ? 0.55 : 1 }}
+                  style={{ opacity: twin ? 0 : 1 }}
                 >
                   {radial.rows.map((row, k) => {
                     const middle = middleOf(k, radial.wedge);
@@ -297,7 +239,7 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
                     style={{
                       background:
                         "conic-gradient(from 0deg, transparent 0turn, transparent 0.8turn, color-mix(in srgb, var(--brand) 14%, transparent) 1turn)",
-                      animation: `spin ${lensLoading ? 2.5 : 14}s linear infinite`,
+                      animation: "spin 14s linear infinite",
                     }}
                   />
                 </span>
@@ -444,7 +386,6 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
                   ? 0
                   : 150 + (Math.hypot(spot.x - centre, spot.y - centre) / (side / 2)) * 650 + order * 4;
                 const entering = change?.entering.includes(spot.key) ?? false;
-                const isFresh = lensOn && !ghost && target !== null && !baseKeys.has(spot.key);
                 const stagger = Math.min(order, 60) * 5;
                 return (
                   <button
@@ -457,7 +398,7 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
                       spot.side
                         ? `, ${sideOf(spot.side).name.toLowerCase()}`
                         : `, ${pull(spot.item.affinity)} out of 100`
-                    }${lighted ? ", lit by Ask Echo" : ""}${isFresh ? ", new for this group" : ""}`}
+                    }${lighted ? ", lit by Ask Echo" : ""}`}
                     onClick={() => setChosen(on ? null : spot.key)}
                     onPointerEnter={() => setHovered(spot.key)}
                     onPointerLeave={() => setHovered(null)}
@@ -497,12 +438,6 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
                     >
                       <TasteImage item={spot.item} color={color} />
                     </span>
-                    {isFresh && (
-                      <span
-                        aria-hidden
-                        className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-sweet shadow-[0_0_0_2px_var(--void)]"
-                      />
-                    )}
                   </button>
                 );
               })}
@@ -527,7 +462,6 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
           <TasteSide
             analysis={analysis}
             spot={picked}
-            lens={twin ? ALL : lens}
             bridged={twin ? guest : null}
             rerun={rerun}
             onBack={() => setChosen(null)}
@@ -548,16 +482,6 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
             onOpen={onOpen}
             guests={analysis.guests}
             onBridge={onBridge}
-          />
-        ) : wanted ? (
-          <LensSide
-            lens={lens}
-            fresh={fresh.map((spot) => spot.item.name)}
-            gone={gone}
-            loading={lensLoading}
-            problem={lensProblem}
-            onRetry={fetchedLens.retry}
-            onClear={() => changeLens(ALL)}
           />
         ) : (
           <Overview rows={rows} focus={focus} onFocus={setFocus} guests={analysis.guests} onBridge={onBridge} />
