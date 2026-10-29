@@ -4,10 +4,21 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Analysis } from "./echo";
 
-// How long each step of a run stays on screen at least, so one the engine finishes in a blink can still be read.
-const HOLD_MS = 1600;
+// How long the screen stays at least on what a step just finished, so a result the engine has in a blink can still be
+// seen: longest for the run screen's two pictures that play out (the left-out names struck through, the guests dropping
+// onto the chart in run-board.tsx), short for the rest. Keyed by the step just shown done; START is before any.
+const HOLD_MS: Record<string, number> = { START: 900, map: 1200, find: 600, clean: 1900, score: 2000, evidence: 600 };
+const HOLD_DEFAULT = 600;
 // How long the finished list of steps shows before the page opens.
-const END_MS = 900;
+const END_MS = 500;
+
+function hold(analysis: Analysis, shown: number): number {
+  if (shown >= analysis.steps.length) return END_MS;
+  const key = shown === 0 ? "START" : analysis.steps[shown - 1].key;
+  // With nobody left out there's no picture to watch for that step.
+  if (key === "clean" && !analysis.left_out.length) return HOLD_DEFAULT;
+  return HOLD_MS[key] ?? HOLD_DEFAULT;
+}
 
 // The leading steps that are done, in order: a later step done early waits for the ones before it.
 function doneCount(analysis: Analysis): number {
@@ -18,7 +29,7 @@ function doneCount(analysis: Analysis): number {
 type Pace = { id: string; shown: number };
 
 // A running analysis as the run screen should show it: the engine's steps revealed one at a time, each held at least
-// HOLD_MS, with each step's results (tastes, who was left out, guests, evidence) held back until its step shows done.
+// its HOLD_MS, with each step's results (tastes, who was left out, guests, evidence) held back until its step shows done.
 // Once the engine is done and every step has shown, the analysis passes through as it is. An analysis first seen
 // finished, failed or with an error passes straight through: there is nothing to watch.
 export function usePacedRun(analysis: Analysis | null): Analysis | null {
@@ -39,17 +50,18 @@ export function usePacedRun(analysis: Analysis | null): Analysis | null {
   const target = !analysis ? 0 : analysis.status === "done" ? total + 1 : doneCount(analysis);
   const pacing = pace !== null && pace.id === id && analysis?.status !== "failed";
 
+  // Each poll brings a new analysis and restarts the timer, which is fine: the wait counts from the last move.
   useEffect(() => {
-    if (!pacing) return;
+    if (!pacing || !analysis) return;
     if (moved.current?.id !== pace.id) moved.current = { id: pace.id, at: Date.now() };
     if (pace.shown >= target) return;
-    const wait = Math.max(0, moved.current.at + (pace.shown >= total ? END_MS : HOLD_MS) - Date.now());
+    const wait = Math.max(0, moved.current.at + hold(analysis, pace.shown) - Date.now());
     const timer = setTimeout(() => {
       moved.current = { id: pace.id, at: Date.now() };
       setPace({ ...pace, shown: pace.shown + 1 });
     }, wait);
     return () => clearTimeout(timer);
-  }, [pacing, pace, target, total]);
+  }, [pacing, pace, target, analysis]);
 
   if (!analysis || !pacing || pace.shown > total) return analysis;
   return held(analysis, pace.shown);

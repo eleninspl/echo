@@ -317,6 +317,27 @@ a {
     animation: taste-pop 700ms var(--ease-out) backwards;
   }
 
+  /* A guest's dot landing on the run screen's small chart. */
+  .dot-pop {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: taste-pop 600ms var(--ease-out) backwards;
+  }
+
+  /* A left-out name struck through, one after another. */
+  @keyframes strike {
+    to {
+      background-size: 100% 1.5px;
+      color: var(--ink-dim);
+    }
+  }
+
+  .strike {
+    background: linear-gradient(currentColor, currentColor) no-repeat 0 58% / 0 1.5px;
+    animation: strike 420ms var(--ease-out) forwards;
+    animation-delay: calc(180ms + var(--order, 0) * 110ms);
+  }
+
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -625,8 +646,15 @@ a {
   .rail,
   .eq > span,
   .shimmer,
-  .writing .listen {
+  .writing .listen,
+  .dot-pop {
     animation: none;
+  }
+
+  .strike {
+    animation: none;
+    background-size: 100% 1.5px;
+    color: var(--ink-dim);
   }
 
   .ask-dock,

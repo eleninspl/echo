@@ -17,7 +17,11 @@ const STRUCK = 3;
 // A step that takes longer than this shows how long it has taken so far, so a slow one visibly moves.
 const SLOW_MS = 3000;
 
-type View = "tastes" | "guests";
+// What the picture beside the steps shows: the latest step's result, one at a time.
+type View = "radar" | "tastes" | "left" | "scope" | "guests";
+
+// How many left-out names the picture strikes through; the rest are counted.
+const SHOWN_LEFT = 12;
 
 export function Rundown({
   analysis,
@@ -31,9 +35,16 @@ export function Rundown({
   const { steps, audience_map: map, guests } = analysis;
   const current = steps.findIndex((step) => !step.done);
   const done = steps.filter((step) => step.done).length;
-  const [chosen, setChosen] = useState<View | null>(null);
-  const tastes = map.some((row) => row.items.length > 0);
-  const view: View | null = guests.length ? (chosen ?? "guests") : tastes ? "tastes" : null;
+  const finished = (key: string) => steps.some((step) => step.key === key && step.done);
+  const view: View = finished("evidence")
+    ? "guests"
+    : guests.length
+      ? "scope"
+      : finished("clean") && analysis.left_out.length
+        ? "left"
+        : map.some((row) => row.items.length > 0)
+          ? "tastes"
+          : "radar";
   return (
     <section aria-labelledby="running" className="flex flex-col gap-4">
       <SectionHead id="running" title="Echo is running" />
@@ -78,30 +89,25 @@ export function Rundown({
           </p>
         </div>
         <div className="@container order-first flex min-h-[22rem] flex-col gap-4 md:order-none md:h-[31rem]">
-          {view === null ? (
-            <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
-          ) : (
-            <>
-              <div role="group" aria-label="Show" className="flex flex-wrap gap-1">
-                <Tab on={view === "tastes"} onClick={() => guests.length && setChosen("tastes")}>
-                  What your listeners love
-                </Tab>
-                <Tab on={view === "guests"} disabled={!guests.length} onClick={() => setChosen("guests")}>
-                  {guests.length ? `First guests · ${guests.length}` : "Guests on the way"}
-                </Tab>
-              </div>
-              {view === "tastes" ? (
-                <Tastes map={map} />
-              ) : (
-                <FirstGuests
-                  guests={guests}
-                  picked={picked}
-                  onPick={onPick}
-                  writing={steps.some((step) => step.key === "ideas" && !step.done)}
-                />
-              )}
-            </>
-          )}
+          {/* Keyed by view, so each step's picture arrives with its own entrance. */}
+          <div key={view} className="fade flex min-h-0 flex-1 flex-col gap-4">
+            {view === "radar" ? (
+              <Radar label={current >= 0 ? steps[current].label : "Finishing"} done={done} total={steps.length} />
+            ) : view === "tastes" ? (
+              <Tastes map={map} />
+            ) : view === "left" ? (
+              <LeftOut people={analysis.left_out} />
+            ) : view === "scope" ? (
+              <MiniScope guests={guests} />
+            ) : (
+              <FirstGuests
+                guests={guests}
+                picked={picked}
+                onPick={onPick}
+                writing={steps.some((step) => step.key === "ideas" && !step.done)}
+              />
+            )}
+          </div>
         </div>
       </div>
       <p aria-live="polite" className="sr-only">
@@ -122,9 +128,10 @@ function detail(step: Step, analysis: Analysis): ReactNode {
     }
     case "clean": {
       if (!step.done) return null;
-      if (!leftOut.length) return "Nobody to leave out";
-      const struck = leftOut.slice(0, STRUCK);
-      const more = leftOut.length - struck.length;
+      const people = distinct(leftOut);
+      if (!people.length) return "Nobody to leave out";
+      const struck = people.slice(0, STRUCK);
+      const more = people.length - struck.length;
       return (
         <>
           Left out{" "}
@@ -150,32 +157,6 @@ function detail(step: Step, analysis: Analysis): ReactNode {
   }
 }
 
-function Tab({
-  on,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex min-h-9 items-center rounded-full px-3.5 text-sm transition-colors disabled:pointer-events-none disabled:opacity-50 ${
-        on ? "bg-ink text-void" : "text-ink-soft ring-1 ring-steel hover:bg-deck-hi hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 type Lit = { name: string; category: string; place: number };
 
 function Tastes({ map }: { map: MapRow[] }) {
@@ -183,6 +164,7 @@ function Tastes({ map }: { map: MapRow[] }) {
   const rows = map.filter((row) => row.items.length > 0);
   return (
     <div className="flex flex-col gap-4">
+      <Caption title="What your listeners love" />
       <ul className="flex flex-col gap-2.5">
         {rows.map((row, rowIndex) => {
           const color = categoryHue(row.category);
@@ -251,7 +233,8 @@ function FirstGuests({
   const shown = guests.slice(0, SHOWN_GUESTS);
   return (
     <div className="flex flex-col gap-3">
-      <p className="flex items-center gap-2.5 text-sm text-ink-soft">
+      <Caption title="Your first guests" />
+      <p className="-mt-1 flex items-center gap-2.5 text-sm text-ink-soft">
         {writing && <Equalizer />}
         <span>
           {writing ? "Echo is writing an episode idea for each. " : ""}Pick anyone you like now: your picks stay when
@@ -343,6 +326,106 @@ function GuestRow({
         </svg>
       </button>
     </li>
+  );
+}
+
+// The engine can list one person twice (two entities with one name); each name is shown once.
+function distinct(people: Analysis["left_out"]): Analysis["left_out"] {
+  return people.filter((person, index) => people.findIndex(({ name }) => name === person.name) === index);
+}
+
+function Caption({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <h3 className="font-display text-lg leading-tight font-semibold">{title}</h3>
+      {children && <span className="text-sm text-ink-dim">{children}</span>}
+    </div>
+  );
+}
+
+// The show's hosts and past guests, struck through one after another as Echo takes them off the list.
+function LeftOut({ people: all }: { people: Analysis["left_out"] }) {
+  const people = distinct(all);
+  const shown = people.slice(0, SHOWN_LEFT);
+  const more = people.length - shown.length;
+  return (
+    <div className="flex flex-col gap-5">
+      <Caption title="Left out">Already on the show, so not new to your listeners</Caption>
+      <ul className="flex max-w-[36rem] flex-wrap gap-x-5 gap-y-3">
+        {shown.map(({ name, why }, index) => (
+          <li
+            key={`${name}-${index}`}
+            className="rise flex items-baseline gap-2"
+            style={{ "--order": index } as CSSProperties}
+          >
+            <span
+              className="strike font-display text-xl leading-tight font-semibold text-ink-soft"
+              style={{ "--order": index } as CSSProperties}
+            >
+              {name}
+            </span>
+            <span className="tag text-ink-dim">{why === "host" ? "Host" : "Past guest"}</span>
+          </li>
+        ))}
+      </ul>
+      {more > 0 && <p className="text-sm text-ink-dim">and {more} more</p>}
+    </div>
+  );
+}
+
+// The guests as they're scored, dropping onto a small fit-by-reach chart: a dot per guest in its label's hue, bigger
+// for more love back, with the box of high fit and reach where the sweet spots ring (components/scope.tsx).
+function MiniScope({ guests }: { guests: Guest[] }) {
+  const sweet = guests.filter((guest) => guest.label === "sweet_spot").length;
+  const W = 300;
+  const H = 180;
+  const x = (reach: number) => 8 + reach * (W - 16);
+  const y = (fit: number) => H - 8 - fit * (H - 16);
+  return (
+    <div className="flex flex-col gap-4">
+      <Caption title={`${guests.length} guests, by fit and reach`}>
+        {sweet ? `${sweet} sweet ${sweet === 1 ? "spot" : "spots"}, ringed` : "No sweet spot in this run"}
+      </Caption>
+      <div className="flex max-w-[34rem] gap-2">
+        <span className="readout rotate-180 self-center text-xs text-fit [writing-mode:vertical-rl]">Fit →</span>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            role="img"
+            aria-label={`${guests.length} guests by fit and reach`}
+            className="w-full overflow-visible"
+          >
+            <rect x="0" y="0" width={W} height={H} rx="10" fill="var(--steel)" fillOpacity="0.25" />
+            <rect
+              x={x(0.33)}
+              y={4}
+              width={W - 4 - x(0.33)}
+              height={y(0.5) - 4}
+              rx="8"
+              fill="var(--sweet)"
+              fillOpacity="0.1"
+              stroke="var(--sweet)"
+              strokeOpacity="0.45"
+            />
+            {guests.map((guest, index) => {
+              const isSweet = guest.label === "sweet_spot";
+              const cx = x(guest.scores.reach ?? 0);
+              const cy = y(guest.scores.fit);
+              const r = 3 + guest.scores.love_back * 4;
+              return (
+                <g key={guest.ref} className="dot-pop" style={{ animationDelay: `${index * 45}ms` }}>
+                  {isSweet && (
+                    <circle cx={cx} cy={cy} r={r + 2.5} fill="none" stroke="var(--sweet)" strokeWidth="1.2" />
+                  )}
+                  <circle cx={cx} cy={cy} r={r} fill={LABEL_HUE[guest.label]} fillOpacity={isSweet ? 1 : 0.85} />
+                </g>
+              );
+            })}
+          </svg>
+          <span className="readout self-center text-xs text-reach">Reach →</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
