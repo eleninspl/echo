@@ -154,118 +154,127 @@ function GuestBody({
   const color = LABEL_HUE[guest.label];
   const sweet = guest.label === "sweet_spot";
   const length = useEpisodeLength(analysis.show.id);
+  // Narrow, the parts run in one column; wide, the guest and their idea sit on the left and the evidence and the
+  // episode on the right, in the same reading order.
   return (
-    <div className="rise flex flex-col gap-10 px-5 pt-7 pb-28 sm:px-8">
-      <header className="flex flex-col gap-6">
-        <div className="flex items-center gap-5">
-          <span
-            className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-well sm:size-28"
-            style={{ boxShadow: sweet ? `0 0 0 2px var(--void), 0 0 0 4px ${color}` : "inset 0 0 0 1px var(--steel)" }}
-          >
-            <Picture guest={guest} sizes="112px" />
-          </span>
-          <div className="min-w-0">
-            <Chip color={color}>{LABELS[guest.label].name}</Chip>
-            <h2
-              ref={heading}
-              tabIndex={-1}
-              className="mt-1.5 font-display text-3xl leading-[1.05] font-semibold text-balance outline-none sm:text-4xl"
-            >
-              {guest.name}
-            </h2>
-            {(guest.bio || guest.description) && (
-              <p className="mt-1.5 text-pretty text-ink-soft">{guest.bio || guest.description}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <p className="flex items-baseline justify-between gap-3">
-            <span className="tag text-ink-dim">Scores, out of 100</span>
-            <span className="flex items-baseline gap-2">
-              <span className="tag text-ink-dim">Echo score</span>
-              <span className="readout text-3xl">{out100(scores.echo)}</span>
-            </span>
-          </p>
-          <Scores scores={scores} bars={64} height={44} readout="text-[1.75rem]" />
-        </div>
-        <p className="text-sm text-ink-soft">
-          <span className="font-semibold" style={{ color }}>
-            {LABELS[guest.label].name}.
-          </span>{" "}
-          {labelMeans(guest.label, scores.reach === null)}
-        </p>
-        <GuestLinks links={guest.links} />
-      </header>
-
-      <Part
-        id="sheet-idea"
-        title="Episode idea"
-        className="scroll-mt-4"
-        aside={
-          rewritten && (
-            <Chip color="var(--accent)" plain>
-              Rewritten by Echo
-            </Chip>
-          )
-        }
-      >
-        {idea ? (
-          <div className="flex flex-col gap-3">
-            <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
-            <p className="text-ink-soft">{idea.pitch}</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <p className="tag text-ink-dim">Why them</p>
-              <p className="text-sm">{idea.reason}</p>
+    <div className="@container">
+      <div className="rise grid grid-cols-1 gap-10 px-5 pt-7 pb-28 sm:px-8 @[46rem]:grid-cols-2 @[46rem]:gap-x-10">
+        <div className="flex min-w-0 flex-col gap-10">
+          <header className="flex flex-col gap-6">
+            <div className="flex items-center gap-5">
+              <span
+                className="relative size-24 shrink-0 overflow-hidden rounded-2xl bg-well sm:size-28 @[46rem]:size-20"
+                style={{
+                  boxShadow: sweet ? `0 0 0 2px var(--void), 0 0 0 4px ${color}` : "inset 0 0 0 1px var(--steel)",
+                }}
+              >
+                <Picture guest={guest} sizes="112px" />
+              </span>
+              <div className="min-w-0">
+                <Chip color={color}>{LABELS[guest.label].name}</Chip>
+                <h2
+                  ref={heading}
+                  tabIndex={-1}
+                  className="mt-1.5 font-display text-3xl leading-[1.05] font-semibold text-balance outline-none! sm:text-4xl @[46rem]:text-3xl"
+                >
+                  {guest.name}
+                </h2>
+                {(guest.bio || guest.description) && (
+                  <p className="mt-1.5 text-pretty text-ink-soft">{guest.bio || guest.description}</p>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <p className="text-sm text-ink-dim">
-            {!analysis.guests.some((other) => other.idea)
-              ? "Episode ideas are off in this demo."
-              : evidence
-                ? "No episode idea yet."
-                : "Echo writes ideas and evidence for the top 10."}
-          </p>
-        )}
-      </Part>
+            <div className="flex flex-col gap-3">
+              <p className="flex items-baseline justify-between gap-3">
+                <span className="tag text-ink-dim">Scores, out of 100</span>
+                <span className="flex items-baseline gap-2">
+                  <span className="tag text-ink-dim">Echo score</span>
+                  <span className="readout text-3xl">{out100(scores.echo)}</span>
+                </span>
+              </p>
+              <Scores scores={scores} bars={64} height={44} readout="text-[1.75rem]" />
+            </div>
+            <p className="text-sm text-ink-soft">
+              <span className="font-semibold" style={{ color }}>
+                {LABELS[guest.label].name}.
+              </span>{" "}
+              {labelMeans(guest.label, scores.reach === null)}
+            </p>
+            <GuestLinks links={guest.links} />
+          </header>
 
-      {evidence && (
-        <Part id="sheet-meet" title="Where your audiences meet">
-          <dl className="grid gap-6 sm:grid-cols-2">
-            <Fact term="Both audiences love">
-              {evidence.shared_tastes.length ? (
-                <TasteChips names={evidence.shared_tastes} color="var(--fit)" />
-              ) : (
-                <span className="text-sm text-ink-dim">Nothing in common yet.</span>
-              )}
-            </Fact>
-            <Fact term="Their fans' podcasts, new to you">
-              {evidence.new_podcasts.length ? (
-                <TasteChips names={evidence.new_podcasts} color="var(--reach)" />
-              ) : (
-                <span className="text-sm text-ink-dim">None new to you.</span>
-              )}
-            </Fact>
-            {evidence.ages.length > 0 && (
-              <Fact term="Their fans' age groups" className="sm:col-span-2">
-                <AgeLamps ages={evidence.ages} />
-              </Fact>
+          <Part
+            id="sheet-idea"
+            title="Episode idea"
+            className="scroll-mt-4"
+            aside={
+              rewritten && (
+                <Chip color="var(--accent)" plain>
+                  Rewritten by Echo
+                </Chip>
+              )
+            }
+          >
+            {idea ? (
+              <div className="flex flex-col gap-3">
+                <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
+                <p className="text-ink-soft">{idea.pitch}</p>
+                <div className="mt-1 flex flex-col gap-1">
+                  <p className="tag text-ink-dim">Why them</p>
+                  <p className="text-sm">{idea.reason}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-ink-dim">
+                {!analysis.guests.some((other) => other.idea)
+                  ? "Episode ideas are off in this demo."
+                  : evidence
+                    ? "No episode idea yet."
+                    : "Echo writes ideas and evidence for the top 10."}
+              </p>
             )}
-          </dl>
-        </Part>
-      )}
+          </Part>
+        </div>
+        <div className="flex min-w-0 flex-col gap-10">
+          {evidence && (
+            <Part id="sheet-meet" title="Where your audiences meet">
+              <dl className="grid gap-6 sm:grid-cols-2">
+                <Fact term="Both audiences love">
+                  {evidence.shared_tastes.length ? (
+                    <TasteChips names={evidence.shared_tastes} color="var(--fit)" />
+                  ) : (
+                    <span className="text-sm text-ink-dim">Nothing in common yet.</span>
+                  )}
+                </Fact>
+                <Fact term="Their fans' podcasts, new to you">
+                  {evidence.new_podcasts.length ? (
+                    <TasteChips names={evidence.new_podcasts} color="var(--reach)" />
+                  ) : (
+                    <span className="text-sm text-ink-dim">None new to you.</span>
+                  )}
+                </Fact>
+                {evidence.ages.length > 0 && (
+                  <Fact term="Their fans' age groups" className="sm:col-span-2">
+                    <AgeLamps ages={evidence.ages} />
+                  </Fact>
+                )}
+              </dl>
+            </Part>
+          )}
 
-      {/* Keyed by the idea: a rewrite brings its own episode. */}
-      <GuestDetails
-        key={`episode-${guest.idea?.title}`}
-        id={analysis.id}
-        guestRef={guest.ref}
-        idea={rewrittenIdea(guest)}
-        length={length}
-        ideaTitle={guest.idea?.title}
-        showMap={analysis.audience_map}
-        onShowMap={onShowMap}
-      />
+          {/* Keyed by the idea: a rewrite brings its own episode. */}
+          <GuestDetails
+            key={`episode-${guest.idea?.title}`}
+            id={analysis.id}
+            guestRef={guest.ref}
+            idea={rewrittenIdea(guest)}
+            length={length}
+            ideaTitle={guest.idea?.title}
+            showMap={analysis.audience_map}
+            onShowMap={onShowMap}
+          />
+        </div>
+      </div>
     </div>
   );
 }

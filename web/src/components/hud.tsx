@@ -36,9 +36,10 @@ export const rank = (index: number) => String(index + 1).padStart(2, "0");
 // The page's frame width and gutters.
 export const FRAME = "mx-auto w-full max-w-[96rem] px-4 sm:px-6";
 
-export const SHEET_WIDTH = "lg:w-[min(40rem,45vw)]";
-export const SHEET_ROOM = "lg:pr-[min(40rem,45vw)]";
-export const SHEET_CLEAR = "lg:right-[calc(min(40rem,45vw)+1rem)]";
+// The guest panel beside the page: wider on a big screen, where it lays its parts out in two columns (guest-sheet.tsx).
+export const SHEET_WIDTH = "lg:w-[min(40rem,45vw)] xl:w-[min(64rem,55vw)]";
+export const SHEET_ROOM = "lg:pr-[min(40rem,45vw)] xl:pr-[min(64rem,55vw)]";
+export const SHEET_CLEAR = "lg:right-[calc(min(40rem,45vw)+1rem)] xl:right-[calc(min(64rem,55vw)+1rem)]";
 
 // A score out of 100 for a readout, or a dash when there's none.
 export const out100 = (value: number | null | undefined) =>
