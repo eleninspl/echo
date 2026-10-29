@@ -29,13 +29,13 @@
   --love: #ff7a52;
   --reach: #ff4d94;
 
-  /* The sweet spot is teal, the one cool thing on the page; the other labels are quiet, told apart by tone
-     and always named. */
+  /* The sweet spot is a strong teal; the other labels are quiet, told apart by hue
+     (cool blue, violet, ochre, neutral grey) and always named. */
   --sweet: #4fd1b9;
-  --safe: #a3b2d8;
-  --far: #bba7dc;
-  --long-shot: #c9a68c;
-  --balanced: #8f7d89;
+  --safe: #93ade6;
+  --far: #c1a0ee;
+  --long-shot: #d9a266;
+  --balanced: #8e8c94;
 
   --alert: #f2555a;
 
@@ -76,10 +76,10 @@
   --love: #ff4a1a;
   --reach: #ff0a7e;
 
-  --safe: #7787ab;
-  --far: #9b86b5;
-  --long-shot: #a5826a;
-  --balanced: #988a93;
+  --safe: #6b83b8;
+  --far: #9a72c4;
+  --long-shot: #b07a45;
+  --balanced: #8c8c91;
 
   --alert: #d0262c;
 

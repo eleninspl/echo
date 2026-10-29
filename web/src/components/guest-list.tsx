@@ -67,7 +67,8 @@ export function GuestList({
     <section aria-labelledby="guests" className="@container flex flex-col gap-4">
       <SectionHead id="guests" title={`All ${guests.length} guests, ${order}`}>
         <div role="group" aria-label="Sort the guests" className="flex flex-wrap items-center gap-1">
-          <span className="mr-1">Sort</span>
+          {/* On a phone the word goes, so the sort and its hint fit on one line; the group still names it. */}
+          <span className="mr-1 hidden sm:inline">Sort</span>
           {SORTS.map(({ key, name, color }) => {
             const on = key === sort;
             return (
@@ -76,7 +77,7 @@ export function GuestList({
                 type="button"
                 aria-pressed={on}
                 onClick={() => choose(key)}
-                className={`flex min-h-8 items-center gap-1.5 rounded-full px-2.5 transition-colors ${
+                className={`flex min-h-8 items-center gap-1.5 rounded-full px-2 transition-colors sm:px-2.5 ${
                   on ? "bg-deck-hi text-ink ring-1 ring-steel-hi" : "text-ink-dim hover:bg-deck hover:text-ink"
                 }`}
               >

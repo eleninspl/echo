@@ -426,7 +426,7 @@ export function Console() {
               fit and high reach: its ringed dots are the sweet spots, whose fans also love your show back, and the
               others are one-way, whose fans are less likely to.
             </p>
-            <LabelSpectrum stats={figures} className="@4xl:w-[30rem] @4xl:shrink-0" />
+            <LabelSpectrum stats={figures} className="@4xl:w-[34rem] @4xl:shrink-0" />
           </div>
         </Scope>
         <GuestList
