@@ -55,10 +55,20 @@ export function useGuestDetails(id: string, guestRef: string, idea?: Idea, lengt
   return { load: state.key === key ? state.load : initial(key), retry };
 }
 
-export function GuestEpisode({ id, details, ideaTitle }: { id: string; details: GuestLoad; ideaTitle?: string }) {
+export function GuestEpisode({
+  id,
+  details,
+  ideaTitle,
+  className = "",
+}: {
+  id: string;
+  details: GuestLoad;
+  ideaTitle?: string;
+  className?: string;
+}) {
   const { load, retry } = details;
   return (
-    <Part id={`episode-${id}`} title="The episode">
+    <Part id={`episode-${id}`} title="The episode" className={className}>
       {load.state === "failed" ? (
         <div role="alert" className="flex flex-col items-start gap-2">
           <p className="font-semibold text-alert">{load.problem.title}</p>
@@ -129,11 +139,11 @@ export function EpisodePlan({ episode, ideaTitle }: { episode: Episode; ideaTitl
       </div>
       <div className="flex flex-col gap-2">
         <p className="tag text-ink-dim">Run of show</p>
-        <ol className="flex flex-col">
+        <ol className="grid grid-cols-1 gap-x-10 @[46rem]:grid-cols-2">
           {episode.segments.map((segment, index) => (
             <li
               key={`${segment.title}-${index}`}
-              className="grid grid-cols-[2rem_1fr] gap-x-3 border-t border-steel py-3.5 last:pb-0"
+              className="grid grid-cols-[2rem_1fr] gap-x-3 border-t border-steel py-3.5"
             >
               <span className="tag pt-1 text-accent">{String(index + 1).padStart(2, "0")}</span>
               <div>
@@ -156,7 +166,7 @@ export function EpisodePlan({ episode, ideaTitle }: { episode: Episode; ideaTitl
       {episode.questions.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="tag text-ink-dim">Questions to ask</p>
-          <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm marker:text-accent">
+          <ol className="flex max-w-prose list-decimal flex-col gap-2 pl-5 text-sm marker:text-accent">
             {episode.questions.map((question, index) => (
               <li key={`${question}-${index}`}>{question}</li>
             ))}

@@ -140,8 +140,9 @@ function GuestBody({
   const length = useEpisodeLength(analysis.show.id);
   // A rewrite brings its own episode.
   const details = useGuestDetails(analysis.id, guest.ref, rewrittenIdea(guest), length);
-  // Narrow, the parts run in one column; wide, the guest and their idea sit on the left, the evidence and the
-  // episode on the right, and the two audiences side by side across the bottom, in the same reading order.
+  const ideasOn = analysis.guests.some((other) => other.idea);
+  // Narrow, the parts run in one column. Wide, the guest sits beside their idea and the evidence, two short columns
+  // that end together, then the episode and the two audiences run the panel's full width, in the same reading order.
   return (
     <div className="@container">
       <div className="rise grid grid-cols-1 gap-10 px-5 pt-7 pb-28 sm:px-8 @[46rem]:grid-cols-2 @[46rem]:gap-x-10">
@@ -188,43 +189,41 @@ function GuestBody({
             </p>
             <GuestLinks links={guest.links} />
           </header>
-
-          <Part
-            id="sheet-idea"
-            title="Episode idea"
-            className="scroll-mt-4"
-            aside={
-              rewritten && (
-                <Chip color="var(--accent)" plain>
-                  Rewritten by Echo
-                </Chip>
-              )
-            }
-          >
-            {idea ? (
-              <div className="flex flex-col gap-3">
-                <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
-                <p className="text-ink-soft">{idea.pitch}</p>
-                <div className="mt-1 flex flex-col gap-1">
-                  <p className="tag text-ink-dim">Why them</p>
-                  <p className="text-sm">{idea.reason}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-ink-dim">
-                {!analysis.guests.some((other) => other.idea)
-                  ? "Episode ideas are off in this demo."
-                  : evidence
-                    ? "No episode idea yet."
-                    : "Echo writes ideas and evidence for the top 10."}
-              </p>
-            )}
-          </Part>
         </div>
         <div className="flex min-w-0 flex-col gap-10">
+          {/* A run without ideas has no box for one: the episode below stands on its own. */}
+          {(idea || ideasOn) && (
+            <Part
+              id="sheet-idea"
+              title="Episode idea"
+              className="scroll-mt-4"
+              aside={
+                rewritten && (
+                  <Chip color="var(--accent)" plain>
+                    Rewritten by Echo
+                  </Chip>
+                )
+              }
+            >
+              {idea ? (
+                <div className="flex flex-col gap-3">
+                  <p className="font-display text-2xl leading-tight font-semibold text-balance">{idea.title}</p>
+                  <p className="text-ink-soft">{idea.pitch}</p>
+                  <div className="mt-1 flex flex-col gap-1">
+                    <p className="tag text-ink-dim">Why them</p>
+                    <p className="text-sm">{idea.reason}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-ink-dim">
+                  {evidence ? "No episode idea yet." : "Echo writes ideas and evidence for the top 10."}
+                </p>
+              )}
+            </Part>
+          )}
           {evidence && (
             <Part id="sheet-meet" title="Where your audiences meet">
-              <dl className="grid gap-6 sm:grid-cols-2">
+              <dl className="grid gap-6 sm:grid-cols-2 @[46rem]:grid-cols-1">
                 <Fact term="Both audiences love">
                   {evidence.shared_tastes.length ? (
                     <TasteChips names={evidence.shared_tastes} color="var(--fit)" />
@@ -240,16 +239,20 @@ function GuestBody({
                   )}
                 </Fact>
                 {evidence.ages.length > 0 && (
-                  <Fact term="Their fans' age groups" className="sm:col-span-2">
+                  <Fact term="Their fans' age groups" className="sm:col-span-2 @[46rem]:col-span-1">
                     <AgeLamps ages={evidence.ages} />
                   </Fact>
                 )}
               </dl>
             </Part>
           )}
-
-          <GuestEpisode id={guest.ref} details={details} ideaTitle={guest.idea?.title} />
         </div>
+        <GuestEpisode
+          id={guest.ref}
+          details={details}
+          ideaTitle={guest.idea?.title}
+          className="@[46rem]:col-span-2"
+        />
         <GuestFans
           id={guest.ref}
           details={details}
