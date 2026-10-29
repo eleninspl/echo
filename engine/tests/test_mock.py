@@ -22,8 +22,6 @@ def decide(guests, text: str, filters: Filters | None = None):
         ("Older please", Filters(age="45_to_54")),
         ("Listeners in their 30s", Filters(age="30_to_34")),
         ("Less famous guests", Filters(fame="less_famous")),
-        ("Rising names from Brazil", Filters(fame="rising", country="Brazil")),
-        ("Guests for listeners in the UK", Filters(country="United Kingdom")),
         ("An episode about the film Heat", Filters(episode_about=EpisodeAbout(query="Heat", type="movie"))),
         ("Make it about road trips", Filters(theme="road trips")),
         ("An episode on first jobs.", Filters(theme="first jobs")),
@@ -33,6 +31,13 @@ def test_the_mock_chat_reads_the_ask(guests, text, expected):
     decision = decide(guests, text)
     assert decision.action == "rerun"
     assert decision.filters == expected
+
+
+@pytest.mark.parametrize("text", ["Rising names from Brazil", "Guests for listeners in the UK"])
+def test_the_mock_chat_has_no_country_filter(guests, text):
+    decision = decide(guests, text)
+    assert decision.action == "none"
+    assert decision.reply == "Echo doesn't filter guests by country."
 
 
 def test_younger_steps_down_from_the_current_age(guests):
@@ -88,26 +93,24 @@ def ask(analysis, text: str, taste=None):
 
 
 @pytest.mark.parametrize(
-    ("text", "category", "age", "country"),
+    ("text", "category"),
     [
-        ("What do my listeners read?", "books", None, None),
-        ("Which films do they watch?", "film", None, None),
-        ("Who here likes jazz?", "music", None, None),
-        ("What do younger listeners watch?", "film", "24_and_younger", None),
-        ("What do listeners in Canada buy?", "brands", None, "Canada"),
+        ("What do my listeners read?", "books"),
+        ("Which films do they watch?", "film"),
+        ("Who here likes jazz?", "music"),
+        ("What do younger listeners watch?", "film"),
     ],
 )
-def test_a_question_about_tastes_points_the_map(example, text, category, age, country):
+def test_a_question_about_tastes_points_the_map(example, text, category):
     decision = ask(example, text)
     assert decision.action == "none"
     assert decision.map is not None
-    assert (decision.map.category, decision.map.age, decision.map.country) == (category, age, country)
-    if not (age or country):
-        names = {item.name for row in example.audience_map if row.category == category for item in row.items}
-        assert decision.map.tastes and set(decision.map.tastes) <= names
+    assert decision.map.category == category
+    names = {item.name for row in example.audience_map if row.category == category for item in row.items}
+    assert decision.map.tastes and set(decision.map.tastes) <= names
 
 
-def test_a_question_about_younger_listeners_names_what_they_lean_to():
+def test_the_map_the_chat_points_at_is_all_the_listeners():
     client = TestClient(create_app(mock=True, step_delay=0))
     reply = client.post(
         "/chat",
@@ -116,12 +119,8 @@ def test_a_question_about_younger_listeners_names_what_they_lean_to():
             "messages": [{"role": "user", "content": "What do younger listeners watch?"}],
         },
     ).json()
-    assert reply["map"]["age"] == "24_and_younger" and reply["map"]["category"] == "film"
-    lens = client.get("/analyses/an_example/map", params={"age": "24_and_younger"}).json()
-    films = [item["name"] for row in lens["audience_map"] if row["category"] == "film" for item in row["items"]]
-    assert reply["map"]["tastes"] == films[:3]
-    assert reply["reply"].endswith(f"{films[2]}.")
-    assert "Listeners 24 and younger lean most to" in reply["reply"]
+    assert set(reply["map"]) == {"category", "tastes"}
+    assert reply["map"]["category"] == "film" and len(reply["map"]["tastes"]) == 3
 
 
 def test_asks_for_guests_still_rerun(example):

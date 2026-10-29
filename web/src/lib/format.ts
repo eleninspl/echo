@@ -51,7 +51,6 @@ export function filterPhrases(filters: Filters): string[] {
   const fame = FAME[filters.fame];
   if (fame) phrases.push(fame);
   if (filters.age) phrases.push(`Listeners ${AGES[filters.age].toLowerCase()}`);
-  if (filters.country) phrases.push(`In ${filters.country}`);
   if (filters.episode_about)
     phrases.push(`An episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
   if (filters.theme)

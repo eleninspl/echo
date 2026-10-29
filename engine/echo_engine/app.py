@@ -24,7 +24,6 @@ from .models import (
     AnalysisStarted,
     Briefing,
     BriefingRequest,
-    ChatDecision,
     ChatReply,
     ChatRequest,
     Draft,
@@ -277,24 +276,6 @@ class Engine:
             return mocked.bridge(guest.ref, analysis.audience_map, maps.audience_map, maps.adds)
         async with self.client() as client:
             return await pipeline.guest_bridge(client, analysis, guest)
-
-    async def with_lens(self, analysis: Analysis, decision: ChatDecision) -> ChatDecision:
-        focus = decision.map
-        if focus is None or not (focus.age or focus.country):
-            return decision
-        try:
-            rows = await self.lens_map(analysis, focus.age, focus.country)
-        except EchoError as error:
-            if error.code not in ("unknown_country", "filters_too_narrow"):
-                raise
-            decision.reply = f"{decision.reply} {error.message}"
-            decision.map = focus.model_copy(update={"age": None, "country": None, "tastes": []})
-            return decision
-        names = llm.lens_leaders(rows, focus.category)
-        if names:
-            focus.tastes = names
-            decision.reply = f"{decision.reply} {llm.lens_line(focus, names)}"
-        return decision
 
     async def taste_fans(self, analysis: Analysis, ask: TasteAsk) -> TasteFans:
         if self.mock:
@@ -576,7 +557,6 @@ def create_app(
             decision = mocked.decide(shown, analysis.filters, body.messages, analysis.audience_map, taste)
         else:
             decision = await llm.chat(analysis, body.messages, exclude, taste)
-        decision = await engine.with_lens(analysis, decision)
         if decision.action == "rerun":
             filters = (decision.filters or analysis.filters).model_copy(update={"exclude": sorted(set(exclude))})
             rerun = await engine.start(analysis.show.id, filters, tasks)

@@ -648,7 +648,7 @@ export function TasteSide({
           onClick={() =>
             onAsk({
               text: `Whose fans like ${spot.item.name} too, and what episode could we build on it?`,
-              taste: { category: spot.category, name: spot.item.name, age: lens.age, country: lens.country },
+              taste: { category: spot.category, name: spot.item.name },
             })
           }
           className="btn self-start"

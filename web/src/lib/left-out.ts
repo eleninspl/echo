@@ -5,8 +5,6 @@ export type LeftOutGuest = { id: string; name: string; why: LeaveOutWhy };
 
 export const LEFT_OUT_LIMIT = 50;
 
-export const WHY_NAMES: Record<LeaveOutWhy, string> = { had_on: "Had them on", not_for_us: "Not for us" };
-
 function parseLeftOut(value: unknown): LeftOutGuest[] {
   if (!Array.isArray(value)) return [];
   return value

@@ -21,7 +21,7 @@ import {
 import type { Analysis, Idea, LeaveOutWhy, MapFocus } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 import { filterPhrases } from "@/lib/format";
-import { LEFT_OUT_LIMIT, useLeftOut, WHY_NAMES, type LeftOutGuest } from "@/lib/left-out";
+import { LEFT_OUT_LIMIT, useLeftOut, type LeftOutGuest } from "@/lib/left-out";
 import { analysisPath, guestPath, readPath } from "@/lib/paths";
 import { readPicks, savePicks, type Pick } from "@/lib/picks";
 import type { Ask, Pointer } from "@/lib/pointer";
@@ -36,7 +36,7 @@ import { AskSection, carryChat, Chat } from "./chat";
 import { FeaturedFallback } from "./featured";
 import { GuestList } from "./guest-list";
 import { GuestSheet } from "./guest-sheet";
-import { Chip, FRAME, hue, SectionHead, SHEET_ROOM } from "./hud";
+import { FRAME, hue, SHEET_ROOM } from "./hud";
 import { LabelSpectrum, LockHeader, requestFilters, ShowLock } from "./lock-header";
 import { PageNav } from "./page-nav";
 import { PickBar } from "./pick-bar";
@@ -62,7 +62,6 @@ type OpenAnalysis = {
   rewritten: Rewrite | null;
   onAskSlot: Dispatch<SetStateAction<HTMLElement | null>>;
   leftOut: LeftOutGuest[];
-  onBringBack: (id: string) => void;
   pointer: Pointer | null;
   onClearPointer: () => void;
   bridged: string | null;
@@ -238,10 +237,6 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
     },
     [guests, openId, setLeftOut, saved, keep, guestRef, router, onClose],
   );
-  const onBringBack = useCallback(
-    (id: string) => setLeftOut((current) => current.filter((guest) => guest.id !== id)),
-    [setLeftOut],
-  );
   const onForget = useCallback(
     () => keep(saved.filter(({ id }) => guests.some((guest) => guest.id === id))),
     [guests, saved, keep],
@@ -296,7 +291,6 @@ export function AnalysisShell({ children }: { children: ReactNode }) {
         rewritten,
         onAskSlot: setAskSlot,
         leftOut,
-        onBringBack,
         pointer,
         onClearPointer,
         bridged,
@@ -334,8 +328,6 @@ export function Console() {
     rerun,
     rewritten,
     onAskSlot,
-    leftOut,
-    onBringBack,
     pointer,
     onClearPointer,
     bridged,
@@ -458,7 +450,6 @@ export function Console() {
             />
           </div>
           {figures.withAges > 0 && <FanAges stats={figures} />}
-          <LeftOut analysis={analysis} leftOut={leftOut} onBringBack={onBringBack} />
         </section>
         <AskSection onSlot={onAskSlot} />
       </div>
@@ -531,63 +522,6 @@ function pin(anchor: Element): (() => void) | undefined {
   window.addEventListener("wheel", stop, { passive: true });
   window.addEventListener("touchmove", stop, { passive: true });
   return stop;
-}
-
-function LeftOut({
-  analysis,
-  leftOut,
-  onBringBack,
-}: {
-  analysis: Analysis;
-  leftOut: LeftOutGuest[];
-  onBringBack: (id: string) => void;
-}) {
-  const count = analysis.left_out.length + leftOut.length;
-  return (
-    <section aria-labelledby="left-out" className="flex flex-col gap-4">
-      <SectionHead id="left-out" title="Left out" small>
-        <span>{count}</span>
-      </SectionHead>
-      <div className="flex flex-col gap-3">
-        {count ? (
-          <ul className="flex flex-col gap-1.5">
-            {leftOut.map(({ id, name, why }) => (
-              <li key={id} className="flex items-center justify-between gap-3 border-b border-steel pb-1.5 text-sm">
-                <span className="min-w-0 truncate">{name}</span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <Chip color="var(--accent)">{WHY_NAMES[why]}</Chip>
-                  <button
-                    type="button"
-                    onClick={() => onBringBack(id)}
-                    className="text-xs text-ink-soft underline underline-offset-4 hover:text-ink"
-                  >
-                    Bring back<span className="sr-only"> {name}</span>
-                  </button>
-                </span>
-              </li>
-            ))}
-            {analysis.left_out.map(({ name, why }) => (
-              <li
-                key={`${name}-${why}`}
-                className="flex items-center justify-between gap-3 border-b border-steel pb-1.5 text-sm"
-              >
-                {name}
-                <Chip color={why === "host" ? "var(--long-shot)" : "var(--balanced)"}>
-                  {why === "host" ? "Host" : "Past guest"}
-                </Chip>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink-dim">Nobody: no hosts or past guests came back.</p>
-        )}
-        <p className="text-xs text-ink-dim">
-          Echo leaves out the show&apos;s hosts, people already in its episode titles, and anyone you leave out. Yours
-          stay out of every run of this show until you bring them back.
-        </p>
-      </div>
-    </section>
-  );
 }
 
 // Holds the console's place while the page loads, so nothing jumps when it arrives.

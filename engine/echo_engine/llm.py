@@ -113,7 +113,8 @@ right for it. Give guest_ref, and why: had_on when they've been on the show, els
 this page and of every run after it.
 - rerun: the host wants different guests. Give the complete filters to use: start from the current filters and \
 change only what the host asked for. fame is any, less_famous or rising. age is one of the buckets or null. country is \
-an English country name or null. episode_about is {{query, type}} for an episode about one named movie, tv_show, \
+always null: Echo doesn't filter by country, so when the host asks for one, say so and change nothing. episode_about \
+is {{query, type}} for an episode about one named movie, tv_show, \
 artist, brand or videogame, or null. theme is a topic for the episode in a few plain words (road trips, first jobs, \
 burnout), up to {THEME_LENGTH} characters, or null: use it for any subject that isn't one named title.
 - rewrite: the host wants a different idea for one guest, such as funnier or shorter. Give guest_ref (the first idea \
@@ -124,12 +125,9 @@ ask to change:
 reply: one or two sentences to the host saying what you did, or the answer. Set the fields that don't apply to null, \
 and never say you can't leave a guest out.
 map: point the taste map on the page at what the reply is about, or null. category is the one asked about or null. \
-tastes are names from what_your_listeners_love that the reply mentions, written exactly as there, or empty. age and \
-country show the map for listeners of one age group or one country when the host asks about them ("what do younger \
-listeners watch?"), else null. When you set age or country you don't know that group's tastes: say only that the map \
-now shows them and leave tastes empty. A sentence naming what they lean to is added after your reply, so don't write \
-one or mention it. A question about what the listeners like \
-is action none with a map: rerun is only for different guests.
+tastes are names from what_your_listeners_love that the reply mentions, written exactly as there, or empty. The map \
+shows all the listeners: it can't show one age group or country. A question about what the listeners like is action \
+none with a map: rerun is only for different guests.
 guest_refs: the refs of the guests the reply names, in the order named, or empty.
 When the host asks about one taste (the_host_asks_about_this_taste), answer in up to three sentences: whose fans \
 tend to like it too, from guests_whose_fans_like_it_most, strongest first, and an episode built on it with one of \
@@ -360,25 +358,9 @@ def pointed(analysis: Analysis, focus: MapFocus | None, taste: TasteFans | None)
     if taste and taste.name not in tastes:
         tastes.insert(0, taste.name)
     category = focus.category if focus.category in set(names.values()) else None
-    if not (category or tastes or focus.age or focus.country):
+    if not (category or tastes):
         return None
-    return MapFocus(category=category, tastes=tastes, age=focus.age, country=focus.country)
-
-
-def lens_leaders(rows: list[MapRow], category: str | None, most: int = 3) -> list[str]:
-    if category:
-        return [item.name for row in rows if row.category == category for item in row.items[:most]]
-    return [row.items[0].name for row in rows if row.items][:most]
-
-
-def lens_line(focus: MapFocus, names: list[str]) -> str:
-    who = "Listeners"
-    if focus.age:
-        who += f" {focus.age.replace('_', ' ')}"
-    if focus.country:
-        who += f" in {focus.country}"
-    listed = names[0] if len(names) < 2 else f"{', '.join(names[:-1])} and {names[-1]}"
-    return f"{who} lean most to {listed}."
+    return MapFocus(category=category, tastes=tastes)
 
 
 async def chat(
@@ -409,8 +391,6 @@ async def chat(
             obj(
                 category=nullable(one_of(categories) if categories else TEXT),
                 tastes=array(one_of(names) if names else TEXT),
-                age=nullable(one_of(AGES)),
-                country=nullable(TEXT),
             )
         ),
         guest_refs=array(one_of(refs) if refs else TEXT),
@@ -418,8 +398,8 @@ async def chat(
     data = await ask(RULES, CHAT_TASK, facts, schema, "chat_decision")
     if isinstance(theme := (data.get("filters") or {}).get("theme"), str):
         data["filters"]["theme"] = theme[:THEME_LENGTH]
-    if isinstance(focus := data.get("map"), dict) and isinstance(country := focus.get("country"), str):
-        focus["country"] = country.strip()[:60] if len(country.strip()) >= 2 else None
+    if isinstance(data.get("filters"), dict):
+        data["filters"]["country"] = None
     decision = checked(ChatDecision, data)
     if decision.action == "rerun" and decision.filters is None:
         decision.action = "none"

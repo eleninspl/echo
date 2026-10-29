@@ -68,7 +68,8 @@ export function TasteMap({ analysis, rerun, pointer, onClearPointer, bridged, on
 
   if (pointer && pointer.key !== seenPointer) {
     setSeenPointer(pointer.key);
-    setLens({ age: pointer.age, country: pointer.country });
+    // Ask Echo points at tastes on the whole map; it doesn't pick an age or a country (W33).
+    setLens(ALL);
     setFocus(pointer.category);
     setChosen(null);
     setEchoed(pointer.tastes);

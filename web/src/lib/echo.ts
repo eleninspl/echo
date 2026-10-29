@@ -85,6 +85,7 @@ export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]
 export type Message = { role: "user" | "assistant"; content: string };
 
 export type LeaveOutWhy = "had_on" | "not_for_us";
+// The taste map for one age group or country (the map's own controls; Ask Echo doesn't set them).
 export type Lens = { age: AgeBucket | null; country: string | null };
 export type MapLens = Lens & { audience_map: MapRow[] };
 export type BridgeCount = { both: number; yours: number; theirs: number };
@@ -96,8 +97,8 @@ export type GuestBridge = {
   totals?: Record<string, BridgeCount>;
 };
 export type TasteFans = { category: string; name: string; guests: { ref: string; affinity: number }[] };
-export type TasteAsk = Lens & { category: string; name: string };
-export type MapFocus = Lens & { category: string | null; tastes: string[] };
+export type TasteAsk = { category: string; name: string };
+export type MapFocus = { category: string | null; tastes: string[] };
 
 export type ChatReply = {
   reply: string;
@@ -210,9 +211,10 @@ export const echo = {
       undefined,
       signal,
     ),
-  tasteFans: (id: string, taste: TasteAsk, signal?: AbortSignal) =>
+  // With the taste map on one age group or country, the fans are counted in that group.
+  tasteFans: (id: string, taste: TasteAsk & Partial<Lens>, signal?: AbortSignal) =>
     call<TasteFans>(
-      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}&${lensQuery(taste)}`,
+      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}&${lensQuery({ age: taste.age ?? null, country: taste.country ?? null })}`,
       undefined,
       signal,
     ),

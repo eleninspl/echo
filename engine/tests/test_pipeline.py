@@ -619,34 +619,3 @@ def test_the_chat_about_a_taste_gets_its_fans_and_points_at_it(engine, monkeypat
     assert seen["taste"].name == film and seen["taste"].guests
     assert reply["action"] == "none"
     assert reply["guest_refs"] == ["g1"]
-
-
-def test_the_chat_says_when_a_country_it_points_at_has_no_data(engine, monkeypatch):
-    analysis = run(engine)
-
-    async def chat(analysis, messages, exclude=(), taste=None):
-        focus = llm.MapFocus(category="film", country="Nowhere")
-        return llm.ChatDecision(reply="The map now shows them.", action="none", map=focus)
-
-    monkeypatch.setattr(llm, "chat", chat)
-    reply = engine.post(
-        "/chat",
-        json={"analysis_id": analysis["id"], "messages": [{"role": "user", "content": "What do they watch there?"}]},
-    ).json()
-    assert reply["reply"] == "The map now shows them. Echo has too little taste data on those listeners."
-    assert reply["map"] == {"category": "film", "tastes": [], "age": None, "country": None}
-
-
-def test_the_chat_names_what_a_country_leans_to(engine, monkeypatch):
-    analysis = run(engine)
-
-    async def chat(analysis, messages, exclude=(), taste=None):
-        return llm.ChatDecision(reply="The map now shows them.", action="none", map=llm.MapFocus(country="Canada"))
-
-    monkeypatch.setattr(llm, "chat", chat)
-    reply = engine.post(
-        "/chat",
-        json={"analysis_id": analysis["id"], "messages": [{"role": "user", "content": "And in Canada?"}]},
-    ).json()
-    assert reply["map"]["country"] == "Canada" and len(reply["map"]["tastes"]) == 3
-    assert reply["reply"].startswith("The map now shows them. Listeners in Canada lean most to ")
