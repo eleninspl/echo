@@ -8,11 +8,13 @@ import type { HostError } from "@/lib/errors";
 import { saveHostName, useHostName } from "@/lib/host-name";
 import {
   NOTE_LIMIT,
+  NO_NAME,
   SHARED_NOTE_LIMIT,
   cleanDetails,
   isEmail,
   mailto,
   saved,
+  signedAs,
   useDetails,
   useDrafts,
   useEmails,
@@ -346,6 +348,7 @@ export function Invite({
               }}
               notSetUp={notSetUp}
               onChange={(draft) => update(guest.id, draft)}
+              onWrite={() => write([guest.id])}
               onWriteAgain={() => writeAgain([guest.id], guest.id)}
               confirming={confirm?.from === guest.id}
               onConfirm={(replace) => (replace ? write([guest.id]) : setConfirm(null))}
@@ -434,6 +437,7 @@ type CardProps = {
   };
   notSetUp: boolean;
   onChange: (draft: SavedDraft) => void;
+  onWrite: () => void;
   onWriteAgain: () => void;
   confirming: boolean;
   onConfirm: (replace: boolean) => void;
@@ -459,6 +463,7 @@ function GuestCard({
   revise,
   notSetUp,
   onChange,
+  onWrite,
   onWriteAgain,
   confirming,
   onConfirm,
@@ -467,7 +472,6 @@ function GuestCard({
   onStatus,
   prepare,
 }: CardProps) {
-  const emailWrong = email.trim() !== "" && !isEmail(email);
   const bio = guest.bio ?? guest.description;
   return (
     <li
@@ -511,21 +515,8 @@ function GuestCard({
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="tag text-ink-dim">Their email</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => onEmail(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Kept in this browser only"
-            aria-invalid={emailWrong || undefined}
-            className={input}
-          />
-          {emailWrong && <span className="text-xs text-alert">That doesn&apos;t look like an email yet</span>}
-        </label>
+      {/* What goes into their invitation, then the invitation, then sending it: the order the host works in. */}
+      <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1.5">
           <span className="tag text-ink-dim">Just for them</span>
           <input
@@ -536,9 +527,8 @@ function GuestCard({
             className={input}
           />
         </label>
+        <GuestDetailsLine name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
       </div>
-
-      <GuestDetailsLine name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
 
       {writing ? (
         <div aria-live="polite" className="flex flex-1 flex-col gap-3 border-t border-steel pt-5">
@@ -554,6 +544,7 @@ function GuestCard({
           guest={guest}
           draft={draft}
           email={email}
+          onEmail={onEmail}
           revise={revise}
           notSetUp={notSetUp}
           onChange={onChange}
@@ -561,10 +552,22 @@ function GuestCard({
           confirming={confirming}
           onConfirm={onConfirm}
         />
-      ) : (
+      ) : notSetUp ? (
         <p className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-steel-hi px-4 py-6 text-center text-sm text-ink-dim">
           Not written yet
         </p>
+      ) : (
+        <button
+          type="button"
+          onClick={onWrite}
+          className="group flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-steel-hi px-4 py-6 text-sm text-ink-soft transition-colors hover:border-brand hover:bg-deck hover:text-ink"
+        >
+          <svg aria-hidden viewBox="0 0 12 12" className="size-3 text-brand">
+            <path d="M6 2v8M2 6h8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          Write this one
+          <span className="sr-only">: the invitation to {guest.name}</span>
+        </button>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-steel pt-4">
@@ -610,6 +613,7 @@ function DraftBody({
   guest,
   draft,
   email,
+  onEmail,
   revise,
   notSetUp,
   onChange,
@@ -618,11 +622,24 @@ function DraftBody({
   onConfirm,
 }: Pick<
   CardProps,
-  "analysisId" | "guest" | "email" | "revise" | "notSetUp" | "onChange" | "onWriteAgain" | "confirming" | "onConfirm"
+  | "analysisId"
+  | "guest"
+  | "email"
+  | "onEmail"
+  | "revise"
+  | "notSetUp"
+  | "onChange"
+  | "onWriteAgain"
+  | "confirming"
+  | "onConfirm"
 > & { draft: SavedDraft }) {
   const [instruction, setInstruction] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<HostError | null>(null);
+  // Signed with the host's name as soon as they give it, without writing the draft again.
+  const body = signedAs(draft.body, revise.hostName);
+  const shown = { subject: draft.subject, body };
+  const emailWrong = email.trim() !== "" && !isEmail(email);
 
   async function rewrite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -640,7 +657,7 @@ function DraftBody({
         details: revise.details,
         details_by_ref: revise.guestDetails ? { [guest.ref]: revise.guestDetails } : undefined,
         ideas: idea && { [guest.ref]: idea },
-        previous: { subject: draft.subject, body: draft.body },
+        previous: shown,
         instruction: instruction.trim(),
       });
       const [revised]: (Draft | undefined)[] = drafts;
@@ -652,7 +669,7 @@ function DraftBody({
     setPending(false);
   }
 
-  const edit = (change: Partial<SavedDraft>) => onChange({ ...draft, ...change, changed: true });
+  const edit = (change: Partial<SavedDraft>) => onChange({ ...draft, body, ...change, changed: true });
   return (
     <div className="flex flex-1 flex-col gap-4 border-t border-steel pt-5">
       <div className="flex items-center justify-between gap-3">
@@ -670,53 +687,43 @@ function DraftBody({
       <label className="flex flex-1 flex-col gap-1.5">
         <span className="sr-only">Invitation to {guest.name}</span>
         <textarea
-          value={draft.body}
+          value={body}
           onChange={(event) => edit({ body: event.target.value })}
           rows={10}
           className={`${input} min-h-48 flex-1 resize-y text-sm leading-relaxed text-ink-soft [field-sizing:content]`}
         />
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <a
-          href={mailto(draft, email)}
-          className="btn btn-solid"
-          style={hue("var(--brand)")}
-          title={isEmail(email) ? `A new email to ${email.trim()}` : "A new email; add their address there"}
-        >
-          Open in email
-          <span className="sr-only">, the invitation to {guest.name}</span>
-        </a>
-        <CopyButton
-          text={`Subject: ${draft.subject}\n\n${draft.body}`}
-          label="Copy"
-          of={`the invitation to ${guest.name}`}
-        />
-        {!notSetUp && !confirming && (
-          <button type="button" onClick={onWriteAgain} className="btn btn-sm ml-auto">
-            Write again
-            <span className="sr-only"> the invitation to {guest.name}</span>
-          </button>
+        {body.includes(NO_NAME) && (
+          <span className="text-xs text-ink-dim">Give your name at the top and it signs off with it.</span>
         )}
-      </div>
-      {confirming && (
+      </label>
+      {confirming ? (
         <Ask question="Replace your changes?" onReplace={() => onConfirm(true)} onCancel={() => onConfirm(false)} />
-      )}
-      {!notSetUp && (
-        <form onSubmit={rewrite} className="flex gap-2">
-          <label className="flex flex-1">
-            <span className="sr-only">Change the invitation to {guest.name}</span>
-            <input
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              maxLength={300}
-              placeholder="Shorter, warmer, mention the tour…"
-              className={input}
-            />
-          </label>
-          <button type="submit" disabled={pending || !instruction.trim()} className="btn">
-            {pending ? "Rewriting…" : "Rewrite"}
-          </button>
-        </form>
+      ) : (
+        !notSetUp && (
+          <form onSubmit={rewrite} className="flex gap-2">
+            <label className="flex flex-1">
+              <span className="sr-only">Change the invitation to {guest.name}</span>
+              <input
+                value={instruction}
+                onChange={(event) => setInstruction(event.target.value)}
+                maxLength={300}
+                placeholder="Shorter, warmer, mention the tour…"
+                className={input}
+              />
+            </label>
+            {/* One button: with an ask it rewrites this draft, without one it writes a fresh one. */}
+            {instruction.trim() || pending ? (
+              <button type="submit" disabled={pending} className="btn">
+                {pending ? "Rewriting…" : "Rewrite"}
+              </button>
+            ) : (
+              <button type="button" onClick={onWriteAgain} className="btn">
+                Write again
+                <span className="sr-only"> the invitation to {guest.name}</span>
+              </button>
+            )}
+          </form>
+        )
       )}
       {problem && (
         <p role="alert" className="text-sm">
@@ -726,6 +733,40 @@ function DraftBody({
           <span className="text-ink-soft">{problem.message}</span>
         </p>
       )}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap gap-2">
+          <label className="flex min-w-48 flex-1">
+            <span className="sr-only">Their email, kept in this browser only</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => onEmail(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Their email, kept in this browser only"
+              aria-invalid={emailWrong || undefined}
+              className={input}
+            />
+          </label>
+          <span className="flex gap-2">
+            <a
+              href={mailto(shown, email)}
+              className="btn btn-solid"
+              style={hue("var(--brand)")}
+              title={isEmail(email) ? `A new email to ${email.trim()}` : "A new email; add their address there"}
+            >
+              Open in email
+              <span className="sr-only">, the invitation to {guest.name}</span>
+            </a>
+            <CopyButton
+              text={`Subject: ${draft.subject}\n\n${body}`}
+              label="Copy"
+              of={`the invitation to ${guest.name}`}
+            />
+          </span>
+        </div>
+        {emailWrong && <span className="text-xs text-alert">That doesn&apos;t look like an email yet</span>}
+      </div>
     </div>
   );
 }
