@@ -32,7 +32,7 @@ Stop echoing in the same room. Find the guest, and the story, that carries your 
 | On a guest | The guest's own audience map next to the show's, then the full episode and the briefing | `/v2/insights` with the guest as signal; LLM |
 | Invitations | One draft per picked guest, from what the audiences share, the idea and your details | LLM |
 
-A fresh analysis takes 44 to 68 Qloo calls; analyses and Qloo answers are cached, so opening one again costs none. Filters (fame, age group, country, an episode about a film, show, artist or brand) change the Qloo calls, not just the order. The theme goes to the LLM only.
+A fresh analysis takes 44 to 68 Qloo calls; analyses and Qloo answers are cached, so opening one again costs none. Filters (fame, age group, an episode about a film, show, artist or brand) change the Qloo calls, not just the order. The theme goes to the LLM only.
 
 ```
 browser ──> web app (Next.js, Vercel) ──> engine (FastAPI, Vercel) ──> Qloo Insights API

@@ -724,7 +724,7 @@ function Send() {
 }
 
 const ASKS = [
-  { what: "Different guests", how: "Younger listeners, less famous names, guests from one country." },
+  { what: "Different guests", how: "Younger listeners or less famous names." },
   { what: "An episode about something", how: "A theme like road trips, or a film, show, artist or brand by name." },
   { what: "A new take on one idea", how: "Echo rewrites a guest's episode idea the way you describe." },
   { what: "Leave a guest out", how: "Say who you've had on or who isn't right, and they stay out of every run." },

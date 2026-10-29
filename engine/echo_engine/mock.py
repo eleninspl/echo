@@ -54,7 +54,7 @@ ANCHOR_WORDS: dict[str, AnchorType] = {
 }  # fmt: skip
 ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
 HELP = (
-    "Mock mode understands a few asks: younger, older or an age; less famous or rising; a country; "
+    "Mock mode understands a few asks: younger, older or an age; less famous or rising; "
     "an episode about a film, show, artist or brand by name; a theme; a funnier, shorter or new take on the "
     "first idea; or leaving out a guest by name."
 )
@@ -140,26 +140,13 @@ def about_taste(guests: list[Guest], taste: TasteFans) -> ChatDecision:
 
 def map_question(audience_map: list[MapRow], said: str) -> ChatDecision | None:
     category = next((key for key, pattern in CATEGORY_WORDS if re.search(pattern, said)), None)
-    age = age_in(said)
-    if age is None and re.search(r"\byoung", said):
-        age = "24_and_younger"
-    elif age is None and re.search(r"\bold(er)?\b", said):
-        age = "55_and_older"
-    country = country_in(said)
-    if not (category or age or country or re.search(r"\b(like|love|into)\b", said)):
+    if country_in(said) or not (category or re.search(r"\b(like|love|into)\b", said)):
         return None
     row = next((row for row in audience_map if row.category == category), None)
-    tastes = [item.name for item in row.items[:3]] if row and not (age or country) else []
-    who = "your listeners"
-    if age:
-        who += f" aged {AGE_WORDS[age]}"
-    if country:
-        who += f" in {country}"
+    tastes = [item.name for item in row.items[:3]] if row else []
     what = CATEGORY_WORDS_SHOWN.get(category or "", "love")
-    reply = f"Mock mode: here's what {who} {what} most, on the taste map."
-    return ChatDecision(
-        reply=reply, action="none", map=MapFocus(category=category, tastes=tastes, age=age, country=country)
-    )
+    reply = f"Mock mode: here's what your listeners {what} most, on the taste map."
+    return ChatDecision(reply=reply, action="none", map=MapFocus(category=category, tastes=tastes))
 
 
 def rewrite(guests: list[Guest], said: str) -> ChatDecision:
@@ -191,6 +178,8 @@ def changed(current: Filters, text: str, said: str) -> tuple[Filters | None, str
     """The filters the message asks for, or None when it asks for none, and a question back when it's unclear."""
     if re.search(r"\b(reset|clear (the )?filters|start over|no filters|everyone again)\b", said):
         return Filters(), None
+    if country_in(said):
+        return None, "Echo doesn't filter guests by country."
     update: dict = {}
     position = AGES.index(current.age) if current.age else None
     if re.search(r"\byoung", said):
@@ -207,10 +196,6 @@ def changed(current: Filters, text: str, said: str) -> tuple[Filters | None, str
         update["fame"] = "rising"
     elif re.search(r"\b(any fame|famous|big names)\b", said):
         update["fame"] = "any"
-    if re.search(r"\b(anywhere|any country|every country)\b", said):
-        update["country"] = None
-    elif country := country_in(said):
-        update["country"] = country
     if re.search(r"\b(no theme|drop the theme|without a theme)\b", said):
         update["theme"] = None
     if re.search(r"\b(no film|no subject|drop the (film|subject))\b", said):

@@ -85,8 +85,6 @@ export type GuestDetails = { ref: string; audience_map: MapRow[]; adds: MapRow[]
 export type Message = { role: "user" | "assistant"; content: string };
 
 export type LeaveOutWhy = "had_on" | "not_for_us";
-export type Lens = { age: AgeBucket | null; country: string | null };
-export type MapLens = Lens & { audience_map: MapRow[] };
 export type BridgeCount = { both: number; yours: number; theirs: number };
 export type GuestBridge = {
   ref: string;
@@ -96,8 +94,8 @@ export type GuestBridge = {
   totals?: Record<string, BridgeCount>;
 };
 export type TasteFans = { category: string; name: string; guests: { ref: string; affinity: number }[] };
-export type TasteAsk = Lens & { category: string; name: string };
-export type MapFocus = Lens & { category: string | null; tastes: string[] };
+export type TasteAsk = { category: string; name: string };
+export type MapFocus = { category: string | null; tastes: string[] };
 
 export type ChatReply = {
   reply: string;
@@ -202,8 +200,6 @@ export const echo = {
   },
   chat: (analysis_id: string, messages: Message[], exclude: string[], taste?: TasteAsk) =>
     call<ChatReply>("/chat", { analysis_id, messages, exclude, taste }),
-  lens: (id: string, lens: Lens, signal?: AbortSignal) =>
-    call<MapLens>(`/analyses/${encodeURIComponent(id)}/map?${lensQuery(lens)}`, undefined, signal),
   bridge: (id: string, ref: string, signal?: AbortSignal) =>
     call<GuestBridge>(
       `/analyses/${encodeURIComponent(id)}/guests/${encodeURIComponent(ref)}/bridge`,
@@ -212,7 +208,7 @@ export const echo = {
     ),
   tasteFans: (id: string, taste: TasteAsk, signal?: AbortSignal) =>
     call<TasteFans>(
-      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}&${lensQuery(taste)}`,
+      `/analyses/${encodeURIComponent(id)}/taste?${new URLSearchParams({ category: taste.category, name: taste.name })}`,
       undefined,
       signal,
     ),
@@ -229,11 +225,4 @@ export const echo = {
 // An idea as the engine takes it, without the web app's own mark.
 function plain({ reason, title, pitch }: Idea) {
   return { reason, title, pitch };
-}
-
-function lensQuery({ age, country }: Lens): string {
-  const query = new URLSearchParams();
-  if (age) query.set("age", age);
-  if (country) query.set("country", country);
-  return query.toString();
 }

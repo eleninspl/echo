@@ -57,7 +57,6 @@ const USAGE = `Usage: node echo.mjs <command> [arguments]
   analyze <show_id> [filters]       rank guests for a show (up to a minute)
       --fame any|less_famous|rising
       --age ${Object.keys(AGES).join("|")}
-      --country <English country name>
       --about <title or name> --about-type ${ABOUT_TYPES.join("|")}
       --theme <the episode's theme, up to ${THEME_CHARS} characters>
   results <analysis_id>             the ranked guests again
@@ -141,7 +140,6 @@ function filterPhrases(filters) {
   const phrases = [];
   if (FAME[filters.fame]) phrases.push(FAME[filters.fame]);
   if (filters.age) phrases.push(`listeners ${AGES[filters.age]}`);
-  if (filters.country) phrases.push(`in ${filters.country}`);
   if (filters.episode_about)
     phrases.push(`an episode about ${filters.episode_about.used ?? filters.episode_about.query}`);
   if (filters.theme) phrases.push(`theme "${filters.theme}"`);
@@ -296,7 +294,6 @@ const COMMANDS = {
     needs(positionals, 1, "the show_id (from find)");
     const filters = { fame: values.fame ?? "any" };
     if (values.age) filters.age = values.age;
-    if (values.country) filters.country = values.country;
     if (values.about) filters.episode_about = { query: values.about, type: values["about-type"] ?? "movie" };
     if (values.theme) filters.theme = values.theme;
     const left = await saved.load("left", positionals[0], []);
@@ -453,7 +450,6 @@ export async function run(argv, env = process.env) {
     options: {
       fame: { type: "string" },
       age: { type: "string" },
-      country: { type: "string" },
       about: { type: "string" },
       "about-type": { type: "string" },
       theme: { type: "string" },

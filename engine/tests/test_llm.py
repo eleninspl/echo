@@ -251,7 +251,7 @@ def test_chat_falls_back_to_an_answer_when_the_action_is_incomplete(fake, analys
 
 
 def test_chat_filters_that_do_not_validate_are_an_llm_error(fake, analysis):
-    bad = {"fame": "any", "age": None, "country": "X", "episode_about": None}
+    bad = {"fame": "famous", "age": None, "country": None, "episode_about": None}
     fake(chat_decision=decision(action="rerun", filters=bad))
     with pytest.raises(LlmError, match="ChatDecision"):
         asyncio.run(llm.chat(analysis, [Message(role="user", content="Only X")]))
