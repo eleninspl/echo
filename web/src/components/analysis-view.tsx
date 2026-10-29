@@ -471,7 +471,6 @@ export function Console() {
         onPick={onPick}
         onOpen={onOpen}
         onClose={onClose}
-        onBridge={onBridge}
       />
       <PickBar analysis={analysis} picked={picked} earlier={missing} beside={beside} />
     </div>

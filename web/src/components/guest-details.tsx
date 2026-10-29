@@ -5,33 +5,28 @@ import { useEffect, useState, type ReactNode } from "react";
 import { echo, type Episode, type GuestDetails as Details, type Idea, type MapRow } from "@/lib/echo";
 import { describe, type HostError } from "@/lib/errors";
 
-import { FansOverlap } from "./fans-venn";
+import { FansVenn } from "./fans-venn";
 import { Lamp, Part } from "./hud";
 
 type Load = { state: "loading" } | { state: "done"; details: Details } | { state: "failed"; problem: HostError };
+export type GuestLoad = { load: Load; retry: () => void };
 
 const loaded = new Map<string, Details>();
 
 const SETTLE = 600;
 
-// `idea`: the guest's idea when the chat rewrote it, so the episode is written for it.
-type Props = {
-  id: string;
-  guestRef: string;
-  idea?: Idea;
-  length?: string;
-  ideaTitle?: string;
-  showMap: MapRow[];
-  onShowMap?: () => void;
+const initial = (key: string): Load => {
+  const details = loaded.get(key);
+  return details ? { state: "done", details } : { state: "loading" };
 };
 
-export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, onShowMap }: Props) {
+// One guest's episode and their fans' map, fetched once for both. `idea`: the guest's idea when the chat rewrote it,
+// so the episode is written for it; a new idea or length starts a new load.
+export function useGuestDetails(id: string, guestRef: string, idea?: Idea, length?: string): GuestLoad {
   const key = `${id}/${guestRef}/${idea ? `${idea.title}/${idea.pitch}` : ""}/${length ?? ""}`;
-  const [load, setLoad] = useState<Load>(() => {
-    const details = loaded.get(key);
-    return details ? { state: "done", details } : { state: "loading" };
-  });
+  const [state, setState] = useState<{ key: string; load: Load }>(() => ({ key, load: initial(key) }));
   const [attempt, setAttempt] = useState(0);
+  if (state.key !== key) setState({ key, load: initial(key) });
 
   useEffect(() => {
     if (loaded.has(key)) return;
@@ -41,10 +36,10 @@ export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, o
         .guest(id, guestRef, idea, length, controller.signal)
         .then((details) => {
           loaded.set(key, details);
-          setLoad({ state: "done", details });
+          setState({ key, load: { state: "done", details } });
         })
         .catch((error) => {
-          if (!controller.signal.aborted) setLoad({ state: "failed", problem: describe(error) });
+          if (!controller.signal.aborted) setState({ key, load: { state: "failed", problem: describe(error) } });
         });
     }, SETTLE);
     return () => {
@@ -53,63 +48,63 @@ export function GuestDetails({ id, guestRef, idea, length, ideaTitle, showMap, o
     };
   }, [id, guestRef, idea, length, key, attempt]);
 
-  if (load.state === "failed") {
-    const { problem } = load;
-    return (
-      <Part id={`episode-${guestRef}`} title="The episode">
+  const retry = () => {
+    setState({ key, load: { state: "loading" } });
+    setAttempt((n) => n + 1);
+  };
+  return { load: state.key === key ? state.load : initial(key), retry };
+}
+
+export function GuestEpisode({ id, details, ideaTitle }: { id: string; details: GuestLoad; ideaTitle?: string }) {
+  const { load, retry } = details;
+  return (
+    <Part id={`episode-${id}`} title="The episode">
+      {load.state === "failed" ? (
         <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="font-semibold text-alert">{problem.title}</p>
-          <p className="text-ink-soft">{problem.message}</p>
-          {problem.next === "retry" && (
-            <button
-              type="button"
-              onClick={() => {
-                setLoad({ state: "loading" });
-                setAttempt((n) => n + 1);
-              }}
-              className="btn"
-            >
+          <p className="font-semibold text-alert">{load.problem.title}</p>
+          <p className="text-ink-soft">{load.problem.message}</p>
+          {load.problem.next === "retry" && (
+            <button type="button" onClick={retry} className="btn">
               Try again
             </button>
           )}
         </div>
-      </Part>
-    );
-  }
+      ) : load.state === "loading" ? (
+        <Waiting>Writing the episode…</Waiting>
+      ) : load.details.episode ? (
+        <EpisodePlan episode={load.details.episode} ideaTitle={ideaTitle} />
+      ) : (
+        <p className="text-ink-dim">Echo hasn&apos;t written this episode yet.</p>
+      )}
+    </Part>
+  );
+}
 
-  const details = load.state === "done" ? load.details : null;
+// The show's listeners and the guest's fans side by side: what only yours love, what both love and what the guest's
+// fans would bring, as pictures in two overlapping circles.
+export function GuestFans({
+  id,
+  details,
+  showMap,
+  guestName,
+  className = "",
+}: {
+  id: string;
+  details: GuestLoad;
+  showMap: MapRow[];
+  guestName: string;
+  className?: string;
+}) {
+  const { load } = details;
+  if (load.state === "failed") return null;
   return (
-    <>
-      <Part id={`meet-${guestRef}`} title="Their fans next to yours">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-          {details ? (
-            <FansOverlap showMap={showMap} guestMap={details.audience_map} adds={details.adds} />
-          ) : (
-            <Waiting short>Mapping their audience…</Waiting>
-          )}
-          {onShowMap && (
-            <button type="button" onClick={onShowMap} className="btn">
-              <svg aria-hidden viewBox="0 0 16 16" className="size-4">
-                <g fill="none" stroke="currentColor" strokeWidth="1.4">
-                  <circle cx="6" cy="8" r="4.5" />
-                  <circle cx="10" cy="8" r="4.5" />
-                </g>
-              </svg>
-              See both on the taste map
-            </button>
-          )}
-        </div>
-      </Part>
-      <Part id={`episode-${guestRef}`} title="The episode">
-        {!details ? (
-          <Waiting>Writing the episode…</Waiting>
-        ) : details.episode ? (
-          <EpisodePlan episode={details.episode} ideaTitle={ideaTitle} />
-        ) : (
-          <p className="text-ink-dim">Echo hasn&apos;t written this episode yet.</p>
-        )}
-      </Part>
-    </>
+    <Part id={`meet-${id}`} title={`Your listeners and ${guestName}'s fans`} className={className}>
+      {load.state === "loading" ? (
+        <Waiting short>Mapping their audience…</Waiting>
+      ) : (
+        <FansVenn showMap={showMap} guestMap={load.details.audience_map} adds={load.details.adds} />
+      )}
+    </Part>
   );
 }
 

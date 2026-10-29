@@ -5,17 +5,14 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import type { Analysis, Guest } from "@/lib/echo";
 import { labelMeans, LABELS } from "@/lib/format";
 import { useEpisodeLength } from "@/lib/invitations";
-import { showTastes } from "@/lib/pointer";
 import { rewrittenIdea } from "@/lib/rewrites";
 
 import type { Rewrite } from "./analysis-view";
 import { AgeLamps, GuestLinks, PickButton, Scores, TasteChips } from "./dossier";
-import { GuestDetails } from "./guest-details";
+import { GuestEpisode, GuestFans, useGuestDetails } from "./guest-details";
 import { Picture } from "./guest-list";
 import { Chip, LABEL_HUE, out100, Part, rank, SHEET_WIDTH } from "./hud";
 
-const BESIDE = "(min-width: 64rem)";
-const AFTER_CLOSE = 750;
 
 type Props = {
   analysis: Analysis;
@@ -25,7 +22,6 @@ type Props = {
   onPick: (guestRef: string) => void;
   onOpen: (guestRef: string) => void;
   onClose: () => void;
-  onBridge: (guestId: string) => void;
 };
 
 export function GuestSheet({
@@ -36,7 +32,6 @@ export function GuestSheet({
   onPick,
   onOpen,
   onClose,
-  onBridge,
 }: Props) {
   const { guests } = analysis;
   const [last, setLast] = useState(guestRef);
@@ -119,15 +114,6 @@ export function GuestSheet({
             guest={guest}
             rewritten={Boolean(guest.idea?.rewritten)}
             heading={heading}
-            onShowMap={() => {
-              onBridge(guest.id);
-              if (matchMedia(BESIDE).matches) {
-                showTastes();
-                return;
-              }
-              onClose();
-              window.setTimeout(showTastes, AFTER_CLOSE);
-            }}
           />
         ) : (
           <p className="px-5 pt-8 font-display text-2xl font-semibold sm:px-8">This guest isn&apos;t in this run.</p>
@@ -142,20 +128,20 @@ function GuestBody({
   guest,
   rewritten,
   heading,
-  onShowMap,
 }: {
   analysis: Analysis;
   guest: Guest;
   rewritten: boolean;
   heading: RefObject<HTMLHeadingElement | null>;
-  onShowMap: () => void;
 }) {
   const { scores, idea, evidence } = guest;
   const color = LABEL_HUE[guest.label];
   const sweet = guest.label === "sweet_spot";
   const length = useEpisodeLength(analysis.show.id);
-  // Narrow, the parts run in one column; wide, the guest and their idea sit on the left and the evidence and the
-  // episode on the right, in the same reading order.
+  // A rewrite brings its own episode.
+  const details = useGuestDetails(analysis.id, guest.ref, rewrittenIdea(guest), length);
+  // Narrow, the parts run in one column; wide, the guest and their idea sit on the left, the evidence and the
+  // episode on the right, and the two audiences side by side across the bottom, in the same reading order.
   return (
     <div className="@container">
       <div className="rise grid grid-cols-1 gap-10 px-5 pt-7 pb-28 sm:px-8 @[46rem]:grid-cols-2 @[46rem]:gap-x-10">
@@ -262,18 +248,15 @@ function GuestBody({
             </Part>
           )}
 
-          {/* Keyed by the idea: a rewrite brings its own episode. */}
-          <GuestDetails
-            key={`episode-${guest.idea?.title}`}
-            id={analysis.id}
-            guestRef={guest.ref}
-            idea={rewrittenIdea(guest)}
-            length={length}
-            ideaTitle={guest.idea?.title}
-            showMap={analysis.audience_map}
-            onShowMap={onShowMap}
-          />
+          <GuestEpisode id={guest.ref} details={details} ideaTitle={guest.idea?.title} />
         </div>
+        <GuestFans
+          id={guest.ref}
+          details={details}
+          showMap={analysis.audience_map}
+          guestName={guest.name}
+          className="@[46rem]:col-span-2"
+        />
       </div>
     </div>
   );
