@@ -580,16 +580,20 @@ function GuestCard({
         </div>
         <Voiceprint fit={scores.fit} love={scores.love_back} reach={scores.reach} bars={44} height={40} className="w-full max-w-80" />
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="tag text-ink-dim">Just for {firstName(guest.name)}</span>
-            <input
-              value={note}
-              onChange={(event) => onNote(event.target.value)}
-              maxLength={NOTE_LIMIT}
-              placeholder="Your angle, how you know them…"
-              className={LINE}
-            />
-          </label>
+          {/* Before the letter is written its line sits on the blank sheet, as the step before writing; after,
+              it waits here for the next time Echo writes. */}
+          {draft && (
+            <label className="flex flex-col gap-1">
+              <span className="tag text-ink-dim">Just for {firstName(guest.name)}, when Echo writes again</span>
+              <input
+                value={note}
+                onChange={(event) => onNote(event.target.value)}
+                maxLength={NOTE_LIMIT}
+                placeholder="Your angle, how you know them…"
+                className={LINE}
+              />
+            </label>
+          )}
           <GuestDetailsLine name={guest.name} shared={sharedDetails} own={ownDetails} onOwn={onOwnDetails} />
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -640,6 +644,8 @@ function GuestCard({
         arrivals={arrivals}
         email={email}
         onEmail={onEmail}
+        note={note}
+        onNote={onNote}
         revise={revise}
         notSetUp={notSetUp}
         onChange={onChange}
@@ -663,6 +669,8 @@ function Letter({
   arrivals,
   email,
   onEmail,
+  note,
+  onNote,
   revise,
   notSetUp,
   onChange,
@@ -679,6 +687,8 @@ function Letter({
   | "writing"
   | "email"
   | "onEmail"
+  | "note"
+  | "onNote"
   | "revise"
   | "notSetUp"
   | "onChange"
@@ -793,19 +803,30 @@ function Letter({
               )}
             </label>
           ) : (
-            <BlankSheet
-              writing={writing}
-              name={name}
-              action={
-                notSetUp ? (
-                  <p className="text-ink-soft">Writing isn&apos;t set up here.</p>
-                ) : (
-                  <button type="button" onClick={onWrite} className="btn btn-brand min-h-12 px-6 text-base">
+            <BlankSheet writing={writing} name={name}>
+              {notSetUp ? (
+                <p className="text-ink-soft">Writing isn&apos;t set up here.</p>
+              ) : (
+                <>
+                  <label className="flex flex-col gap-2">
+                    <span className="font-display text-xl leading-tight font-semibold text-ink">
+                      Anything just for {name}?
+                    </span>
+                    <textarea
+                      value={note}
+                      onChange={(event) => onNote(event.target.value)}
+                      maxLength={NOTE_LIMIT}
+                      rows={3}
+                      placeholder="Your angle, how you know them, a show of theirs you loved… Echo works it in."
+                      className="field w-full resize-none px-4 py-3 text-[0.9375rem] leading-relaxed"
+                    />
+                  </label>
+                  <button type="button" onClick={onWrite} className="btn btn-brand min-h-12 w-full text-base">
                     Write to {name}
                   </button>
-                )
-              }
-            />
+                </>
+              )}
+            </BlankSheet>
           )}
           {draft?.changed && !writing && (
             <span className="tag absolute top-4 right-6 text-ink-dim sm:right-10">Edited</span>
@@ -875,9 +896,9 @@ function Letter({
   );
 }
 
-// The sheet before its letter: faint lines where the words will go, and the way to write it. While Echo writes, the
-// lines shimmer in turn.
-function BlankSheet({ writing, name, action }: { writing: boolean; name: string; action: ReactNode }) {
+// The sheet before its letter: faint lines where the words will go, and over them the line just for this guest and
+// the way to write it. While Echo writes, the lines shimmer in turn.
+function BlankSheet({ writing, name, children }: { writing: boolean; name: string; children: ReactNode }) {
   const lines = [38, 0, 96, 92, 88, 64, 0, 94, 90, 72, 0, 24];
   return (
     <div className={`relative flex flex-1 flex-col ${writing ? "writing" : ""}`}>
@@ -901,7 +922,9 @@ function BlankSheet({ writing, name, action }: { writing: boolean; name: string;
             Echo is writing to {name}…
           </p>
         ) : (
-          <div className="rounded-full bg-deck p-2 shadow-pop">{action}</div>
+          <div className="flex w-full max-w-md flex-col gap-4 rounded-3xl bg-deck p-5 shadow-pop ring-1 ring-steel sm:p-6">
+            {children}
+          </div>
         )}
       </div>
     </div>
