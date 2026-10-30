@@ -179,8 +179,6 @@ const EMAIL = /^[^\s@,;?&/]+@[^\s@,;?&/]+\.[^\s@,;?&/]+$/;
 
 export const isEmail = (text: string) => EMAIL.test(text.trim());
 
-// A new email in the host's own mail app, to the guest when their address is given. Line breaks as CRLF, per RFC
-// 6068.
 // The engine signs a draft "[Your name]" when it has no name; the name the host gives later takes its place.
 export const NO_NAME = "[Your name]";
 
@@ -188,6 +186,8 @@ export function signedAs(text: string, name: string | undefined): string {
   return name ? text.replaceAll(NO_NAME, name) : text;
 }
 
+// A new email in the host's own mail app, to the guest when their address is given. Line breaks as CRLF, per RFC
+// 6068.
 export function mailto(draft: DraftText, email: string): string {
   const to = isEmail(email) ? email.trim() : "";
   const body = draft.body.replace(/\r?\n/g, "\r\n");
