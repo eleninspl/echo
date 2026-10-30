@@ -6,7 +6,7 @@ Ask an AI assistant who to invite on a podcast, or what to talk about, and it su
 
 Stop echoing in the same room. Find the guest, and the story, that carries your voice somewhere new.
 
-> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026), by Eleni and Leonidas.
+> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026), by [Eleni Nasopoulou](https://github.com/eleninspl) and [Leonidas Anagnou](https://github.com/anagnole).
 
 ## Try it
 
@@ -119,6 +119,8 @@ openclaw/ an Echo agent for OpenClaw, with the echo skill
 scripts/  repo helpers and TypeScript probes of the Qloo API
 src/      TypeScript Qloo client used by the probes
 ```
+
+This repo is published from the team's private working repo by `scripts/publish.sh`, with the full history less a file of Qloo results and a deleted video. Pull request numbers in commit messages refer to the working repo.
 
 ## License
 
