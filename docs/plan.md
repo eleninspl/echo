@@ -18,7 +18,7 @@ Two pieces: the **engine** (Python, FastAPI) and the **web app** (Next.js), both
 10. **Briefing** before recording, on Your guests: every picked guest by show, where each invitation stands (not sent, sent, booked), with the invitation, the briefing, the episode plan and their fans next to yours. Kept in the browser, no accounts.
 11. **Qloo stays under the hood.** The UI doesn't name Qloo (25 Oct call, which cut the What Qloo saw tab); the analysis still returns `qloo_calls`.
 
-3 or 4 featured shows, precomputed, open instantly from the landing page.
+3 or 4 featured shows, precomputed, open instantly. They're offered when Echo can't analyse a show or is resting for the day; the landing page has no row of them since 30 Oct.
 
 **OpenClaw** (To agree 1): `openclaw/` is the workspace of an Echo agent for a host's own OpenClaw: `AGENTS.md`, `SOUL.md`, `IDENTITY.md` and the `echo` skill (`openclaw/skills/echo/`), a Node script with no dependencies that calls the API below (`find`, `analyze`, `results`, `guest`, `ask`, `invite`, `revise`, `brief`) and prints plain text for the agent. It keeps the ideas the chat rewrites, the last draft per guest and the guests the chat left out (per show) in a temp folder, and sends them back like the web app does; `guest` and `brief` take `--length`. It drafts in whatever chat OpenClaw is connected to, and sends a draft only when the host says to, through a tool the host has set up. Leonidas.
 

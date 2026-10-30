@@ -1,5 +1,4 @@
 import { Backdrop } from "@/components/backdrop";
-import { FeaturedShows } from "@/components/featured";
 import { FRAME } from "@/components/hud";
 import { RESULTS_SLOT, ShowFinder } from "@/components/show-finder";
 import { ScoreKey } from "@/components/signal";
@@ -19,9 +18,8 @@ export default function Home() {
               Echo maps what your listeners love, then finds guests they&apos;ll love whose own fans will love your show
               back.
             </p>
-            <div data-echo-quiet className="flex max-w-2xl flex-col gap-4">
+            <div data-echo-quiet className="max-w-2xl">
               <ShowFinder />
-              <FeaturedShows />
             </div>
           </div>
           <div id={RESULTS_SLOT} className="hidden xl:block xl:translate-y-12 xl:self-center xl:pr-6" />
