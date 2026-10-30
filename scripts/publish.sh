@@ -4,7 +4,7 @@
 # them hold a file of Qloo results. Needs git-filter-repo (brew install git-filter-repo).
 set -euo pipefail
 
-public="${ECHO_PUBLIC_REPO:-https://github.com/eleninspl/echo.git}"
+public="${ECHO_PUBLIC_REPO:-https://github.com/eleninspl/echo-qloo.git}"
 private="$(git -C "$(dirname "$0")/.." remote get-url origin)"
 
 # Deleted from main, still in the history: Qloo results (engine/reach.json) and

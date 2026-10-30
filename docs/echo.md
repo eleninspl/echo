@@ -49,7 +49,7 @@ Qloo Agentic Hackathon 2026, online on Devpost. The brief: build an agent, or an
 | **Final** | **5 November:** the top 3 present live on air to the investor judge, the comedian judge and Qloo's CEO, answer questions and hear the result there. Finalists are told soon after the deadline. |
 | Prizes | $15,000, $6,000, $4,000, plus the investor judge's $25,000. About 1,590 registered. |
 
-A submission needs **a live hosted demo** judges can use start to finish (nothing that only runs on a laptop), **public source code** under an open licence (MIT, at https://github.com/eleninspl/echo, published from the private working repo: `docs/plan.md`, Publishing the source) and **a written description** of what it does and why it needs Qloo. The guide also asks how a request turns into a result and what the limits are.
+A submission needs **a live hosted demo** judges can use start to finish (nothing that only runs on a laptop), **public source code** under an open licence (MIT, at https://github.com/eleninspl/echo-qloo, published from the private working repo: `docs/plan.md`, Publishing the source) and **a written description** of what it does and why it needs Qloo. The guide also asks how a request turns into a result and what the limits are.
 
 Four criteria, equal weight. Ties go to the first.
 
