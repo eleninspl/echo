@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { InviteDetails } from "@/lib/echo";
 import { cleanDetails, DETAIL_LIMITS, mergedDetails } from "@/lib/invitations";
@@ -392,49 +392,164 @@ export function GuestDetailsLine({
   );
 }
 
-const MORE: Partial<Record<Field, string[]>> = {
-  dates: QUICK.dates,
-  length: QUICK.length,
+// How each detail reads inside the booking sentence, and what shows while it isn't given (dimmed, never sent).
+const SENTENCE: Record<Field, (details: InviteDetails) => string> = {
+  dates: (details) => {
+    const dates = details.dates?.trim() ?? "";
+    if (dates === "Flexible") return "whenever suits them";
+    return QUICK.dates?.includes(dates) ? dates.toLowerCase() : dates;
+  },
+  format: (details) =>
+    details.format === "remote"
+      ? "remotely"
+      : details.format === "in_person"
+        ? details.place?.trim()
+          ? `in person at ${details.place.trim()}`
+          : "in person"
+        : "",
+  length: (details) => details.length?.trim() ?? "",
+  fee: (details) => {
+    if (details.unpaid) return "unpaid";
+    const fee = details.fee?.trim();
+    if (!fee) return "";
+    return fee === PAID ? "paid" : `paid, ${fee}`;
+  },
 };
 
-// Everyone's details on the invite page, each with its choices in sight: one click sets or clears one, with a field
-// beside the choices for anything in the host's own words. The guests' cards keep the smaller DetailsPicker.
-export function DetailsRows({
+const UNSAID: Record<Field, string> = {
+  dates: "on dates to agree",
+  format: "remote or in person",
+  length: "any length",
+  fee: "fee not mentioned",
+};
+
+// Everyone's details as one sentence the host reads like the line they'd write: "We'd record whenever suits them,
+// remotely, for 60 min, unpaid." Each underlined phrase opens its choices in a small menu beside it.
+export function BookingLine({
   details,
   onChange,
+  className = "",
 }: {
   details: InviteDetails;
   onChange: (change: Partial<InviteDetails>) => void;
+  className?: string;
 }) {
+  const [open, setOpen] = useState<Field | null>(null);
+  const token = (field: Field, after: string) => (
+    <Token
+      field={field}
+      after={after}
+      details={details}
+      open={open === field}
+      onOpen={(on) => setOpen(on ? field : null)}
+      onChange={onChange}
+    />
+  );
   return (
-    // Two columns only once each row's choices fit on one line.
-    <div className="@container">
-      <div className="grid gap-x-8 gap-y-4 @[44rem]:grid-cols-2">
-        {FIELDS.map((field) => (
-          <Row key={field} field={field} details={details} onChange={onChange} />
-        ))}
-      </div>
-    </div>
+    <p className={className}>
+      We&apos;d record {token("dates", ",")} {token("format", ",")} for {token("length", ",")} {token("fee", ".")}
+    </p>
   );
 }
 
-function Row({
+function Token({
+  field,
+  after,
+  details,
+  open,
+  onOpen,
+  onChange,
+}: {
+  field: Field;
+  after: string;
+  details: InviteDetails;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  onChange: (change: Partial<InviteDetails>) => void;
+}) {
+  const id = useId();
+  const box = useRef<HTMLSpanElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const said = SENTENCE[field](details);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) onOpen(false);
+    };
+    const keys = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onOpen(false);
+      button.current?.focus();
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", keys);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", keys);
+    };
+  }, [open, onOpen]);
+
+  return (
+    <span ref={box} className="relative inline-block">
+      <button
+        ref={button}
+        type="button"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        aria-label={`${NAMES[field]}: ${said || "not given"}`}
+        onClick={() => onOpen(!open)}
+        className={`rounded-md underline decoration-2 underline-offset-[0.3em] transition-colors ${
+          said
+            ? "text-ink decoration-brand/70 hover:decoration-brand"
+            : "text-ink-dim decoration-steel-hi decoration-dashed hover:text-ink-soft"
+        } ${open ? "bg-deck-hi decoration-brand" : ""}`}
+      >
+        {said || UNSAID[field]}
+        {/* The punctuation rides with its phrase, so a line never starts with a comma; as an inline block it
+            takes no underline. */}
+        <span aria-hidden className="inline-block text-ink-soft">
+          {after}
+        </span>
+      </button>
+      {open && (
+        <span
+          id={id}
+          role="group"
+          aria-label={NAMES[field]}
+          className="pop-in absolute top-full left-0 z-30 mt-3 flex w-[min(20rem,80vw)] flex-col gap-3 rounded-2xl bg-deck p-3 font-sans text-sm font-normal shadow-pop ring-1 ring-steel"
+        >
+          <MenuChoices field={field} details={details} onChange={onChange} onDone={() => onOpen(false)} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// A detail's choices: one click sets or clears one, with a field for Other, the place or the amount.
+function MenuChoices({
   field,
   details,
   onChange,
+  onDone,
 }: {
   field: Field;
   details: InviteDetails;
   onChange: (change: Partial<InviteDetails>) => void;
+  onDone: () => void;
 }) {
-  const quick = MORE[field];
+  const quick = QUICK[field];
   const typedKey = field === "dates" || field === "length" ? field : undefined;
   const value = typedKey ? (details[typedKey] ?? "") : "";
   const custom = Boolean(quick && value.trim() && !quick.includes(value.trim()));
   const [other, setOther] = useState(custom);
   const showOther = other || custom;
   const paid = !details.unpaid && Boolean(details.fee?.trim());
-  const small = "field h-9 min-w-36 flex-1 px-3 text-sm";
+  const small = "field h-9 w-full px-3 text-sm";
+  const set = (change: Partial<InviteDetails>, done = true) => {
+    onChange(change);
+    if (done) onDone();
+  };
 
   const choices: { name: string; on: boolean; pick: () => void }[] =
     quick && typedKey
@@ -442,10 +557,7 @@ function Row({
           ...quick.map((choice) => ({
             name: choice,
             on: value.trim() === choice,
-            pick: () => {
-              setOther(false);
-              onChange({ [typedKey]: value.trim() === choice ? "" : choice });
-            },
+            pick: () => set({ [typedKey]: value.trim() === choice ? "" : choice }),
           })),
           {
             name: "Other",
@@ -458,68 +570,74 @@ function Row({
         ]
       : field === "format"
         ? [
-            { name: "Remote", on: details.format === "remote", value: "remote" as const },
-            { name: "In person", on: details.format === "in_person", value: "in_person" as const },
-          ].map(({ name, on, value: format }) => ({ name, on, pick: () => onChange({ format: on ? undefined : format }) }))
+            { name: "Remote", on: details.format === "remote", pick: () => set({ format: details.format === "remote" ? undefined : "remote" }) },
+            {
+              name: "In person",
+              on: details.format === "in_person",
+              pick: () => set({ format: details.format === "in_person" ? undefined : "in_person" }, false),
+            },
+          ]
         : [
-            {
-              name: "Unpaid",
-              on: Boolean(details.unpaid),
-              pick: () => onChange({ unpaid: !details.unpaid, fee: "" }),
-            },
-            {
-              name: "Paid",
-              on: paid,
-              pick: () => onChange(paid ? { fee: "" } : { unpaid: false, fee: PAID }),
-            },
+            { name: "Unpaid", on: Boolean(details.unpaid), pick: () => set({ unpaid: !details.unpaid, fee: "" }) },
+            { name: "Paid", on: paid, pick: () => set(paid ? { fee: "" } : { unpaid: false, fee: PAID }, false) },
           ];
 
+  const done = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onDone();
+    }
+  };
+
   return (
-    <div role="group" aria-label={NAMES[field]} className="flex min-w-0 flex-col gap-2">
+    <>
       <span className="tag flex items-center gap-1.5 text-ink-dim">
         <Icon field={field} />
         {NAMES[field]}
       </span>
-      <div className="flex flex-wrap items-center gap-1">
+      <span className="flex flex-wrap gap-1">
         {choices.map(({ name, on, pick }) => (
           <button key={name} type="button" aria-pressed={on} onClick={pick} className={`${pill(on)} px-3!`}>
             {name}
           </button>
         ))}
-        {typedKey && showOther && (
-          <input
-            aria-label={`${NAMES[field]} in your words`}
-            autoFocus={!custom}
-            value={value}
-            onChange={(event) => onChange({ [typedKey]: event.target.value })}
-            maxLength={DETAIL_LIMITS[typedKey]}
-            placeholder={TYPED[field]?.placeholder.replace("Or in your words: ", "e.g. ")}
-            className={small}
-          />
-        )}
-        {field === "format" && details.format === "in_person" && (
-          <input
-            aria-label="Where"
-            value={details.place ?? ""}
-            onChange={(event) => onChange({ place: event.target.value })}
-            maxLength={DETAIL_LIMITS.place}
-            placeholder="Where, e.g. our studio"
-            className={small}
-          />
-        )}
-        {field === "fee" && paid && (
-          <input
-            aria-label="How much"
-            value={details.fee?.trim() === PAID ? "" : (details.fee ?? "")}
-            onChange={(event) =>
-              onChange({ fee: event.target.value.trim() ? event.target.value : PAID, unpaid: false })
-            }
-            maxLength={DETAIL_LIMITS.fee}
-            placeholder="How much, e.g. $300"
-            className={small}
-          />
-        )}
-      </div>
-    </div>
+      </span>
+      {typedKey && showOther && (
+        <input
+          aria-label={`${NAMES[field]} in your words`}
+          autoFocus
+          value={value}
+          onChange={(event) => onChange({ [typedKey]: event.target.value })}
+          onKeyDown={done}
+          maxLength={DETAIL_LIMITS[typedKey]}
+          placeholder={TYPED[field]?.placeholder.replace("Or in your words: ", "e.g. ")}
+          className={small}
+        />
+      )}
+      {field === "format" && details.format === "in_person" && (
+        <input
+          aria-label="Where"
+          autoFocus
+          value={details.place ?? ""}
+          onChange={(event) => onChange({ place: event.target.value })}
+          onKeyDown={done}
+          maxLength={DETAIL_LIMITS.place}
+          placeholder="Where, e.g. our studio"
+          className={small}
+        />
+      )}
+      {field === "fee" && paid && (
+        <input
+          aria-label="How much"
+          autoFocus
+          value={details.fee?.trim() === PAID ? "" : (details.fee ?? "")}
+          onChange={(event) => onChange({ fee: event.target.value.trim() ? event.target.value : PAID, unpaid: false })}
+          onKeyDown={done}
+          maxLength={DETAIL_LIMITS.fee}
+          placeholder="How much, e.g. $300"
+          className={small}
+        />
+      )}
+    </>
   );
 }
