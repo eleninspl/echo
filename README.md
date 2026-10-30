@@ -6,13 +6,13 @@ Ask an AI assistant who to invite on a podcast, or what to talk about, and it su
 
 Stop echoing in the same room. Find the guest, and the story, that carries your voice somewhere new.
 
-> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026), by Eleni and Leonidas.
+> Entry to the [Qloo Agentic Hackathon](https://qloo.devpost.com/) (2026), by [Eleni Nasopoulou](https://github.com/eleninspl) and [Leonidas Anagnou](https://github.com/anagnole).
 
 ## Try it
 
 **[echo-web-mu-taupe.vercel.app](https://echo-web-mu-taupe.vercel.app)**
 
-1. Type a podcast's name and pick it, or open one of the featured shows.
+1. Type a podcast's name and pick it.
 2. In under a minute Echo ranks 20 guests by fit, love back and reach, and puts the sweet spots first, each with the tastes both audiences share and an episode idea. While it runs you see what your listeners love, then the first guests, and can start picking.
 3. Open a guest for the full episode and how their fans compare with yours. Ask Echo for "less famous guests", "younger listeners", "an episode about road trips" or "make this idea funnier". Leave out anyone you've already had on.
 4. Pick guests and write the invitations, with your dates, format, length, fee and a note for each. Echo sends nothing: open each draft in your own email.
@@ -119,6 +119,8 @@ openclaw/ an Echo agent for OpenClaw, with the echo skill
 scripts/  repo helpers and TypeScript probes of the Qloo API
 src/      TypeScript Qloo client used by the probes
 ```
+
+This repo is published from the team's private working repo by `scripts/publish.sh`, with the full history less a file of Qloo results and a deleted video. Pull request numbers in commit messages refer to the working repo.
 
 ## License
 
