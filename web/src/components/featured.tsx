@@ -44,32 +44,6 @@ export function FeaturedList({ featured }: { featured: Featured[] }) {
   );
 }
 
-// The landing page's row of shows Echo has run, under the search. Hidden when there's nothing to open.
-export function FeaturedShows() {
-  const featured = useFeatured();
-  if (!featured?.length) return null;
-  return (
-    <section aria-labelledby="featured" className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <h2 id="featured" className="tag text-ink-dim">
-        Or open a show Echo has run
-      </h2>
-      <ul className="flex flex-wrap gap-2">
-        {featured.map(({ show, analysis_id }) => (
-          <li key={analysis_id}>
-            <Link
-              href={`/analyses/${encodeURIComponent(analysis_id)}`}
-              className="flex items-center gap-2 rounded-xl bg-deck py-1 pr-3 pl-1 shadow-[inset_0_0_0_1px_var(--steel)] transition-colors hover:bg-deck-hi"
-            >
-              <ShowCover show={show} size={28} />
-              <span className="font-display font-semibold">{show.title}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 // For errors that send the host to the featured shows.
 export function FeaturedFallback() {
   const featured = useFeatured();
