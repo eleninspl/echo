@@ -242,6 +242,8 @@ On Vercel the engine won't start without `QLOO_API_KEY`, `DATABASE_URL` and the 
 
 **Running against production locally.** The repo root has a git-ignored `.env.production` (mode 600, single-quoted values) with the production `DATABASE_URL`, `QLOO_API_KEY` and Upstash variables, copied from the Neon and Upstash consoles. From `engine/`, `set -a; source ../.env.production; set +a` loads them into the shell, where they override `.env`. Then `scripts/warm.py` writes the featured shows to production, and the Redis tests run on the real Upstash with `TEST_UPSTASH_REDIS_REST_URL` and `TEST_UPSTASH_REDIS_REST_TOKEN` set from them. Never point `TEST_DATABASE_URL` at either Neon branch: those tests drop their tables.
 
+**Publishing the source** (30 Oct). The public repo is https://github.com/eleninspl/echo. This one, `echo-qloo`, stays private: it's where we work and what Vercel deploys from. GitHub keeps every PR's commits, and PRs #13 to #57 hold `engine/reach.json` (real Qloo IDs, deleted on 27 Oct), which no force-push can remove. `scripts/publish.sh` clones `main` from here, removes that file and `brag-output/` from the whole history, maps both authors' emails to their GitHub noreply addresses, checks that `main`'s tree came through unchanged and pushes it. The rewrite gives the same commits every time, so after each merge to `main` it's a plain fast-forward. Run it after the last merge before judging. If a file ever has to come out of the history, add it to `removed` in the script and push with `--force` once by hand.
+
 **Checking a deploy.** `/health` answers `"mock": false` with today's Qloo calls and the monthly quota from Upstash. `vercel logs --environment production --since 30m --json` from `engine/` shows the function log.
 
 ## API
